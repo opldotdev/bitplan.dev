@@ -161,6 +161,33 @@ function versionTransfer(coin: BitplanCoin, envelope: Uint8Array) {
 }
 
 /**
+ * `sendOrdinals` still stamps 1sat permission-module labels on the transfer.
+ * BSV Desktop is a plain BRC-100 wallet and rejects those
+ * (`Unsupported P-label scheme: p 1sat`). The native local pipeline does not
+ * need them; drop them before createAction.
+ */
+function walletWithoutPLabels(wallet: WalletInterface): WalletInterface {
+	const createAction = wallet.createAction.bind(wallet)
+	return new Proxy(wallet, {
+		get(target, prop, receiver) {
+			if (prop === 'createAction') {
+				return (args: Parameters<WalletInterface['createAction']>[0]) => {
+					const labels = args.labels?.filter(
+						(label) => !label.startsWith('p '),
+					)
+					return createAction({
+						...args,
+						labels: labels?.length ? labels : undefined,
+					})
+				}
+			}
+			const value = Reflect.get(target, prop, receiver)
+			return typeof value === 'function' ? value.bind(target) : value
+		},
+	})
+}
+
+/**
  * Build the reinscription transfer: same envelope, content type, and MAP the
  * later publish spends onto the coin.
  */
@@ -174,15 +201,26 @@ export async function buildVersionTransfer(
 	})
 }
 
-/** Later publishes: spend the draft's coin back to self with a new envelope. */
+/**
+ * Later publishes: spend the draft's coin back to self with a new envelope.
+ *
+ * This is the SDK reinscribe-transfer: `sendOrdinals` with
+ * `TransferItem.inscription`. The coin (and origin) carry forward; the new
+ * envelope is the next version. Permission-module routing stays off so a
+ * plain BRC-100 wallet (BSV Desktop) can sign it.
+ */
 export async function publishVersion(
 	wallet: WalletInterface,
 	coin: BitplanCoin,
 	envelope: Uint8Array,
 ): Promise<PublishResult> {
-	const result = await sendOrdinals.execute(walletContext(wallet), {
-		transfers: [versionTransfer(coin, envelope)],
-	})
+	const result = await sendOrdinals.execute(
+		walletContext(walletWithoutPLabels(wallet)),
+		{
+			transfers: [versionTransfer(coin, envelope)],
+			usePermissionModule: false,
+		},
+	)
 
 	if (result.error) {
 		throw new CliError(

@@ -7,7 +7,11 @@ import {
 } from '@bsv/sdk'
 import { CONTENT_TYPE, MAP_METADATA, TYPE_TAG } from '../src/constants.js'
 import { MAGIC } from '../src/envelope.js'
-import { type BitplanCoin, buildVersionTransfer } from '../src/ordinals.js'
+import {
+	type BitplanCoin,
+	buildVersionTransfer,
+	publishVersion,
+} from '../src/ordinals.js'
 
 const SOURCE_TXID = 'a'.repeat(64)
 const SOURCE_OUTPOINT = `${SOURCE_TXID}.0`
@@ -101,8 +105,41 @@ describe('buildVersionTransfer', () => {
 
 		const tags = result.outputs?.[0]?.tags ?? []
 		expect(tags).toContain(TYPE_TAG)
-		expect(tags.some((tag) => tag === `origin:${ORIGIN}` || tag === 'origin')).toBe(
-			true,
-		)
+		expect(
+			tags.some((tag) => tag === `origin:${ORIGIN}` || tag === 'origin'),
+		).toBe(true)
+	})
+})
+
+describe('publishVersion', () => {
+	test('reinscribes through sendOrdinals and drops p-labels on createAction', async () => {
+		const { coin, output } = makeCoin()
+		const txid = 'b'.repeat(64)
+		let createActionCalls = 0
+		let seenLabels: string[] | undefined
+		const wallet = {
+			listOutputs: async () => ({
+				outputs: [output],
+				BEEF: FAKE_BEEF,
+				totalOutputs: 1,
+			}),
+			getPublicKey: async () => ({ publicKey: SELF_PUB }),
+			createAction: async (args: { labels?: string[] }) => {
+				createActionCalls += 1
+				seenLabels = args.labels
+				return { txid }
+			},
+			signAction: async () => ({ txid }),
+		} as WalletInterface
+
+		const result = await publishVersion(wallet, coin, ENVELOPE)
+		expect(result.txid).toBe(txid)
+		expect(result.origin).toBe(ORIGIN)
+		expect(result.outpoint).toBe(`${txid}_0`)
+		expect(createActionCalls).toBe(1)
+		expect(
+			seenLabels === undefined ||
+				seenLabels.every((label) => !label.startsWith('p ')),
+		).toBe(true)
 	})
 })
