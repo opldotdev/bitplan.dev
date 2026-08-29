@@ -109,16 +109,16 @@ export const SECRET_PATTERNS: readonly SecretPattern[] = [
 		id: 'generic-hex-secret',
 		description: 'Long hex value assigned to a key/token/secret name',
 		regex:
-			/\b(?:api[_-]?key|secret|token|password|passwd)\b\s*[=:]\s*["']?([0-9a-f]{32,128})\b/gi,
+			/\b(?:api[_-]?key|secret|token|password|passwd)\b\s*[=:]\s*["']?([0-9a-f]{32,})\b/gi,
 	},
 	{
 		id: 'generic-base64-secret',
 		description: 'Long base64 value assigned to a key/token/secret name',
-		// The lookahead skips values that are pure lowercase hex — those are
+		// The lookahead skips values that are pure hex — those are
 		// already reported by `generic-hex-secret`, and one finding per secret
 		// means one waiver per secret.
 		regex:
-			/\b(?:api[_-]?key|secret|token|password|passwd)\b\s*[=:]\s*["']?(?![0-9a-f]{32,128}(?:["'\s,;]|$))([A-Za-z0-9+/]{32,}={0,2})(?=["'\s,;]|$)/gi,
+			/\b(?:api[_-]?key|secret|token|password|passwd)\b\s*[=:]\s*["']?(?![0-9a-f]{32,}(?:["'\s,;]|$))([A-Za-z0-9+/]{32,}={0,2})(?=["'\s,;]|$)/gi,
 	},
 	{
 		id: 'home-path-macos',

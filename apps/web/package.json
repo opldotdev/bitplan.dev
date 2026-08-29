@@ -2,18 +2,28 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://bitplan.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/opldotdev/bitplan.dev.git",
+    "directory": "apps/web"
+  },
+  "license": "MIT",
   "scripts": {
     "build": "next build --turbopack",
     "check": "ultracite check",
     "dev": "next dev --turbopack",
     "fix": "ultracite fix",
-    "start": "next start"
+    "start": "next start",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@1sat/actions": "0.0.200",
+    "@1sat/client": "0.0.50",
     "@bsv/sdk": "^2.4.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^1.35.0",
+    "lucide-react": "1.37.0",
     "next": "16.3.3",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.6.7",
@@ -25,13 +35,13 @@
     "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.9",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "tailwindcss": "^4",
-    "typescript": "^5",
+    "@biomejs/biome": "2.5.11",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "tailwindcss": "^4.3.3",
+    "typescript": "7.0.2",
     "ultracite": "7.10.7"
   },
   "packageManager": "bun@1.3.14",

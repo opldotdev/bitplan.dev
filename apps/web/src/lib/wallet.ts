@@ -34,6 +34,10 @@ export function getConnectedWallet(): DraftsWallet | null {
   return cached;
 }
 
+export function getConnectedWalletClient(): WalletInterface | null {
+  return cachedClient;
+}
+
 export function isWalletConnected(): boolean {
   return cached !== null;
 }
@@ -119,6 +123,15 @@ export async function connectBrowserWallet(): Promise<DraftsWallet> {
     connectInFlight = null;
   });
   return connectInFlight;
+}
+
+/** Full BRC-100 client for explicit wallet actions such as sponsor purchases. */
+export async function connectBrowserWalletClient(): Promise<WalletInterface> {
+  await connectBrowserWallet();
+  if (!cachedClient) {
+    throw new Error("Wallet connection was not established.");
+  }
+  return cachedClient;
 }
 
 /** Clears the tab-local cache. Tests only. */

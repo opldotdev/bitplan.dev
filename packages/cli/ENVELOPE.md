@@ -30,7 +30,7 @@ All multi-byte integers are little-endian.
 
 The version byte is `0x01` for a private envelope and `0x02` for a shared
 envelope. Readers reject unknown versions, bad magic, invalid headers, buffer
-overruns, and empty ciphertext.
+overruns, headers larger than 64 KiB, and empty ciphertext.
 
 ## Version 1: wallet only
 

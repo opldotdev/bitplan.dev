@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.0.8
+
+### Changed
+
+- Added repository, issue-tracker, license, changelog, and third-party notice
+  metadata to the npm package.
+- `npm pack` now builds the CLI first, so a clean checkout cannot produce a
+  tarball with a missing executable bundle.
+- Updated the supported runtime to Node.js 22.12 or newer and refreshed all
+  direct dependencies to their latest releases.
+
+### Fixed
+
+- Secret-looking hex values longer than 128 characters remain one
+  `generic-hex-secret` finding instead of being mislabeled as base64.
+
 ## 0.0.7
 
 ### Added

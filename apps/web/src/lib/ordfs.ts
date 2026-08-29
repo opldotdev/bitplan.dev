@@ -1,17 +1,34 @@
 import { parseEnvelope } from "@/lib/envelope";
 import { toOrdinalOutpoint } from "@/lib/outpoint";
 
+const TRAILING_SLASHES = /\/+$/;
+
 /**
- * Same-origin content proxy. next.config.ts rewrites `/ordfs/:path*` to
- * `https://api.1sat.app/:path*` so the browser can read `x-outpoint`,
- * `x-origin`, and `x-ord-seq`.
+ * Same-origin content proxy. A narrow Route Handler accepts only GET/HEAD for
+ * validated BitPlan content pointers, then returns inert envelope bytes.
  */
 export const ORDFS_PROXY = "/ordfs";
 
 /** Absolute gateway for server-side reads (OG images, metadata). */
-export const ORDFS_GATEWAY = "https://api.1sat.app";
+export const ORDFS_GATEWAY = configuredOrdfsGateway();
 
 export const BITPLAN_CONTENT_TYPE = "application/x-bitplan";
+
+function configuredOrdfsGateway(): string {
+  const configured = process.env.NEXT_PUBLIC_ORDFS_GATEWAY_URL?.trim();
+  if (!configured) {
+    return "https://api.1sat.app";
+  }
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      return "https://api.1sat.app";
+    }
+    return url.toString().replace(TRAILING_SLASHES, "");
+  } catch {
+    return "https://api.1sat.app";
+  }
+}
 
 export interface OrdfsContent {
   bytes: Uint8Array;

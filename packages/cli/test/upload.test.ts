@@ -60,9 +60,10 @@ if (!CHILD_RUN) {
 		outpoint: VERSION_OUTPOINT,
 		output: {},
 	} as BitplanCoin
+	const genesisBeef = Uint8Array.of(4, 5, 6)
 	const genesisResult: PublishResult = {
 		txid: 'c'.repeat(64),
-		beef: Uint8Array.of(4, 5, 6),
+		beef: genesisBeef,
 		origin: GENESIS_OUTPOINT,
 		outpoint: GENESIS_OUTPOINT,
 	}
@@ -448,7 +449,7 @@ if (!CHILD_RUN) {
 			await uploadCommand(htmlFile, { new: true, relay: true, yes: true })
 
 			expect(calls.relays).toEqual([
-				{ beef: genesisResult.beef, txid: genesisResult.txid },
+				{ beef: genesisBeef, txid: genesisResult.txid },
 			])
 			expect(console.log).toHaveBeenCalledWith(
 				'Relay:    1Sat accepted (SEEN_ON_NETWORK)',

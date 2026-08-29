@@ -1,8 +1,26 @@
 import type { NextConfig } from "next";
 
+const securityHeaders = [
+  {
+    key: "Content-Security-Policy",
+    value: "base-uri 'self'; frame-ancestors 'none'; object-src 'none'",
+  },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), geolocation=(), microphone=(), payment=()",
+  },
+  { key: "Referrer-Policy", value: "no-referrer" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+] as const;
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
+      {
+        headers: [...securityHeaders],
+        source: "/:path*",
+      },
       {
         headers: [
           {
@@ -14,14 +32,16 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  async rewrites() {
-    return [
+  images: {
+    remotePatterns: [
       {
-        destination: "https://api.1sat.app/:path*",
-        source: "/ordfs/:path*",
+        hostname: "api.1sat.app",
+        pathname: "/1sat/ordfs/image/**",
+        protocol: "https",
       },
-    ];
+    ],
   },
+  poweredByHeader: false,
 };
 
 export default nextConfig;

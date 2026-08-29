@@ -9,11 +9,9 @@
  * wrapped-key slot per authorized identity and one SDK-encrypted payload.
  */
 
-import { SymmetricKey } from "@bsv/sdk";
+import { SymmetricKey, type WalletInterface } from "@bsv/sdk";
 
 import { normalizeIdentityKey } from "@/lib/sharing";
-
-// TODO: extract shared @bitplan/envelope package (tracked in TODO.md)
 
 /** ASCII 'BPLN'. */
 export const MAGIC = Uint8Array.from([0x42, 0x50, 0x4c, 0x4e]);
@@ -108,15 +106,7 @@ export interface ParsedEnvelope {
  * Minimal wallet surface used to decrypt the body.
  * Satisfied by `@bsv/sdk` WalletClient and by the in-test XOR mock.
  */
-export interface EnvelopeWallet {
-  decrypt: (args: {
-    ciphertext: number[];
-    counterparty: string;
-    keyID: string;
-    protocolID: [number, string];
-  }) => Promise<{ plaintext: number[] }>;
-  getPublicKey: (args: { identityKey: true }) => Promise<{ publicKey: string }>;
-}
+export type EnvelopeWallet = Pick<WalletInterface, "decrypt" | "getPublicKey">;
 
 export function sharedWith(header: EnvelopeHeader): string[] {
   if (header.v === 1) {

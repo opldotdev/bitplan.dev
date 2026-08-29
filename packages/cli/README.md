@@ -130,6 +130,9 @@ bitplan fetch <origin|url>
 bitplan version
 ```
 
+In a non-interactive shell, `upload` requires `--yes`; otherwise it stops before
+encryption or publishing rather than assuming consent.
+
 ## How it works
 
 - **Encryption.** Private drafts use one BRC-2 `wallet.encrypt` call with
@@ -180,4 +183,5 @@ origins are on chain, and each draft's keyID is in its envelope header.
 
 ## License
 
-MIT.
+[MIT](./LICENSE). Bundled dependency notices are in
+[THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).

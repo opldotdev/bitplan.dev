@@ -145,10 +145,12 @@ describe('secret scanner — findings', () => {
 	})
 
 	test('a pure-hex secret produces one finding, not two', () => {
-		const findings = scanForSecrets([
-			{ source: 'x', text: 'api_key = "0123456789abcdef0123456789abcdef"' },
-		])
-		expect(findings.map((f) => f.pattern)).toEqual(['generic-hex-secret'])
+		for (const value of ['a'.repeat(128), 'A'.repeat(129), 'ab'.repeat(100)]) {
+			const findings = scanForSecrets([
+				{ source: 'x', text: `api_key = "${value}"` },
+			])
+			expect(findings.map((f) => f.pattern)).toEqual(['generic-hex-secret'])
+		}
 	})
 })
 

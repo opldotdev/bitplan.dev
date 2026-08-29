@@ -1,34 +1,54 @@
 {
 	"name": "bitplan",
-	"version": "0.0.7",
+	"version": "0.0.8",
 	"description": "Publish plan documents to Bitcoin as 1Sat Ordinals. Encrypted by default.",
 	"license": "MIT",
+	"homepage": "https://bitplan.dev",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/opldotdev/bitplan.dev.git",
+		"directory": "packages/cli"
+	},
+	"bugs": {
+		"url": "https://github.com/opldotdev/bitplan.dev/issues"
+	},
+	"keywords": [
+		"bitcoin",
+		"brc-100",
+		"bsv",
+		"encryption",
+		"ordinals"
+	],
 	"type": "module",
 	"bin": {
 		"bitplan": "./bin/bitplan.mjs"
 	},
-	"types": "./dist/types/index.d.ts",
 	"files": [
 		"bin/",
-		"dist/",
+		"dist/bitplan.js",
+		"CHANGELOG.md",
 		"ENVELOPE.md",
-		"README.md"
+		"LICENSE",
+		"README.md",
+		"THIRD_PARTY_NOTICES.md"
 	],
 	"engines": {
-		"node": ">=20"
+		"node": ">=22.12"
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.json && bun build src/cli.ts --target=node --format=esm --outfile=dist/bitplan.js && chmod +x dist/bitplan.js bin/bitplan.mjs",
-		"clean": "rm -rf dist"
+		"clean": "rm -rf dist",
+		"prepack": "bun run build",
+		"typecheck": "tsc -p tsconfig.test.json"
 	},
 	"dependencies": {
 		"@1sat/actions": "0.0.200",
-		"@bsv/sdk": "^2.1.9",
-		"commander": "^14.0.0",
-		"parse5": "^7.3.0"
+		"@bsv/sdk": "^2.4.2",
+		"commander": "^15.0.0",
+		"parse5": "^8.0.1"
 	},
 	"devDependencies": {
-		"@types/node": "^22.10.0",
-		"typescript": "^5.9.3"
+		"@types/node": "^26.4.0",
+		"typescript": "^7.0.2"
 	}
 }

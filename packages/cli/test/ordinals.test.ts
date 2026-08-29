@@ -77,7 +77,7 @@ function makeWallet(output: WalletOutput): WalletInterface {
 			totalOutputs: 1,
 		}),
 		getPublicKey: async () => ({ publicKey: SELF_PUB }),
-	} as WalletInterface
+	} as unknown as WalletInterface
 }
 
 describe('buildVersionTransfer', () => {
@@ -130,7 +130,7 @@ describe('publishVersion', () => {
 				return { txid }
 			},
 			signAction: async () => ({ txid }),
-		} as WalletInterface
+		} as unknown as WalletInterface
 
 		const result = await publishVersion(wallet, coin, ENVELOPE)
 		expect(result.txid).toBe(txid)

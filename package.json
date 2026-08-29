@@ -1,6 +1,17 @@
 {
 	"name": "bitplan-dev",
+	"description": "Encrypted, versioned HTML plans published through a BRC-100 wallet.",
 	"private": true,
+	"license": "MIT",
+	"packageManager": "bun@1.3.14",
+	"homepage": "https://bitplan.dev",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/opldotdev/bitplan.dev.git"
+	},
+	"bugs": {
+		"url": "https://github.com/opldotdev/bitplan.dev/issues"
+	},
 	"workspaces": [
 		"packages/*",
 		"apps/*"
@@ -12,11 +23,13 @@
 		"lint:fix:root": "biome check --write .",
 		"lint:root": "biome check .",
 		"lint:web": "bun run --cwd apps/web check",
+		"sponsor:setup": "bun packages/cli/scripts/setupSponsorSlot.ts",
+		"typecheck": "bun run --filter '*' typecheck",
 		"test": "bun test"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.3.8",
-		"@types/bun": "^1.3.10",
-		"typescript": "^5.9.3"
+		"@biomejs/biome": "2.5.11",
+		"@types/bun": "^1.4.0",
+		"typescript": "^7.0.2"
 	}
 }

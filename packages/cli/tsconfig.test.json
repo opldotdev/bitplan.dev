@@ -1,0 +1,14 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"lib": ["ES2022", "DOM"],
+		"noEmit": true,
+		"paths": {
+			"@/*": ["../../apps/web/src/*"]
+		},
+		"rootDir": "../..",
+		"types": ["node", "bun"]
+	},
+	"include": ["scripts/**/*.ts", "src/**/*.ts", "test/**/*.ts"],
+	"exclude": ["node_modules", "dist", "../../apps/web/.next"]
+}

@@ -38,7 +38,9 @@ mock.module("@bsv/sdk", () => ({
 
 const {
   connectBrowserWallet,
+  connectBrowserWalletClient,
   getConnectedWallet,
+  getConnectedWalletClient,
   isWalletConnected,
   reconnectAuthenticatedWallet,
   resetWalletConnection,
@@ -116,5 +118,11 @@ describe("connectBrowserWallet", () => {
     waitForAuthenticationCalls = 0;
     await connectBrowserWallet();
     expect(waitForAuthenticationCalls).toBe(0);
+  });
+
+  test("exposes the full BRC-100 client for explicit wallet actions", async () => {
+    const client = await connectBrowserWalletClient();
+    expect(client).toBe(getConnectedWalletClient());
+    expect(getConnectedWallet()).not.toBe(client);
   });
 });

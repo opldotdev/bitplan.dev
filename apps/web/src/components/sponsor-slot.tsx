@@ -1,27 +1,67 @@
+import Image from "next/image";
+
+import { SponsorDialog } from "@/components/sponsor-dialog";
 import { Button } from "@/components/ui/button";
+import type { SponsorSlotState, SponsorTier } from "@/lib/sponsors";
+import { sponsorImageUrl } from "@/lib/sponsors";
 import { cn } from "@/lib/utils";
 
 export function SponsorSlot({
-  slotClassName,
+  slot,
   slotId,
-  tierName,
+  tier,
 }: {
-  slotClassName: string;
+  slot?: SponsorSlotState;
   slotId: string;
-  tierName: string;
+  tier: SponsorTier;
 }) {
+  if (slot?.sponsor) {
+    return (
+      <Button
+        asChild
+        className={cn("h-auto w-full overflow-hidden p-0", tier.slotClassName)}
+        variant="outline"
+      >
+        <a
+          aria-label={`${slot.sponsor.name}, ${tier.name} sponsor`}
+          href={slot.sponsor.url}
+          rel="sponsored noopener noreferrer"
+          target="_blank"
+        >
+          <Image
+            alt={`${slot.sponsor.name} logo`}
+            className="size-full object-cover"
+            height={tier.imageHeight}
+            src={sponsorImageUrl(slot.sponsor.imageOutpoint, tier)}
+            unoptimized
+            width={tier.imageWidth}
+          />
+        </a>
+      </Button>
+    );
+  }
+
+  if (slot && (slot.status === "available" || slot.status === "reserved")) {
+    return (
+      <div className={cn("w-full", tier.slotClassName)}>
+        <SponsorDialog slot={slot} tier={tier} />
+      </div>
+    );
+  }
+
   return (
     <Button
-      aria-label={`${tierName} sponsor slot ${slotId}; sponsorships are not yet available`}
+      aria-label={`${tier.name} sponsor slot ${slotId}; sponsorship is unavailable`}
       className={cn(
         "h-auto w-full border-dashed px-2 text-muted-foreground uppercase",
-        slotClassName
+        tier.slotClassName
       )}
       disabled
+      title={slot?.error}
       type="button"
       variant="outline"
     >
-      Coming soon
+      Unavailable
     </Button>
   );
 }

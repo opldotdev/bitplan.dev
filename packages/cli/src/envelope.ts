@@ -91,6 +91,11 @@ export interface ParsedEnvelope {
 	ciphertext: Uint8Array
 }
 
+type EnvelopeWallet = Pick<
+	WalletInterface,
+	'decrypt' | 'encrypt' | 'getPublicKey'
+>
+
 /** Mint a fresh keyID for a draft. Reused for every version of that draft. */
 export function newKeyId(): string {
 	return webcrypto.randomUUID()
@@ -138,7 +143,7 @@ export function fromBase64(value: string): Uint8Array {
  * wallet to decrypt without local state.
  */
 export async function sealEnvelope(
-	wallet: WalletInterface,
+	wallet: EnvelopeWallet,
 	plaintext: DraftPlaintext,
 	keyID: string,
 	recipientIdentityKeys: readonly string[] = [],
@@ -190,7 +195,7 @@ export async function sealEnvelope(
 }
 
 async function sealSharedEnvelope(
-	wallet: WalletInterface,
+	wallet: EnvelopeWallet,
 	body: Uint8Array,
 	keyID: string,
 	recipientIdentityKeys: readonly string[],
@@ -558,7 +563,7 @@ function assertPlaintext(value: unknown): DraftPlaintext {
  * is validated as BitPlan's exact BRC-43 protocol before any wallet call.
  */
 export async function openEnvelope(
-	wallet: WalletInterface,
+	wallet: EnvelopeWallet,
 	bytes: Uint8Array,
 ): Promise<{ header: EnvelopeHeader; plaintext: DraftPlaintext }> {
 	const { header, ciphertext: body } = parseEnvelope(bytes)
