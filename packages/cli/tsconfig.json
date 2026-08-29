@@ -1,0 +1,34 @@
+{
+	// moduleResolution is "Bundler", not "NodeNext", on purpose: @1sat/actions
+	// ships .d.ts files whose relative re-exports have no file extension, which
+	// NodeNext rejects for an ESM package — every `export * from './ordinals'`
+	// then resolves to nothing and the whole ordinals/inscriptions surface
+	// disappears from the package's public types.
+	//
+	// The same package's *runtime* files have the same problem, and Node's ESM
+	// loader cannot resolve them either, so the published bin is produced by
+	// bundling (see the build script) rather than by shipping tsc's output.
+	// tsc's job here is the typecheck and the declarations.
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"lib": ["ES2022"],
+		"types": ["node"],
+		"outDir": "./dist/types",
+		"rootDir": "./src",
+		"declaration": true,
+		"declarationMap": true,
+		"emitDeclarationOnly": true,
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		"noFallthroughCasesInSwitch": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true,
+		"verbatimModuleSyntax": true
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": ["node_modules", "dist"]
+}

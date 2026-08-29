@@ -1,0 +1,156 @@
+import { describe, expect, test } from 'bun:test'
+import type { Command } from 'commander'
+import { estimateFeeSats, viewerUrl } from '../src/commands/upload.js'
+import { buildProgram } from '../src/index.js'
+import { originFromReference } from '../src/ordfs.js'
+import {
+	isOutpoint,
+	toOrdinalOutpoint,
+	toWalletOutpoint,
+} from '../src/outpoint.js'
+import { CLI_VERSION } from '../src/version.js'
+
+const ORIGIN = `${'a'.repeat(64)}_0`
+
+function commandNamed(program: Command, name: string): Command {
+	const found = program.commands.find((c) => c.name() === name)
+	if (!found) throw new Error(`no ${name} command`)
+	return found
+}
+
+function flagsOf(command: Command): string[] {
+	return command.options.map((o) => o.long ?? o.short ?? '')
+}
+
+/** A program that throws on parse errors instead of exiting, output silenced. */
+function overridden(): Command {
+	const program = buildProgram()
+	const silence = { writeErr: () => {}, writeOut: () => {} }
+	program.exitOverride().configureOutput(silence)
+	for (const command of program.commands) {
+		command.exitOverride().configureOutput(silence)
+	}
+	return program
+}
+
+describe('cli surface', () => {
+	const program = buildProgram()
+
+	test('is named bitplan and reports the package version', () => {
+		expect(program.name()).toBe('bitplan')
+		expect(program.version()).toBe(CLI_VERSION)
+		expect(CLI_VERSION).toMatch(/^\d+\.\d+\.\d+/)
+	})
+
+	test('exposes exactly the four v1 commands', () => {
+		expect(program.commands.map((c) => c.name()).sort()).toEqual([
+			'fetch',
+			'list',
+			'upload',
+			'whoami',
+		])
+	})
+
+	test('upload takes a file and the documented flags', () => {
+		const upload = commandNamed(program, 'upload')
+		expect(upload.registeredArguments.map((a) => a.name())).toEqual(['file'])
+		expect(flagsOf(upload)).toEqual(
+			expect.arrayContaining([
+				'--draft',
+				'--new',
+				'--description',
+				'--yes',
+				'--allow-finding',
+				'--wallet-url',
+			]),
+		)
+	})
+
+	test('fetch takes a reference and a --meta flag', () => {
+		const fetch = commandNamed(program, 'fetch')
+		expect(fetch.registeredArguments.map((a) => a.name())).toEqual([
+			'origin|url',
+		])
+		expect(flagsOf(fetch)).toEqual(expect.arrayContaining(['--meta']))
+	})
+
+	test('--allow-finding is repeatable', () => {
+		const upload = commandNamed(buildProgram(), 'upload')
+		let captured: string[] | undefined
+		upload.action((_file: string, options: { allowFinding?: string[] }) => {
+			captured = options.allowFinding
+		})
+		upload.exitOverride()
+		upload.parse(
+			['plan.html', '--allow-finding', 'a-1', '--allow-finding', 'b-2'],
+			{ from: 'user' },
+		)
+		expect(captured).toEqual(['a-1', 'b-2'])
+	})
+
+	test('an unknown command is an error, not a silent no-op', () => {
+		const p = overridden()
+		expect(() => p.parse(['nope'], { from: 'user' })).toThrow()
+	})
+
+	test('an unknown flag on a subcommand is an error', () => {
+		// Regression guard: exitOverride is not inherited by subcommands, so
+		// without the loop in main() this would call process.exit() instead.
+		const p = overridden()
+		expect(() => p.parse(['list', '--not-a-flag'], { from: 'user' })).toThrow()
+	})
+})
+
+describe('viewer urls and fees', () => {
+	test('the viewer url url-encodes the outpoint', () => {
+		expect(viewerUrl(ORIGIN)).toBe(`https://bitplan.dev/d/${ORIGIN}`)
+		expect(viewerUrl('a b')).toBe('https://bitplan.dev/d/a%20b')
+	})
+
+	test('the fee estimate is 1 sat per KB, rounded up', () => {
+		expect(estimateFeeSats(1)).toBe(1)
+		expect(estimateFeeSats(1000)).toBe(1)
+		expect(estimateFeeSats(1001)).toBe(2)
+		expect(estimateFeeSats(45_000)).toBe(45)
+	})
+})
+
+describe('outpoint spellings', () => {
+	test('converts between wallet and ordinal forms', () => {
+		expect(toOrdinalOutpoint(`${'a'.repeat(64)}.3`)).toBe(`${'a'.repeat(64)}_3`)
+		expect(toWalletOutpoint(`${'a'.repeat(64)}_3`)).toBe(`${'a'.repeat(64)}.3`)
+		expect(toOrdinalOutpoint(`${'a'.repeat(64)}_3`)).toBe(`${'a'.repeat(64)}_3`)
+	})
+
+	test('rejects things that are not outpoints', () => {
+		expect(isOutpoint('nope')).toBe(false)
+		expect(isOutpoint('a'.repeat(64))).toBe(false)
+		expect(isOutpoint(`${'z'.repeat(64)}_0`)).toBe(false)
+		expect(isOutpoint(`${'a'.repeat(64)}_x`)).toBe(false)
+		expect(isOutpoint(`${'a'.repeat(64)}_0`)).toBe(true)
+	})
+})
+
+describe('draft references', () => {
+	test('accepts a bare outpoint in either spelling', () => {
+		expect(originFromReference(ORIGIN)).toBe(ORIGIN)
+		expect(originFromReference(`${'a'.repeat(64)}.0`)).toBe(ORIGIN)
+	})
+
+	test('accepts a viewer url', () => {
+		expect(originFromReference(`https://bitplan.dev/d/${ORIGIN}`)).toBe(ORIGIN)
+		expect(
+			originFromReference(
+				`https://bitplan.dev/d/${encodeURIComponent(ORIGIN)}`,
+			),
+		).toBe(ORIGIN)
+	})
+
+	test('rejects anything else', () => {
+		expect(() => originFromReference('')).toThrow(/No draft reference/)
+		expect(() => originFromReference('hello')).toThrow(/Not an outpoint/)
+		expect(() => originFromReference('https://bitplan.dev/d/hello')).toThrow(
+			/Not an outpoint/,
+		)
+	})
+})

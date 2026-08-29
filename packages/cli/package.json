@@ -1,0 +1,33 @@
+{
+	"name": "bitplan",
+	"version": "0.0.1",
+	"description": "Publish plan documents to Bitcoin as 1Sat Ordinals. Encrypted by default.",
+	"license": "MIT",
+	"type": "module",
+	"bin": {
+		"bitplan": "./dist/bitplan.js"
+	},
+	"types": "./dist/types/index.d.ts",
+	"files": [
+		"dist/",
+		"ENVELOPE.md",
+		"README.md"
+	],
+	"engines": {
+		"node": ">=20"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json && bun build src/index.ts --target=node --format=esm --outfile=dist/bitplan.js && chmod +x dist/bitplan.js",
+		"clean": "rm -rf dist"
+	},
+	"dependencies": {
+		"@1sat/actions": "0.0.200",
+		"@bsv/sdk": "^2.1.9",
+		"commander": "^14.0.0",
+		"parse5": "^7.3.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.10.0",
+		"typescript": "^5.9.3"
+	}
+}
