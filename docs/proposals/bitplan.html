@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en" data-vp-url="https://k57tkc9tukz5.postplan.dev">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BitPlan — plan documents on the chain, not on a server</title>
+<style>
+:root{
+  --bg:#f7f5f0; --panel:#ffffff; --ink:#1a1712; --muted:#6b6459; --line:#ddd6c8;
+  --accent:#e8632c; --accent-ink:#ffffff; --good:#1e7d43; --warn:#b3771d; --bad:#b3362c;
+  --chip:#efe9dc; --code-bg:#211d16; --code-ink:#f2ede2; --sel:#fdf0e8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#16130e; --panel:#211d16; --ink:#f0ebe0; --muted:#a89e8d; --line:#3a342a;
+    --accent:#f27a45; --accent-ink:#1a1712; --good:#5dbb82; --warn:#dfa64e; --bad:#e0685e;
+    --chip:#2c2720; --code-bg:#0f0d09; --code-ink:#e8e2d4; --sel:#31251c;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:880px;margin:0 auto;padding:48px 20px 96px}
+h1{font-size:clamp(30px,5vw,44px);line-height:1.08;margin:0 0 10px;letter-spacing:-.02em}
+h2{font-size:24px;margin:56px 0 12px;letter-spacing:-.01em}
+h3{font-size:18px;margin:28px 0 8px}
+p{margin:10px 0;max-width:70ch}
+a{color:var(--accent)}
+.small{font-size:13.5px;color:var(--muted)}
+.lede{font-size:19px;max-width:64ch}
+.kicker{font:600 12px/1 var(--mono);text-transform:uppercase;letter-spacing:.14em;color:var(--accent);margin-bottom:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:18px 0}
+.callout{border-left:4px solid var(--accent);padding:12px 16px;background:var(--panel);border-radius:0 8px 8px 0;margin:18px 0}
+.callout.warn{border-left-color:var(--warn)}
+.callout.bad{border-left-color:var(--bad)}
+.chip{display:inline-block;font:600 11.5px/1 var(--mono);padding:4px 8px;border-radius:99px;background:var(--chip);color:var(--muted);vertical-align:2px;white-space:nowrap}
+.chip.ok{color:var(--good)} .chip.warn{color:var(--warn)} .chip.bad{color:var(--bad)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+.twrap{overflow-x:auto;margin:14px 0}
+th{text-align:left;font:600 12px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+code,pre{font-family:var(--mono);font-size:13.5px}
+code{background:var(--chip);padding:1.5px 5px;border-radius:4px}
+pre{background:var(--code-bg);color:var(--code-ink);padding:14px 16px;border-radius:8px;overflow-x:auto;line-height:1.55}
+pre code{background:none;padding:0;color:inherit}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:22px 0}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat b{display:block;font-size:22px;letter-spacing:-.01em}
+.stat span{font-size:12.5px;color:var(--muted)}
+svg{max-width:100%;height:auto;display:block;margin:10px auto}
+.sbox{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+.sbox-acc{fill:var(--sel);stroke:var(--accent);stroke-width:1.5}
+.sbox-dead{fill:var(--chip);stroke:var(--line);stroke-width:1.5;stroke-dasharray:4 3}
+.stx{fill:var(--ink);font:600 12.5px var(--mono)}
+.stx2{fill:var(--muted);font:11px var(--mono)}
+.stx-acc{fill:var(--accent);font:700 12.5px var(--mono)}
+.sline{stroke:var(--muted);stroke-width:1.5;fill:none}
+.sline-acc{stroke:var(--accent);stroke-width:2;fill:none}
+.decision{border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:26px 0;background:var(--panel)}
+.decision .dnum{font:700 12px var(--mono);color:var(--accent);letter-spacing:.1em}
+.opt input{position:absolute;opacity:0;pointer-events:none}
+.opt{position:relative;display:block;margin:12px 0}
+.opt label{display:block;border:1.5px solid var(--line);border-radius:10px;padding:14px 16px;cursor:pointer}
+.opt label:hover{border-color:var(--muted)}
+.opt input:checked + label{border-color:var(--accent);background:var(--sel);box-shadow:0 0 0 1px var(--accent)}
+.opt input:focus-visible + label{outline:2px solid var(--accent);outline-offset:2px}
+.opt .ohead{font-weight:700;margin-bottom:4px}
+.opt .oletter{display:inline-block;width:22px;height:22px;border-radius:50%;background:var(--chip);color:var(--muted);text-align:center;font:700 12px/22px var(--mono);margin-right:8px}
+.opt input:checked + label .oletter{background:var(--accent);color:var(--accent-ink)}
+.cons{margin:8px 0 0;padding-left:20px;font-size:14px}
+.cons li{margin:3px 0}
+.cons .plus::marker{color:var(--good)} .cons .minus::marker{color:var(--bad)} .cons .flat::marker{color:var(--muted)}
+hr{border:none;border-top:1px solid var(--line);margin:48px 0}
+.filetree{font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--muted)}
+.filetree b{color:var(--ink);font-weight:600}
+ol.steps{counter-reset:s;list-style:none;padding:0}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 4px 40px;margin:10px 0}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 13px/26px var(--mono);text-align:center}
+</style>
+</head>
+<body>
+<main>
+
+<div class="kicker">Proposal · bitplan.dev · 2026-08-28</div>
+<h1>BitPlan: plan documents on the chain, not on a server</h1>
+<p class="lede">Every plan an agent publishes through <a href="https://postplan.dev" target="_blank" rel="noreferrer">postplan.dev</a> lands on someone else's Postgres and S3. That company can read, alter, lose, or be compelled to hand over every draft. BitPlan removes the host: the CLI inscribes the document as a <b>1Sat Ordinal</b> on BSV, each revision is a <b>reinscription</b> on the same coin, and bitplan.dev is only a viewer with no storage of its own.</p>
+
+<p class="lede">Removing the host inverts the risk. PostPlan's worst case: <i>one company reads your plan</i>. BitPlan's worst case: <i>everyone reads it, forever</i> — a published transaction cannot be deleted or amended. So BitPlan encrypts by default, and the six choices that shape the security model are now decided — recorded below with the full option space they were chosen from.</p>
+
+<svg viewBox="0 0 840 240" role="img" aria-label="PostPlan stack versus BitPlan stack">
+  <text x="105" y="22" text-anchor="middle" class="stx">POSTPLAN TODAY</text>
+  <rect x="20" y="36" width="170" height="34" rx="6" class="sbox"/><text x="105" y="57" text-anchor="middle" class="stx">postplan CLI</text>
+  <rect x="20" y="92" width="170" height="34" rx="6" class="sbox-dead"/><text x="105" y="108" text-anchor="middle" class="stx">Express API server</text><text x="105" y="121" text-anchor="middle" class="stx2">api keys · rate limits</text>
+  <rect x="20" y="148" width="80" height="34" rx="6" class="sbox-dead"/><text x="60" y="169" text-anchor="middle" class="stx">Postgres</text>
+  <rect x="110" y="148" width="80" height="34" rx="6" class="sbox-dead"/><text x="150" y="169" text-anchor="middle" class="stx">S3</text>
+  <rect x="20" y="204" width="170" height="30" rx="6" class="sbox-dead"/><text x="105" y="223" text-anchor="middle" class="stx2">operator reads everything</text>
+  <line x1="105" y1="70" x2="105" y2="92" class="sline"/>
+  <line x1="60" y1="126" x2="60" y2="148" class="sline"/><line x1="150" y1="126" x2="150" y2="148" class="sline"/>
+
+  <text x="320" y="130" text-anchor="middle" class="stx-acc">→</text>
+
+  <text x="590" y="22" text-anchor="middle" class="stx-acc">BITPLAN</text>
+  <rect x="410" y="36" width="160" height="34" rx="6" class="sbox-acc"/><text x="490" y="52" text-anchor="middle" class="stx">bitplan CLI</text><text x="490" y="65" text-anchor="middle" class="stx2">scan · encrypt · sign</text>
+  <rect x="600" y="36" width="160" height="34" rx="6" class="sbox"/><text x="680" y="52" text-anchor="middle" class="stx">1Sat wallet</text><text x="680" y="65" text-anchor="middle" class="stx2">keys + BRC-42 crypto</text>
+  <rect x="410" y="110" width="350" height="40" rx="6" class="sbox-acc"/><text x="585" y="127" text-anchor="middle" class="stx">BSV chain — 1Sat Ordinal per draft</text><text x="585" y="141" text-anchor="middle" class="stx2">v1 inscription → v2 reinscription → v3 …</text>
+  <rect x="410" y="176" width="160" height="34" rx="6" class="sbox"/><text x="490" y="192" text-anchor="middle" class="stx">indexer / OrdFS</text><text x="490" y="205" text-anchor="middle" class="stx2">public read path</text>
+  <rect x="600" y="176" width="160" height="34" rx="6" class="sbox"/><text x="680" y="192" text-anchor="middle" class="stx">bitplan.dev viewer</text><text x="680" y="205" text-anchor="middle" class="stx2">static · decrypts client-side</text>
+  <line x1="570" y1="53" x2="600" y2="53" class="sline"/>
+  <line x1="490" y1="70" x2="490" y2="110" class="sline-acc"/>
+  <line x1="490" y1="150" x2="490" y2="176" class="sline"/>
+  <line x1="570" y1="193" x2="600" y2="193" class="sline"/>
+</svg>
+
+<div class="stats">
+  <div class="stat"><b>0</b><span>servers that store plan content</span></div>
+  <div class="stat"><b>~$0.001</b><span>per 50 KB version at 1 sat/KB, BSV ≈ $16.58 (approx — check miner policy)</span></div>
+  <div class="stat"><b>∞</b><span>retention: a published version can never be removed</span></div>
+  <div class="stat"><b>bitplan</b><span>npm name — confirmed unclaimed (404 on registry, 2026-08-28)</span></div>
+</div>
+
+<hr>
+
+<h2>What exists today — verified, with sources</h2>
+<p>Everything below comes from reading real code this session, not from memory.</p>
+
+<h3>PostPlan (the product we mirror)</h3>
+<p>The npm package <a href="https://www.npmjs.com/package/postplan" target="_blank" rel="noreferrer">postplan@0.0.4</a> (MIT, by t3dotgg) ships the entire service: CLI, Express server, Postgres schema, and S3 storage. 2,951 lines total. Key facts:</p>
+<div class="twrap"><table>
+<tr><th>Area</th><th>How PostPlan does it</th><th>Source</th></tr>
+<tr><td>CLI commands</td><td><code>upload</code> (with <code>--draft</code>, <code>--new</code>, <code>--description</code>), <code>auth login</code> / <code>auth set</code>, <code>whoami</code>, <code>list</code></td><td><code>bin/postplan.js</code> (408 lines)</td></tr>
+<tr><td>Local state</td><td><code>~/.postplan/</code>: <code>config.json</code>, <code>credentials.json</code> (0600), <code>drafts.json</code> maps file path → draft id, so re-upload of the same file becomes a new version</td><td><code>bin/postplan.js</code></td></tr>
+<tr><td>HTML policy</td><td>parse5 walk at upload: blocks external scripts, event handlers, forms, iframes, <code>javascript:</code> URLs, meta-refresh. Inline classic JS allowed at upload but blocked at serve time by CSP <code>script-src 'none'</code>. 512 KB cap.</td><td><code>src/html-policy.js</code> (192 lines)</td></tr>
+<tr><td>Versioning</td><td><code>draft_versions</code> table, monotonic numbers, immutable URLs <code>/d/&lt;id&gt;/v/&lt;n&gt;/raw</code>, byte-for-byte serving</td><td><code>src/db.js</code>, <code>src/api.js</code></td></tr>
+<tr><td>Auth</td><td>Shoo (OIDC + PKCE) web sign-in → account → mint API keys at <code>/cli/auth</code>; paste key into CLI. Anonymous uploads allowed, unattributed.</td><td><code>src/shoo.js</code>, <code>src/web-auth.js</code></td></tr>
+<tr><td>Provenance</td><td>Records git branch/commit/dirty, CI run URL, client IP — displayed, never trusted for authorization</td><td><code>bin/postplan.js</code>, <code>src/db.js</code></td></tr>
+<tr><td><b>Privacy model</b></td><td><b>Unguessable URL, nothing else.</b> Any draft opens in an incognito window. No <code>robots.txt</code> (live check: 404), no <code>X-Robots-Tag</code>, no <code>noindex</code> anywhere in the source — the served headers are CSP, draft-id, nosniff, no-store only. A plan URL mentioned in a public PR is handed to crawlers and can end up in search results — the same failure mode as the recent Claude Artifacts indexing incident.</td><td><code>src/api.js</code> lines 458–553; live <code>postplan.dev/robots.txt</code></td></tr>
+</table></div>
+
+<h3>1sat-sdk (the substrate we build on)</h3>
+<p>Local monorepo at <code>~/code/1sat-sdk</code>, 24 packages. What BitPlan needs is mostly already there:</p>
+<div class="twrap"><table>
+<tr><th>Capability</th><th>Status</th><th>Where</th></tr>
+<tr><td>Create inscription (single tx up to 50 MB, or 1 MiB OrdFS stream chunks), MAP metadata, optional BAP/Sigma identity signature</td><td><span class="chip ok">shipped</span></td><td><code>packages/actions/src/inscriptions/index.ts</code> — <code>inscribe</code> action</td></tr>
+<tr><td>Encrypt / decrypt with BRC-42 (Type-42) key derivation — <code>counterparty: 'self'</code> for private-to-self, or a recipient public key for sharing</td><td><span class="chip ok">shipped</span></td><td><code>packages/actions/src/signing/counterpartyCrypto.ts</code> — <code>wallet.encrypt</code> / <code>wallet.decrypt</code></td></tr>
+<tr><td>Transfer ordinal with MAP metadata on a self-spend</td><td><span class="chip ok">shipped</span></td><td><code>packages/actions/src/ordinals/index.ts</code> — <code>buildTransferOrdinals</code></td></tr>
+<tr><td><b>Reinscription</b> — spend the 1-sat coin into a new output that carries a <i>new inscription envelope</i> (the versioning mechanism)</td><td><span class="chip warn">small gap — wire-up</span></td><td>Proven in the ecosystem: legacy <code>js-1sat-ord</code>'s <code>sendOrdinals</code> takes an optional <code>inscription</code> (<code>dataB64</code> + <code>contentType</code>) per destination — reinscription on transfer, shipped. In 1sat-sdk the <code>Inscription</code> template exists in <code>@1sat/templates</code>, but <code>TransferItem</code> is <code>{id, counterparty?, address?, map?}</code> and the transfer output is P2PKH + MAP only. The work: add an <code>inscription?</code> field and prepend the existing template, with <code>js-1sat-ord</code> as reference.</td></tr>
+<tr><td>Wallet for a Node/Bun CLI; wallet for the browser; connect flow to an existing 1Sat wallet</td><td><span class="chip ok">shipped</span></td><td><code>@1sat/wallet-node</code>, <code>@1sat/wallet-browser</code>, <code>@1sat/connect</code></td></tr>
+<tr><td>BRC-100 wallet bridge on this machine: <a href="https://github.com/bsv-blockchain/bsv-desktop" target="_blank" rel="noreferrer">BSV Desktop</a> serves the full wallet JSON API on <code>127.0.0.1:3321</code> — <code>/createAction</code>, <code>/signAction</code>, <code>/listOutputs</code>, <code>/getPublicKey</code>, <code>/encrypt</code>, <code>/decrypt</code> — with per-origin permission prompts in the wallet UI</td><td><span class="chip ok">verified in source</span></td><td><code>bsv-desktop</code> @ 2.8.4: <code>electron/httpServer.ts</code>, <code>src/onWalletReady.ts</code> lines 361–630, <code>src/lib/WalletContext.tsx</code> line 398 (permission routing)</td></tr>
+</table></div>
+
+<div class="callout"><b>License note.</b> PostPlan is MIT. BitPlan can port <code>html-policy.js</code> and the CLI command shape directly, with attribution. That keeps the two CLIs behavior-compatible where it matters: same upload validation, same file→draft mapping convention, same flags.</div>
+
+<hr>
+
+<h2>Architecture</h2>
+
+<h3>Publishing a version</h3>
+<ol class="steps">
+<li><b>Validate.</b> Same parse5 policy as PostPlan: no external scripts, no forms, no iframes. Fails locally before anything touches the network.</li>
+<li><b>Scan for secrets.</b> Gitleaks-style patterns (API keys, private keys, connection strings) plus local filesystem paths. A hit blocks publish until the user overrides per-finding. This runs <i>even for encrypted publishes</i> — see the security model for why.</li>
+<li><b>Show the bill and the warning.</b> Byte count, fee estimate, and one sentence: "This is permanent. It cannot be deleted." Confirm.</li>
+<li><b>Encrypt (default).</b> Fresh random 32-byte key per draft; AES-256-GCM over the HTML; the content key is wrapped according to Decision 1.</li>
+<li><b>Inscribe or reinscribe.</b> First publish calls <code>inscribe</code> → the ordinal's origin outpoint becomes the permanent draft ID. Later publishes spend the current coin into a new output with a new inscription envelope — one transaction per version.</li>
+<li><b>Record locally.</b> <code>~/.bitplan/drafts.json</code> maps file path → origin, exactly like PostPlan maps file path → draft id.</li>
+</ol>
+
+<h3>Versioning: one coin, many inscriptions</h3>
+<p>The draft is the coin. Every version is a spend of that same satoshi carrying new content. The chain itself is the version history — ordered, timestamped, and signed by the publishing key. Nothing to store server-side.</p>
+<svg viewBox="0 0 840 150" role="img" aria-label="Reinscription chain: origin inscription spent into version 2, spent into version 3">
+  <rect x="20" y="40" width="220" height="64" rx="8" class="sbox-acc"/>
+  <text x="130" y="62" text-anchor="middle" class="stx">v1 — inscribe</text>
+  <text x="130" y="79" text-anchor="middle" class="stx2">origin = txid₁_0 (draft ID forever)</text>
+  <text x="130" y="94" text-anchor="middle" class="stx2">1 sat + ciphertext + MAP</text>
+  <rect x="310" y="40" width="220" height="64" rx="8" class="sbox"/>
+  <text x="420" y="62" text-anchor="middle" class="stx">v2 — reinscribe</text>
+  <text x="420" y="79" text-anchor="middle" class="stx2">spends txid₁_0 → txid₂_0</text>
+  <text x="420" y="94" text-anchor="middle" class="stx2">new envelope, same coin</text>
+  <rect x="600" y="40" width="220" height="64" rx="8" class="sbox"/>
+  <text x="710" y="62" text-anchor="middle" class="stx">v3 — reinscribe</text>
+  <text x="710" y="79" text-anchor="middle" class="stx2">spends txid₂_0 → txid₃_0</text>
+  <text x="710" y="94" text-anchor="middle" class="stx2">indexer tracks origin chain</text>
+  <line x1="240" y1="72" x2="310" y2="72" class="sline-acc"/>
+  <line x1="530" y1="72" x2="600" y2="72" class="sline-acc"/>
+  <text x="130" y="128" text-anchor="middle" class="stx2">bitplan.dev/d/&lt;origin&gt;/v/1</text>
+  <text x="420" y="128" text-anchor="middle" class="stx2">…/v/2</text>
+  <text x="710" y="128" text-anchor="middle" class="stx2">…/v/3 = latest</text>
+</svg>
+
+<h3>Reading</h3>
+<p>bitplan.dev is a static site. It resolves <code>/d/&lt;origin&gt;</code> through a public indexer to the newest inscription in the chain, fetches the bytes, and — if the draft is encrypted — decrypts in the browser using a key that never reaches any server. Agents use <code>bitplan fetch &lt;url&gt;</code>, which does the same thing over HTTP and prints the HTML. The CSP story matches PostPlan: the viewer renders the document with <code>script-src 'none'</code>.</p>
+
+<h3>What auth becomes</h3>
+<p>PostPlan needs Shoo + API keys because a server must decide who may write to a draft. BitPlan has no server to convince: <b>only the holder of the coin can spend it</b>, so only the holder can publish a new version. The wallet <i>is</i> the account, the signature <i>is</i> the API key, and ownership transfers are a coin send. <code>bitplan list</code> reads the wallet's ordinals basket filtered to <code>app=bitplan</code> — no <code>/api/drafts</code> endpoint required. Optional BAP identity signing (<code>signWithBAP</code>, already in the SDK) adds public attribution when wanted.</p>
+
+<h3>Devices, revocation, rotation — where PostPlan's model maps worst</h3>
+<p>PostPlan's <code>/cli/auth</code> page mints one API key per device and lets you revoke each individually; revoking one stops that machine while your account and other devices continue. BitPlan has no server to honor a revocation list, so the mapping is different — better in one way, worse in two:</p>
+<div class="twrap"><table>
+<tr><th>Operation</th><th>PostPlan</th><th>BitPlan</th></tr>
+<tr><td>Revoke a device</td><td>Server marks the key <code>revoked_at</code>; works if the operator is honest and up</td><td><b>Rotate:</b> one batch transaction sweeps every draft coin to a fresh key (SDK sweep machinery exists). The old key holds nothing, so it can publish nothing — enforced by consensus, no server involved. Stronger guarantee, ~one tx of cost.</td></tr>
+<tr><td>Damage before you notice</td><td>Attacker publishes junk versions; operator can retroactively disable a draft (<code>disabled_at</code> in the schema)</td><td>Attacker can publish junk versions or transfer draft coins away. A junk version can be <i>superseded</i> by your next publish, never erased from the history chain. A stolen coin is gone unless returned.</td></tr>
+<tr><td>Stop future reads</td><td>Revoked key can no longer call the API</td><td><span class="chip bad">no analogue</span> The attacker keeps the public ciphertext and the old key forever: every draft wrapped to the compromised key stays decryptable by them permanently. Rotation protects future drafts only. This is the sharpest difference in the whole design — key hygiene matters more here than on PostPlan.</td></tr>
+<tr><td>Several devices, one account</td><td>Three CLIs, three keys, one account — native</td><td>A draft coin lives on exactly one key. Per-device wallets = per-device draft ownership (drafts transferable between devices, not shared). A shared seed gives every device access but removes per-device revocation. The SDK's cosign machinery is a plausible v2 path to true multi-device, at the cost of a coordinator. Open question below.</td></tr>
+</table></div>
+
+<hr>
+
+<h2>Security model</h2>
+<p>Encrypted by default is decided. Here is exactly what that does and does not buy, in plain terms:</p>
+<div class="twrap"><table>
+<tr><th>Threat</th><th>Covered?</th><th>Plain English</th></tr>
+<tr><td>Host reads your plans</td><td><span class="chip ok">eliminated</span></td><td>There is no host. Nobody operates a database of your documents.</td></tr>
+<tr><td>Host loses / censors your plans</td><td><span class="chip ok">eliminated</span></td><td>Anyone can run an indexer; the data outlives bitplan.dev itself.</td></tr>
+<tr><td>Public reads an encrypted plan</td><td><span class="chip ok">protected</span></td><td>They see ciphertext and a size. AES-256-GCM with a random per-draft key.</td></tr>
+<tr><td>Accidental cleartext publish</td><td><span class="chip warn">mitigated</span></td><td>Encrypted default + secret scan + typed confirmation. But if it happens, it is permanent. This is the single worst failure mode of the product.</td></tr>
+<tr><td>Leaked share link</td><td><span class="chip warn">depends on Decision 1</span></td><td>If the key travels in the link, anyone who ever obtains the link can decrypt that draft forever. There is no revocation on an immutable ledger.</td></tr>
+<tr><td>Search engines index your plan</td><td><span class="chip ok">fixed for encrypted tiers</span></td><td>PostPlan today: no robots.txt, no noindex — a URL shared in a public PR can be crawled and indexed (the Claude Artifacts failure). BitPlan: the viewer ships robots.txt + <code>X-Robots-Tag: noindex</code> on draft routes, and for encrypted drafts a crawler that ignores both still only fetches ciphertext — the key lives in the URL fragment, which browsers never transmit. Cleartext drafts remain crawlable via the chain itself; no viewer header can change that.</td></tr>
+<tr><td>Metadata leakage</td><td><span class="chip warn">depends on Decision 2</span></td><td>Even with encrypted content, cleartext MAP fields (title, repo name, git branch) can leak what you're working on. Sizes and timestamps always leak.</td></tr>
+<tr><td>Harvest now, decrypt later</td><td><span class="chip bad">accepted risk</span></td><td>secp256k1 ECDH and AES are not post-quantum. Ciphertext is public forever, so a future quantum computer could decrypt today's drafts. Plan documents usually have a shelf life of months; judge accordingly, and never publish long-lived secrets even encrypted — that is why the secret scan always runs.</td></tr>
+<tr><td>Lost wallet / lost key</td><td><span class="chip bad">user's burden</span></td><td>No password reset exists. Losing the decryption key means the ciphertext on chain is unreadable forever. Mitigation: the SDK's existing BAP/wallet backup flows, plus Decision 1's recovery wrap.</td></tr>
+<tr><td>Stolen device / compromised publishing key</td><td><span class="chip warn">rotation, with a sharp edge</span></td><td>The "revoke" analogue is rotating: one batch transaction sweeps every draft coin to a fresh key, and the old key can publish nothing — enforced by consensus, not by a server. But rotation protects the <i>future</i> only: the attacker holds the public ciphertext plus the old key, so every draft wrapped to that key is decryptable by them forever. And a malicious version they published before rotation can be superseded by your next version, never erased. See "Devices, revocation, rotation" below.</td></tr>
+</table></div>
+
+<div class="callout bad"><b>The rule the tooling enforces:</b> treat the chain like a newspaper, even when encrypting. Encryption sets the <i>reading cost</i>; it does not restore the <i>delete button</i>. The secret scanner therefore blocks credentials and personal data on every publish, encrypted or not.</div>
+
+<h3>The three visibility tiers</h3>
+<p>PostPlan and Claude Artifacts both really offer one tier: <i>unlisted</i> — public content behind an unguessable URL. A public ledger cannot copy that trick: URLs guard nothing when anyone can enumerate every inscription tagged <code>app=bitplan</code> with a chain scanner. What replaces it is cleaner, because each tier is enforced by cryptography rather than by hoping a URL stays secret:</p>
+<div class="twrap"><table>
+<tr><th>Tier</th><th>Mechanism</th><th>Who can read</th><th>PostPlan equivalent</th></tr>
+<tr><td><b>Public</b></td><td>Cleartext inscription</td><td>Everyone, including chain scanners and search engines. <b>More</b> exposed than a PostPlan draft — it is listed, not unlisted, and permanent.</td><td>None — PostPlan has no truly listed tier</td></tr>
+<tr><td><b>Unlisted</b></td><td>Ciphertext on chain; key rides in the link fragment (<code>#k=…</code>)</td><td>Anyone holding the link — humans and agents alike, pasted in a PR like today. Fragments never reach servers, logs, or crawlers, so the secret sits in a strictly safer channel than PostPlan's URL path.</td><td>The normal PostPlan draft, done correctly</td></tr>
+<tr><td><b>Private</b></td><td>Ciphertext on chain; content key wrapped to named recipients — a wallet public key, or a BAP identity resolved through <a href="https://sigmaidentity.com" target="_blank" rel="noreferrer">Sigma Identity</a></td><td>Exactly the people you name. No server grants or revokes access; the wrap is the ACL.</td><td>None — PostPlan cannot do this at all</td></tr>
+</table></div>
+<p>Sigma auth's role here is deliberately narrow: with no server hosting content, there is no place to enforce a login wall. Sigma Identity instead serves as the <b>directory</b> — "share with <code>@satchmo</code>" resolves a BAP ID to its current public key, and the CLI wraps the content key to it. The reader proves identity to no one; they simply hold the only key that opens the wrap. The viewer can still use Sigma auth as a convenience login to locate your wallet key in a browser, but it is never the thing standing between an attacker and the plaintext.</p>
+<p>The bitplan.dev viewer additionally ships what PostPlan forgot on day one: <code>robots.txt</code> disallowing draft routes and <code>X-Robots-Tag: noindex</code> on every draft response. For encrypted tiers that is defense in depth; for the public tier it is honest-but-limited — the chain itself remains crawlable, which is exactly why cleartext requires Decision 6's gate.</p>
+
+<hr>
+
+<h2>The decisions — your questionnaire</h2>
+<p>Six choices. Tap an option on each card (selection is visual only — this page runs no scripts), then copy the reply template at the bottom and fill in your letters. Each option lists its consequences: <span style="color:var(--good)">▲ what you gain</span>, <span style="color:var(--bad)">▼ what you give up</span>, <span style="color:var(--muted)">• what changes</span>.</p>
+
+<!-- D1 -->
+<div class="decision">
+<div class="dnum">DECISION 1 · the big one <span class="chip ok">✓ DECIDED — A: wallet-wrapped; share to known pubkeys (BRC-2)</span></div>
+<h3 style="margin-top:6px">How do decryption keys travel?</h3>
+<p>Every encrypted draft has one content key. Where that key lives determines who can read the plan, how sharing feels, and what happens when things leak.</p>
+
+<div class="opt"><input type="radio" name="d1" id="d1a" checked><label for="d1a">
+<div class="ohead"><span class="oletter">A</span>Wallet-wrapped only (the Private tier for everything)</div>
+<p class="small">The content key is encrypted to your own wallet key (BRC-42, counterparty "self"). Sharing wraps the key to a recipient's public key — given directly, or resolved from a BAP identity through Sigma Identity ("share with @name").</p>
+<ul class="cons">
+<li class="plus">Strongest model: a leaked URL exposes nothing; readers are named individually; the Bitcoin-native way.</li>
+<li class="minus">Every reader needs a BSV wallet or BAP identity first. "Paste a link in a PR" stops working — the Unlisted tier doesn't exist under this option.</li>
+<li class="minus">Agents (Claude fetching your plan) need wallet access to read.</li>
+<li class="flat">Recovery = your wallet backup. Lose the wallet, lose every draft.</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d1" id="d1b"><label for="d1b">
+<div class="ohead"><span class="oletter">B</span>Key in the link (the Unlisted tier for everything)</div>
+<p class="small">The share URL carries the key in its fragment: <code>bitplan.dev/d/&lt;origin&gt;#k=&lt;key&gt;</code>. Fragments never reach any server. The viewer (or <code>bitplan fetch</code>) decrypts locally.</p>
+<ul class="cons">
+<li class="plus">Sharing is identical to PostPlan today: paste one URL in a PR, any human or agent reads it, zero setup. And unlike PostPlan, the secret never appears in a URL path, server log, or crawler index.</li>
+<li class="minus">The link IS the secret. Anyone who ever sees it — chat logs, browser history, screenshots — can decrypt that draft forever. No revocation, ever.</li>
+<li class="minus">Lose the link and keep no copy → the draft is unreadable, including by you.</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d1" id="d1c"><label for="d1c">
+<div class="ohead"><span class="oletter">C</span>All three tiers: wallet-wrapped owner copy, plus link keys and BAP-targeted wraps on demand</div>
+<p class="small">The key is always wrapped to your wallet (recovery; <code>bitplan list</code> can always decrypt your own drafts). <code>bitplan share &lt;draft&gt;</code> then emits an Unlisted link (fragment key) or a Private wrap to a named pubkey/BAP ID — your choice per share.</p>
+<ul class="cons">
+<li class="plus">You can never lose access to your own drafts while you hold your wallet.</li>
+<li class="plus">The PR-link workflow and the named-recipient workflow both exist; pick per document.</li>
+<li class="minus">Inherits B's leak property for any link you hand out (that is the Unlisted tier's nature).</li>
+<li class="flat">Most machinery: owner wrap + optional share wraps per draft. All of it is the same <code>wallet.encrypt</code> primitive.</li>
+</ul></label></div>
+</div>
+
+<!-- D2 -->
+<div class="decision">
+<div class="dnum">DECISION 2 <span class="chip ok">✓ DECIDED — A: minimal on chain</span></div>
+<h3 style="margin-top:6px">What stays readable on chain when a draft is encrypted?</h3>
+<p>PostPlan's dashboard earns its keep from metadata: drafts grouped by auto-linked git repo (with a GitHub link), and every version row showing the commit subject, branch + short sha, a <code>dirty</code> badge when the tree had uncommitted changes, and publish time. BitPlan keeps that experience — the question is where the metadata lives. On chain in cleartext MAP fields it is public forever; inside the encrypted payload it is visible only after decryption.</p>
+
+<div class="opt"><input type="radio" name="d2" id="d2a" checked><label for="d2a">
+<div class="ohead"><span class="oletter">A</span>Minimal: <code>app=bitplan</code> + encryption marker only</div>
+<p class="small">Title, description, git provenance all move <i>inside</i> the encrypted payload. The chain shows: an encrypted bitplan document exists, its size, its version count.</p>
+<ul class="cons">
+<li class="plus">A competitor watching the chain learns almost nothing — not even project names.</li>
+<li class="minus"><code>bitplan list</code> must decrypt each draft to show titles (fine for the owner; slower).</li>
+<li class="minus">No public discoverability of your encrypted drafts — usually the point.</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d2" id="d2b"><label for="d2b">
+<div class="ohead"><span class="oletter">B</span>Rich: title + repo metadata in the clear, content encrypted</div>
+<p class="small">Mirrors PostPlan's dashboard experience without decryption.</p>
+<ul class="cons">
+<li class="plus">Fast listing, browsable dashboards, no decrypt round-trips.</li>
+<li class="minus">"acme-corp/secret-rewrite — Q3 migration plan, 14 versions, last pushed from branch kill-postgres" is exactly the kind of leak the encryption was for.</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d2" id="d2c"><label for="d2c">
+<div class="ohead"><span class="oletter">C</span>Minimal on chain, rich locally</div>
+<p class="small">Chain carries Option A's minimum. Title, description, repo org/name, commit subject, branch/sha, and the dirty flag travel <i>inside</i> the encrypted payload, and the CLI mirrors them in <code>~/.bitplan/drafts.json</code> (which it keeps anyway). <code>bitplan list</code> and the signed-in viewer reproduce PostPlan's repo-grouped dashboard — instantly from local state, or by decrypting your own drafts on a fresh machine.</p>
+<ul class="cons">
+<li class="plus">A's privacy with the full PostPlan dashboard experience — repo groups, dirty badges, version history — for the owner and anyone the draft is shared with.</li>
+<li class="minus">Fresh machine = slower first <code>list</code> until the local cache rebuilds from decryption.</li>
+</ul></label></div>
+</div>
+
+<!-- D3 -->
+<div class="decision">
+<div class="dnum">DECISION 3 <span class="chip ok">✓ DECIDED — B first: external BRC-100 wallet only; C is a follow-up</span></div>
+<h3 style="margin-top:6px">Which wallet does the CLI use?</h3>
+<p>The architecture question is already settled by a standard: the CLI codes against the <b>BRC-100 wallet interface</b> once, and every option below is a configuration of which wallet answers. Verified in source: <a href="https://github.com/bsv-blockchain/bsv-desktop" target="_blank" rel="noreferrer">BSV Desktop</a> serves the full BRC-100 API (<code>createAction</code>, <code>encrypt</code>, <code>decrypt</code>, <code>getPublicKey</code>, …) on <code>127.0.0.1:3321</code> with per-origin permission prompts in the wallet UI, and <code>@1sat/wallet</code> is a BRC-100 engine. Two properties fall out for free: the wallet itself asks before each publish spend (a second human gate), and encrypted drafts open with any compliant wallet holding the key — not just our tooling.</p>
+
+<div class="opt"><input type="radio" name="d3" id="d3a"><label for="d3a">
+<div class="ohead"><span class="oletter">A</span>Embedded wallet in <code>~/.bitplan</code></div>
+<p class="small">First run creates a BRC-100 wallet via <code>@1sat/wallet-node</code>. User funds it with a few cents of BSV. Mirrors PostPlan's "works immediately" feel.</p>
+<ul class="cons">
+<li class="plus">One command to start: <code>bitplan upload plan.html</code> prompts wallet creation inline. No external app.</li>
+<li class="minus">Another key to back up; drafts owned by this machine's key unless exported. No out-of-band spend approval — the CLI's own confirm is the only gate.</li>
+<li class="flat">Funding step is new friction PostPlan never had (~$1 covers hundreds of versions).</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d3" id="d3b" checked><label for="d3b">
+<div class="ohead"><span class="oletter">B</span>External BRC-100 wallet only (BSV Desktop, 1Sat wallet)</div>
+<p class="small">The CLI is a pure BRC-100 client: it talks to whatever wallet is listening on the local bridge, and holds no keys of its own.</p>
+<ul class="cons">
+<li class="plus">One identity and one backup across every BSV app; every publish spend and every decrypt is approved in the wallet's own UI; smallest possible CLI attack surface (no key material on disk in <code>~/.bitplan</code>).</li>
+<li class="minus">Hard dependency on a running wallet app — a taller first step for a stranger who just ran <code>npx bitplan</code>, and headless/CI publishing needs extra arrangement.</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d3" id="d3c"><label for="d3c">
+<div class="ohead"><span class="oletter">C</span>Auto-detect: external bridge if one answers, embedded otherwise</div>
+<p class="small">If <code>127.0.0.1:3321</code> responds, use the running wallet (with its permission prompts). Otherwise offer to create the embedded wallet. <code>bitplan whoami</code> always says which wallet is active.</p>
+<ul class="cons">
+<li class="plus">npx-friendly onboarding, power-user integration, and CI support in one behavior.</li>
+<li class="minus">Two code paths to test; "which wallet owns this draft?" needs unmissable UX, since drafts and decryption keys follow the wallet that made them.</li>
+</ul></label></div>
+</div>
+
+<!-- D4 -->
+<div class="decision">
+<div class="dnum">DECISION 4 <span class="chip ok">✓ DECIDED — A: PR to 1sat-sdk</span></div>
+<h3 style="margin-top:6px">Where does the missing <code>reinscribe</code> live?</h3>
+<p>The one true SDK gap. Two homes for the new code:</p>
+
+<div class="opt"><input type="radio" name="d4" id="d4a" checked><label for="d4a">
+<div class="ohead"><span class="oletter">A</span>Upstream: new action in <code>@1sat/actions</code></div>
+<ul class="cons">
+<li class="plus">Every 1Sat app gets reinscription; BitPlan stays a thin consumer; reviewed in the SDK's own gates.</li>
+<li class="minus">BitPlan's schedule couples to an SDK release cycle (you control it, so mostly a sequencing cost).</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d4" id="d4b"><label for="d4b">
+<div class="ohead"><span class="oletter">B</span>Local first: build inside bitplan, upstream later</div>
+<ul class="cons">
+<li class="plus">Fastest path to a working product; upstream once the shape is proven by real use.</li>
+<li class="minus">Duplicates transfer-building logic (<code>buildTransferOrdinals</code> is ~130 lines to mirror); a period where the ecosystem's reinscribe lives in an app repo.</li>
+</ul></label></div>
+</div>
+
+<!-- D5 -->
+<div class="decision">
+<div class="dnum">DECISION 5 <span class="chip ok">✓ DECIDED — fully BSV-native: wallet is the DB, ORDFS reads content</span></div>
+<h3 style="margin-top:6px">What does reading depend on?</h3>
+<p>Content lives on chain, but somebody must index origin chains and serve bytes over HTTP.</p>
+
+<div class="opt"><input type="radio" name="d5" id="d5a" checked><label for="d5a">
+<div class="ohead"><span class="oletter">A</span>Public indexers (ordfs.network / GorillaPool) only</div>
+<ul class="cons">
+<li class="plus">Zero infrastructure to run; live on day one.</li>
+<li class="minus">Read availability depends on a third party again — weaker than PostPlan's own S3 if the indexer has an outage. (The <i>data</i> is never at risk, only the convenient read path.)</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d5" id="d5b"><label for="d5b">
+<div class="ohead"><span class="oletter">B</span>Indexer abstraction with fallbacks</div>
+<p class="small">Viewer and CLI try a configured list of read endpoints in order; self-hosting one later is a config change, not a rewrite.</p>
+<ul class="cons">
+<li class="plus">No single read dependency; the "no third party" story stays honest.</li>
+<li class="flat">A thin resolver interface to design now (~a day), servers to run: still zero.</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d5" id="d5c"><label for="d5c">
+<div class="ohead"><span class="oletter">C</span>Self-host the read stack from day one</div>
+<ul class="cons">
+<li class="plus">Full control of the read path.</li>
+<li class="minus">Reintroduces servers and ops on day one — the thing BitPlan exists to remove. Nothing stops adding this later under Option B.</li>
+</ul></label></div>
+</div>
+
+<!-- D6 -->
+<div class="decision">
+<div class="dnum">DECISION 6 <span class="chip ok">✓ DECIDED — A: no cleartext in v1</span></div>
+<h3 style="margin-top:6px">How hard is it to publish in cleartext?</h3>
+<p>Cleartext is the feature that makes a plan a public, linkable document — and the loaded gun.</p>
+
+<div class="opt"><input type="radio" name="d6" id="d6a" checked><label for="d6a">
+<div class="ohead"><span class="oletter">A</span>Not possible in v1</div>
+<ul class="cons">
+<li class="plus">The catastrophic mistake cannot happen. Ship encryption first, add public publishing in v2 with lessons learned.</li>
+<li class="minus">No public plans at launch — no "look at my roadmap" links, weaker demo story.</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d6" id="d6b"><label for="d6b">
+<div class="ohead"><span class="oletter">B</span><code>--public</code> + secret scan + typed confirmation</div>
+<p class="small">Flag required, scanner must pass (overrides are per-finding), and the user types the draft's title to confirm permanence — the friction of deleting a GitHub repo.</p>
+<ul class="cons">
+<li class="plus">Full product on day one; three independent layers between a tired user and a permanent mistake.</li>
+<li class="minus">Layers reduce, never zero, the risk. One inattentive confirm is still forever.</li>
+</ul></label></div>
+
+<div class="opt"><input type="radio" name="d6" id="d6c"><label for="d6c">
+<div class="ohead"><span class="oletter">C</span><code>--public</code> flag only</div>
+<ul class="cons">
+<li class="plus">Least friction for people who know what they're doing.</li>
+<li class="minus">One typo away from permanent disclosure; agents invoking the CLI could pass the flag autonomously.</li>
+</ul></label></div>
+</div>
+
+<hr>
+
+<h2>CLI: postplan → bitplan, command for command</h2>
+<div class="twrap"><table>
+<tr><th>postplan</th><th>bitplan</th><th>What changes underneath</th></tr>
+<tr><td><code>npx postplan upload ./plan.html</code></td><td><code>npx bitplan upload ./plan.html</code></td><td>POST to a server → validate, scan, encrypt, inscribe (v1) or reinscribe (vN)</td></tr>
+<tr><td><code>--draft &lt;id&gt;</code> / <code>--new</code> / <code>--description</code></td><td>identical flags</td><td>draft id = origin outpoint; description placement per Decision 2</td></tr>
+<tr><td><code>auth login</code> (paste API key)</td><td><code>auth</code> = wallet setup / connect per Decision 3</td><td>API keys cease to exist; the spending key is the credential</td></tr>
+<tr><td><code>whoami</code></td><td><code>whoami</code></td><td>prints wallet address, balance, BAP identity if present</td></tr>
+<tr><td><code>list</code></td><td><code>list</code></td><td>reads the wallet's ordinals basket, not <code>/api/drafts</code></td></tr>
+<tr><td>—</td><td><code>fetch &lt;url&gt;</code> <span class="chip">new</span></td><td>resolve + decrypt a bitplan URL from the terminal; what agents call instead of <code>curl …/raw</code></td></tr>
+<tr><td>—</td><td><code>share &lt;draft&gt;</code> <span class="chip">new</span></td><td>emit a share link / wrap the key to a recipient, per Decision 1</td></tr>
+<tr><td><code>~/.postplan/</code></td><td><code>~/.bitplan/</code></td><td>same three files; <code>credentials.json</code> becomes wallet storage (0600)</td></tr>
+</table></div>
+
+<h2>What a version costs</h2>
+<p>A 50 KB encrypted plan ≈ 51 KB transaction. At the common 1 sat/KB miner rate and BSV at $16.58: <b>≈ 51 sats ≈ $0.00085</b>. Twenty versions of a large plan: about two cents. Numbers marked approximate — miner fee policy needs a live check during Phase 1, and the CLI always shows the real fee before you confirm.</p>
+
+<hr>
+
+<h2>Build plan <span class="chip ok">updated for the locked decisions</span></h2>
+<p>Implementation runs as a Workflow: Sonnet 5 / Opus 5 workers, an Opus 5 review gate on every phase, Fable advising. Phases are sequenced by dependency; 1–2 are the critical path.</p>
+<div class="twrap"><table>
+<tr><th>Phase</th><th>Deliverable</th><th>Depends on</th></tr>
+<tr><td><b>0 · Reinscribe PR</b></td><td>PR to <code>~/code/1sat-sdk</code>: add <code>inscription?</code> to <code>TransferItem</code>, prepend the existing <code>Inscription</code> template in <code>buildTransferOrdinals</code>, port the shape from <code>js-1sat-ord</code>'s <code>sendOrdinals</code>. Origin-chain verified against the indexer; tests on testnet coins.</td><td>—</td></tr>
+<tr><td><b>1 · CLI core</b></td><td><code>bitplan</code> on npm as a <b>pure BRC-100 client</b> — no keys on disk, talks to BSV Desktop / 1Sat wallet on <code>127.0.0.1:3321</code>: <code>upload</code> (validate → scan → encrypt via <code>wallet.encrypt</code> counterparty self → inscribe/reinscribe via <code>wallet.createAction</code>), <code>list</code> (wallet <code>listOutputs</code>, decrypt titles), <code>whoami</code>, <code>fetch</code>. Encrypted only — no cleartext path exists. <code>~/.bitplan</code> holds config + file→origin map, nothing secret.</td><td>Phase 0</td></tr>
+<tr><td><b>2 · Viewer</b></td><td>bitplan.dev (Next.js, static, Vercel): connects to the user's wallet over BRC-100 from the browser (BSV Desktop bridge; bsv-browser compatible), lists plans from the wallet's own outputs, fetches ciphertext via ORDFS, decrypts via <code>wallet.decrypt</code>, renders with PostPlan-equivalent CSP + noindex headers. No BitPlan backend.</td><td>publishable drafts from Phase 1</td></tr>
+<tr><td><b>3 · Sharing</b></td><td><code>bitplan share &lt;draft&gt; --to &lt;pubkey|BAP id&gt;</code>: resolve recipient key (Sigma Identity for BAP ids), re-wrap the content key with BRC-2 <code>wallet.encrypt</code>, deliver the wrap; recipient reads via viewer + their own wallet. Agent skill file (the BitPlan analogue of PostPlan's <code>SKILL.md</code>).</td><td>Phase 1</td></tr>
+<tr><td><b>4 · Hardening</b></td><td>Security review of envelope + scanner (code-auditor pass), docs, landing page, npm publish, dogfood: publish BitPlan's own roadmap with BitPlan.</td><td>everything</td></tr>
+</table></div>
+
+<h3>Follow-up issues (deliberately out of v1)</h3>
+<ul>
+<li><b>Embedded wallet + auto-detect (D3 → C):</b> <code>@1sat/wallet-node</code> fallback when no bridge answers, for npx strangers and CI. Ships only after the pure-client path is solid.</li>
+<li><b>Unlisted link-key tier (D1 expansion):</b> fragment-key share links for the PR-paste workflow, added as an explicit per-share choice on top of wallet wraps.</li>
+<li><b>Public cleartext tier (D6 → B):</b> <code>--public</code> + secret scan + typed confirmation, once the encrypted product has proven the pipeline.</li>
+<li><b>Rich local dashboard cache (D2 comfort):</b> optional local metadata cache for instant repo-grouped <code>list</code> on fresh machines.</li>
+</ul>
+
+<h2>Open questions (not blocking the decisions above)</h2>
+<ul>
+<li><b>Draft transfer & multi-author:</b> the coin model gives single-writer semantics; co-authoring means passing the coin or multisig. Punt to v2?</li>
+<li><b>Multi-device publishing:</b> largely dissolved by D3-B — BSV Desktop builds on <code>@bsv/wallet-toolbox</code>, whose storage can be remote and shared across devices (<code>StorageClient</code>), so device sync is the wallet's job, not BitPlan's. Residual: confirm shared-storage UX during Phase 1 testing.</li>
+<li><b>BAP attribution default:</b> sign versions with a public identity, or stay pseudonymous by default? Interacts with Decision 2.</li>
+<li><b>Anonymous/free tier:</b> PostPlan allows unauthenticated uploads. On-chain publishing always costs sats — is a faucet-funded first draft worth it for onboarding?</li>
+<li><b>Name/discovery:</b> OpNS names for pretty URLs (<code>bitplan.dev/@satchmo/roadmap</code>) — v2 candidate, machinery exists in the SDK.</li>
+</ul>
+
+<hr>
+
+<h2>Decisions — locked 2026-08-28</h2>
+<div class="twrap"><table>
+<tr><th>#</th><th>Call</th><th>Rationale in one line</th></tr>
+<tr><td>D1</td><td><b>A</b> — wallet-wrapped only; sharing wraps the content key to known pubkeys (BRC-2 <code>wallet.encrypt</code>, the modern ECIES; BAP ids resolve via Sigma Identity)</td><td>Start from the most secure position; link-key tier is a tracked expansion.</td></tr>
+<tr><td>D2</td><td><b>A</b> — chain shows <code>app=bitplan</code> + encryption marker only; everything else rides inside the ciphertext</td><td>Most secure; expand only as needed.</td></tr>
+<tr><td>D3</td><td><b>B</b> — pure BRC-100 client, external wallet only (BSV Desktop / 1Sat wallet); no key material in <code>~/.bitplan</code></td><td>The CLI never creates keys in v1; auto-detect + embedded (C) is a follow-up issue.</td></tr>
+<tr><td>D4</td><td><b>A</b> — reinscription lands as a PR to <code>1sat-sdk</code></td><td>Whole ecosystem gets it; BitPlan stays a thin consumer.</td></tr>
+<tr><td>D5</td><td><b>Fully BSV-native</b> — plans are NFTs in your wallet; the UTXO store is the database; wallet shared storage syncs devices; bitplan.dev connects over BRC-100 from the browser and reads content via ORDFS</td><td>It's encrypted anyway — no resolver abstraction needed in v1.</td></tr>
+<tr><td>D6</td><td><b>A</b> — no cleartext path exists in v1</td><td>The catastrophic mistake is structurally impossible at launch; public tier is a planned expansion.</td></tr>
+</table></div>
+<p class="small">The questionnaire cards above are kept with the chosen options highlighted, as the record of what was considered and why.</p>
+
+<p class="small" style="margin-top:40px">Grounding: postplan@0.0.4 source (npm tarball, MIT, read in full — 2,951 lines) plus live postplan.dev header/robots checks; ~/code/1sat-sdk packages (actions/inscriptions, actions/ordinals, actions/signing, templates, wallet-node, connect); js-1sat-ord source (<code>sendOrdinals</code> reinscription reference); bsv-desktop 2.8.4 source (BRC-100 bridge: <code>electron/httpServer.ts</code>, <code>src/onWalletReady.ts</code>); npm registry checks; whatsonchain exchange rate 2026-08-28. Fee-rate and indexer-latency figures are marked approximate and get verified in Phase 1. Authored with Fable planning the design; implementation staffing per the build plan.</p>
+
+</main>
+</body>
+</html>
