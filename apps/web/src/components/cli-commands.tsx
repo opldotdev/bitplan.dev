@@ -6,6 +6,10 @@ const COMMANDS = [
     hint: "Publish a draft. bunx bitplan works the same.",
   },
   {
+    cmd: "npx bitplan upload ./plan.html --relay",
+    hint: "Also send wallet BEEF through 1Sat; this may speed up the viewer.",
+  },
+  {
     cmd: 'npx bitplan upload ./plan.html --description "migration, phase one"',
     hint: "Optional label, shown in list and My drafts.",
   },

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.7
+
+### Added
+
+- `upload --relay` sends the wallet-returned Atomic BEEF through 1Sat after a
+  successful publish. 1Sat attempts to capture it for ORDFS and relays the
+  transaction to Arcade; relay failure never disguises a successful wallet
+  publish.
+
 ## 0.0.6
 
 ### Added

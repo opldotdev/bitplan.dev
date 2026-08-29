@@ -42,6 +42,8 @@ export interface BitplanCoin {
 
 export interface PublishResult {
 	txid: string
+	/** Wallet-returned BRC-95 Atomic BEEF, when the wallet provides it. */
+	beef?: Uint8Array
 	/** `txid_vout` of the coin holding the version just published. */
 	outpoint: string
 	/** `txid_vout` of the genesis inscription. */
@@ -145,7 +147,12 @@ export async function publishGenesis(
 	}
 
 	const outpoint = await locateCoinOutpoint(wallet, result.txid)
-	return { txid: result.txid, outpoint, origin: outpoint }
+	return {
+		txid: result.txid,
+		beef: result.tx ? Uint8Array.from(result.tx) : undefined,
+		outpoint,
+		origin: outpoint,
+	}
 }
 
 function versionTransfer(coin: BitplanCoin, envelope: Uint8Array) {
@@ -223,7 +230,12 @@ export async function publishVersion(
 	}
 
 	const outpoint = await locateCoinOutpoint(wallet, result.txid)
-	return { txid: result.txid, outpoint, origin: coin.origin }
+	return {
+		txid: result.txid,
+		beef: result.tx ? Uint8Array.from(result.tx) : undefined,
+		outpoint,
+		origin: coin.origin,
+	}
 }
 
 /**

@@ -27,6 +27,18 @@ npx bitplan upload ./plan.html
 bunx bitplan upload ./plan.html
 ```
 
+Add `--relay` when the viewer should become available as quickly as possible:
+
+```sh
+npx bitplan upload ./plan.html --relay
+```
+
+The wallet still publishes normally. Afterward, bitplan sends the
+wallet-returned Atomic BEEF through 1Sat, which attempts to capture it for
+ORDFS and forwards the transaction to Arcade. This may make the viewer
+available sooner. A relay failure is only a warning because the wallet publish
+may already have succeeded.
+
 Attach an optional description (shown in `bitplan list` and the My drafts page).
 Re-running with `--description` updates it; omitting it leaves the existing one
 untouched:
@@ -102,6 +114,7 @@ bitplan upload <file>
   --description <text>     Set a short description
   --share-with <key>       Add a reader identity key (repeatable)
   --private                Make the new version wallet-only
+  --relay                  Relay wallet BEEF through 1Sat; may speed ORDFS availability
   -y, --yes                Skip the confirmation prompt
   --allow-finding <id>     Waive one secret-scanner finding (repeatable)
 
@@ -127,6 +140,9 @@ bitplan version
 - **Versioning.** The first publish inscribes a 1-satoshi output. Later
   publishes spend that satoshi back to you carrying a new envelope. Only the
   wallet holding the coin can publish the next one.
+- **Propagation.** With `--relay`, the CLI sends the wallet-returned Atomic
+  BEEF to 1Sat. 1Sat attempts to store it for ORDFS and forwards the leaf
+  transaction to Arcade. The wallet remains the publisher.
 - **Metadata.** The cleartext MAP on chain is three fields:
   `{ app: "bitplan", type: "plan", enc: "1" }`. Titles, descriptions and git
   provenance live inside the ciphertext.

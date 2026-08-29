@@ -30,6 +30,7 @@ import {
 	publishVersion,
 } from '../ordinals.js'
 import { toOrdinalOutpoint } from '../outpoint.js'
+import { relayBeef } from '../relay.js'
 import { scanForSecrets } from '../secretScan.js'
 import {
 	type DraftRecord,
@@ -50,6 +51,7 @@ export interface UploadOptions {
 	private?: boolean
 	walletUrl?: string
 	ordfsUrl?: string
+	relay?: boolean
 }
 
 export async function uploadCommand(
@@ -221,8 +223,6 @@ export async function uploadCommand(
 			? 'Access:   This wallet only'
 			: `Access:   This wallet + ${sharedWith.length} shared identit${sharedWith.length === 1 ? 'y' : 'ies'}`,
 	)
-	console.log(`Viewer:   ${viewerUrl(published.origin)}`)
-
 	const record: DraftRecord = {
 		origin: published.origin,
 		keyID,
@@ -243,6 +243,28 @@ export async function uploadCommand(
 			`Keep the origin and outpoint above. A retry would publish another version.`,
 		)
 	}
+
+	if (options.relay) {
+		if (published.beef) {
+			try {
+				const relay = await relayBeef(published.beef, published.txid)
+				console.log(
+					relay.state === 'accepted'
+						? `Relay:    1Sat accepted (${relay.txStatus})`
+						: `Relay:    1Sat is still processing (${relay.txStatus})`,
+				)
+			} catch (error) {
+				console.warn(
+					`Warning: the wallet published the draft, but 1Sat relay failed: ${error instanceof Error ? error.message : String(error)}`,
+				)
+			}
+		} else {
+			console.warn(
+				'Warning: the wallet published the draft but returned no Atomic BEEF, so it could not be relayed to 1Sat.',
+			)
+		}
+	}
+	console.log(`Viewer:   ${viewerUrl(published.origin)}`)
 }
 
 export function resolveDescription(

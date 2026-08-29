@@ -48,6 +48,7 @@ if (!CHILD_RUN) {
 		findCoin: string[]
 		genesis: Uint8Array[]
 		version: Array<{ coin: BitplanCoin; envelope: Uint8Array }>
+		relays: Array<{ beef: Uint8Array; txid: string }>
 		seals: SealCall[]
 		saves: Array<{ file: string; record: DraftRecord }>
 	}
@@ -61,6 +62,7 @@ if (!CHILD_RUN) {
 	} as BitplanCoin
 	const genesisResult: PublishResult = {
 		txid: 'c'.repeat(64),
+		beef: Uint8Array.of(4, 5, 6),
 		origin: GENESIS_OUTPOINT,
 		outpoint: GENESIS_OUTPOINT,
 	}
@@ -75,6 +77,7 @@ if (!CHILD_RUN) {
 	let knownByOrigin: DraftRecord | undefined
 	let genesisError: Error | undefined
 	let identityKeyCalls = 0
+	let relayError: Error | undefined
 	let stateSaveError: Error | undefined
 	let ordfsContent:
 		| {
@@ -190,6 +193,14 @@ if (!CHILD_RUN) {
 		},
 	}))
 
+	mock.module('../src/relay.js', () => ({
+		relayBeef: async (beef: Uint8Array, txid: string) => {
+			calls.relays.push({ beef, txid })
+			if (relayError) throw relayError
+			return { state: 'accepted', txStatus: 'SEEN_ON_NETWORK' }
+		},
+	}))
+
 	const { estimateEnvelopeBytes, uploadCommand } = await import(
 		'../src/commands/upload.js'
 	)
@@ -200,6 +211,7 @@ if (!CHILD_RUN) {
 			findCoin: [],
 			genesis: [],
 			version: [],
+			relays: [],
 			seals: [],
 			saves: [],
 		}
@@ -207,6 +219,7 @@ if (!CHILD_RUN) {
 		knownByOrigin = undefined
 		genesisError = undefined
 		identityKeyCalls = 0
+		relayError = undefined
 		stateSaveError = undefined
 		ordfsContent = undefined
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bitplan-upload-test-'))
@@ -428,6 +441,24 @@ if (!CHILD_RUN) {
 			expect(console.log).toHaveBeenCalledWith(`Outpoint: ${GENESIS_OUTPOINT}`)
 			expect(console.warn).toHaveBeenCalledWith(
 				expect.stringContaining('local state was not saved'),
+			)
+		})
+
+		test('--relay submits wallet BEEF without changing publish success semantics', async () => {
+			await uploadCommand(htmlFile, { new: true, relay: true, yes: true })
+
+			expect(calls.relays).toEqual([
+				{ beef: genesisResult.beef, txid: genesisResult.txid },
+			])
+			expect(console.log).toHaveBeenCalledWith(
+				'Relay:    1Sat accepted (SEEN_ON_NETWORK)',
+			)
+
+			relayError = new Error('relay unavailable')
+			await uploadCommand(htmlFile, { new: true, relay: true, yes: true })
+			expect(calls.saves).toHaveLength(2)
+			expect(console.warn).toHaveBeenCalledWith(
+				expect.stringContaining('wallet published the draft'),
 			)
 		})
 	})

@@ -54,6 +54,12 @@ export default function HowItWorksPage() {
             broadcasts a new inscription, or spends the current draft coin to
             create its next version.
           </li>
+          <li>
+            <strong>Optional relay.</strong> With <code>--relay</code>, the CLI
+            sends the wallet-returned Atomic BEEF to 1Sat. 1Sat attempts to
+            capture it for OrdFS and forwards the transaction to Arcade. The
+            wallet publish remains authoritative.
+          </li>
         </ol>
       </section>
       <section id="sharing">

@@ -52,7 +52,8 @@ export function buildShareInstructions(
 Use the local source HTML and the BitPlan CLI. Do not handle private keys or encrypt the file yourself. Run:
 
 npx bitplan upload ./plan.html --draft ${origin} \\
-${flags}
+${flags} \\
+  --relay
 
 Replace ./plan.html with the actual local source path when needed. The CLI preserves the draft's current readers and asks the connected BRC-100 wallet to wrap the shared document key for each reader. Review the wallet prompts and publish the version. Do not use --private. Older on-chain versions and their access lists cannot be changed.`;
 }

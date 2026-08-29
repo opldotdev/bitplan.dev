@@ -20,7 +20,7 @@ const FLAGS = [
   {
     command: "upload <file>",
     flags:
-      "--draft <origin>, --new, --description <text>, --share-with <identity-key>, --private, -y, --allow-finding <id>",
+      "--draft <origin>, --new, --description <text>, --share-with <identity-key>, --private, --relay, -y, --allow-finding <id>",
   },
   {
     command: "list",
@@ -87,6 +87,12 @@ export default function CommandsPage() {
         <code>fetch --meta</code> writes metadata to stderr, including whether
         the envelope is private or shared and the public reader list. HTML
         remains on stdout so it can be redirected to a file.
+      </p>
+      <p>
+        <code>upload --relay</code> sends the wallet-returned Atomic BEEF to
+        1Sat after publishing. 1Sat attempts to capture it for OrdFS and
+        forwards the transaction to Arcade, which can make the viewer available
+        sooner. Relay failure is a warning; it does not undo the wallet publish.
       </p>
       <p>
         On-chain bytes are documented in the{" "}

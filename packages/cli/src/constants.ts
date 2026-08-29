@@ -40,6 +40,9 @@ export const VIEWER_BASE_URL = 'https://bitplan.dev/d'
 /** 1sat content gateway used to read published envelopes back. */
 export const DEFAULT_ORDFS_URL = 'https://api.1sat.app'
 
+/** Accepts Atomic BEEF, attempts ORDFS capture, then submits to Arcade. */
+export const DEFAULT_RELAY_URL = 'https://api.1sat.app/1sat/tx'
+
 /** Fee estimate shown before publishing, in satoshis per 1000 bytes. */
 export const FEE_SATS_PER_KB = 1
 
