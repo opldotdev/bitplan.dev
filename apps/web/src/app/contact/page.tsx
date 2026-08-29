@@ -18,6 +18,13 @@ export default function ContactPage() {
           .
         </p>
         <p>
+          Follow{" "}
+          <a href="https://twitter.com/opldotdev">
+            Open Protocol Labs (@opldotdev)
+          </a>
+          .
+        </p>
+        <p>
           The CLI is{" "}
           <a href="https://www.npmjs.com/package/bitplan">bitplan on npm</a>.
           Install it with <code>npx bitplan</code> or <code>bunx bitplan</code>.
