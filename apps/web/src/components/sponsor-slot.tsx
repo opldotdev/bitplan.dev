@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { fetchBsvUsdRate, sponsorAddress, usdToSatoshis } from "@/lib/sponsors";
 import { cn } from "@/lib/utils";
-import { sendSponsorshipPayment } from "@/lib/wallet";
+import { sendSponsorshipPayment, walletErrorMessage } from "@/lib/wallet";
 
 export function SponsorSlot({
   slotClassName,
@@ -42,7 +42,7 @@ export function SponsorSlot({
       setTxid(paid.txid);
       toast.success("Sponsorship paid");
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : String(caught);
+      const message = walletErrorMessage(caught);
       setError(message);
       toast.error(message);
     } finally {

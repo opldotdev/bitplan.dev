@@ -50,6 +50,7 @@ const {
   isWalletConnected,
   reconnectAuthenticatedWallet,
   resetWalletConnection,
+  walletErrorMessage,
 } = await import("./wallet");
 
 beforeEach(() => {
@@ -108,6 +109,42 @@ describe("reconnectAuthenticatedWallet", () => {
     expect(a).toBe(b);
     expect(connectToSubstrateCalls).toBe(1);
     expect(isAuthenticatedCalls).toBe(1);
+  });
+});
+
+describe("walletErrorMessage", () => {
+  test("turns a createAction insufficient-funds blob into a short line", () => {
+    const blob = JSON.stringify({
+      args: { description: "BitPlan Diamond sponsor" },
+      call: "createAction",
+      message:
+        "Storage method createAction failed: Insufficient funds in the available inputs to cover the cost of the required outputs and the transaction fee (2999122228 more satoshis are needed, for a total of 3002101779), plus whatever would be required in order to pay the fee to unlock and spend the outputs used to provide the additional satoshis.",
+    });
+    expect(walletErrorMessage(new Error(blob))).toBe(
+      "Not enough BSV in this wallet."
+    );
+    expect(walletErrorMessage(blob)).not.toContain("createAction");
+    expect(walletErrorMessage(blob)).not.toContain("satoshis");
+  });
+
+  test("maps a cancelled action", () => {
+    expect(walletErrorMessage(new Error("Action aborted by user"))).toBe(
+      "Payment cancelled."
+    );
+  });
+
+  test("maps a missing wallet", () => {
+    expect(
+      walletErrorMessage(
+        new Error("No wallet available over any communication substrate.")
+      )
+    ).toBe("No wallet answered. Start BSV Desktop and try again.");
+  });
+
+  test("never returns a JSON blob", () => {
+    expect(walletErrorMessage(new Error('{"call":"createAction"}'))).toBe(
+      "Payment failed."
+    );
   });
 });
 
