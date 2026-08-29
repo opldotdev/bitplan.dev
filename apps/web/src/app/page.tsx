@@ -42,7 +42,7 @@ export default function Home() {
             <h1 className="font-heading font-semibold text-[clamp(2.25rem,11vw,2.75rem)] leading-[1.08] tracking-tight md:text-5xl lg:whitespace-nowrap lg:text-6xl">
               Plan documents{" "}
               <span className="block lg:inline">
-                on <em className="italic">Bitcoin</em>
+                <em className="italic">on Bitcoin</em>
                 <span className="text-primary">.</span>
               </span>
             </h1>
