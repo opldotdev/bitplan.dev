@@ -1,7 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { CommandCopy } from "@/components/command-copy";
 import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = {
+  description:
+    "Publish an encrypted HTML file as a 1Sat Ordinal. Your wallet encrypts and publishes. This site is the viewer.",
+  title: {
+    absolute: "BitPlan",
+  },
+};
 
 export default function Home() {
   return (

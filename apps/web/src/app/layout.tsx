@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { SiteChrome } from "@/components/site-chrome";
+import { SiteJsonLd } from "@/components/site-json-ld";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SITE_URL } from "@/lib/site";
 
 import "./globals.css";
 
@@ -21,10 +23,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   description:
     "Publish encrypted HTML plans through a BRC-100 wallet on Bitcoin. bitplan.dev is the viewer.",
-  metadataBase: new URL("https://bitplan.dev"),
+  metadataBase: new URL(SITE_URL),
+  openGraph: {
+    locale: "en_US",
+    siteName: "BitPlan",
+    type: "website",
+  },
   title: {
     default: "BitPlan",
     template: "%s · BitPlan",
+  },
+  twitter: {
+    card: "summary_large_image",
   },
 };
 
@@ -36,6 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body className="flex min-h-dvh flex-col">
+        <SiteJsonLd />
         <ThemeProvider>
           <TooltipProvider>
             <SiteChrome>{children}</SiteChrome>

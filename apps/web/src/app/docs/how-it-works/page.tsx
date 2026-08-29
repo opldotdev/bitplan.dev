@@ -25,7 +25,7 @@ export default function HowItWorksPage() {
       </p>
       <ArchitectureDiagram />
       <p>
-        bitplan.dev fetches public ciphertext through OrdFS. In the browser, the
+        bitplan.dev fetches public ciphertext from 1Sat. In the browser, the
         connected wallet decrypts a private draft or unwraps a shared document
         key. The site has no drafts database, and plaintext never reaches its
         server.
