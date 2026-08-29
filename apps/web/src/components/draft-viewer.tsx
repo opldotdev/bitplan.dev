@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ShareDraftDialog } from "@/components/share-draft-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
-import { openEnvelope } from "@/lib/envelope";
+import { EnvelopeAccessError, openEnvelope } from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
 import {
   fetchOrdfsContent,
@@ -44,7 +45,11 @@ import {
   reconnectAuthenticatedWallet,
 } from "@/lib/wallet";
 
-type WalletIssue = "no-wallet" | "unwrap-refused";
+type WalletIssue =
+  | "connect-failed"
+  | "decrypt-refused"
+  | "identity-unavailable"
+  | "not-authorized";
 
 export interface LoadedDraft {
   content: OrdfsContent;
@@ -208,8 +213,27 @@ async function reopenDraft(
   try {
     const opened = await openEnvelope(wallet, bytes);
     return { issue: null, plaintext: opened.plaintext };
-  } catch {
-    return { issue: "unwrap-refused", plaintext: null };
+  } catch (error) {
+    return { issue: accessIssue(error), plaintext: null };
+  }
+}
+
+function accessIssue(error: unknown): WalletIssue {
+  return error instanceof EnvelopeAccessError ? error.issue : "decrypt-refused";
+}
+
+function walletIssueMessage(issue: WalletIssue): string {
+  switch (issue) {
+    case "connect-failed":
+      return "Could not connect to or authorize a BRC-100 wallet.";
+    case "not-authorized":
+      return "This wallet identity is not authorized for this version.";
+    case "identity-unavailable":
+      return "The wallet could not provide its identity key.";
+    case "decrypt-refused":
+      return "The wallet declined to decrypt this version.";
+    default:
+      return assertNever(issue);
   }
 }
 
@@ -334,7 +358,7 @@ export function DraftViewer() {
     } catch {
       setView((current) =>
         current.requestKey === requestKey && current.phase === "encrypted"
-          ? { ...current, walletIssue: "no-wallet" }
+          ? { ...current, walletIssue: "connect-failed" }
           : current
       );
       setBusy(false);
@@ -353,10 +377,10 @@ export function DraftViewer() {
             }
           : current
       );
-    } catch {
+    } catch (error) {
       setView((current) =>
         current.requestKey === requestKey && current.phase === "encrypted"
-          ? { ...current, walletIssue: "unwrap-refused" }
+          ? { ...current, walletIssue: accessIssue(error) }
           : current
       );
     } finally {
@@ -393,6 +417,7 @@ export function DraftViewer() {
         currentVersion={view.draft.currentVersion}
         latestVersion={view.draft.latestVersion}
         onVersion={handleVersion}
+        origin={view.draft.origin}
         plaintext={view.plaintext}
       />
     );
@@ -551,14 +576,12 @@ function EncryptedView({
               </Button>
               {walletIssue ? (
                 <p className="text-center text-destructive text-sm">
-                  {walletIssue === "no-wallet"
-                    ? "No BRC-100 wallet answered on this machine."
-                    : "The wallet declined to unwrap this draft's key."}
+                  {walletIssueMessage(walletIssue)}
                 </p>
               ) : null}
               <p className="text-center text-muted-foreground text-sm">
-                Only a wallet holding this draft&apos;s key can read it.
-                bitplan.dev stores nothing.
+                Only an authorized wallet can read it. bitplan.dev stores no
+                draft or plaintext server-side.
               </p>
             </div>
           </CardContent>
@@ -573,11 +596,13 @@ function DecryptedView({
   currentVersion,
   latestVersion,
   onVersion,
+  origin,
 }: {
   plaintext: DraftPlaintext;
   currentVersion: number;
   latestVersion: number;
   onVersion: (version: number) => void;
+  origin: string;
 }) {
   const { title } = plaintext.meta;
   const versions = Array.from({ length: latestVersion }, (_, i) => i + 1);
@@ -604,6 +629,7 @@ function DecryptedView({
           <div className="flex-1" />
         )}
         <div className="ml-auto flex items-center gap-1">
+          <ShareDraftDialog origin={origin} />
           <MetaInfo meta={plaintext.meta} />
           <ThemeToggle />
         </div>

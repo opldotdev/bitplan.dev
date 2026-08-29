@@ -56,6 +56,7 @@ describe('cli surface', () => {
 		expect(program.commands.map((c) => c.name())).toEqual([
 			'auth',
 			'whoami',
+			'version',
 			'upload',
 			'list',
 			'fetch',
@@ -92,11 +93,25 @@ describe('cli surface', () => {
 				'--draft',
 				'--new',
 				'--description',
+				'--share-with',
+				'--private',
 				'--yes',
 				'--allow-finding',
 				'--wallet-url',
 			]),
 		)
+	})
+
+	test('version command prints only the package version', async () => {
+		const chunks: string[] = []
+		const original = console.log
+		console.log = (value?: unknown) => chunks.push(String(value))
+		try {
+			await main(['node', 'bitplan', 'version'])
+		} finally {
+			console.log = original
+		}
+		expect(chunks).toEqual([CLI_VERSION])
 	})
 
 	test('list takes json, verbose, and limit flags', () => {
@@ -126,6 +141,20 @@ describe('cli surface', () => {
 			{ from: 'user' },
 		)
 		expect(captured).toEqual(['a-1', 'b-2'])
+	})
+
+	test('--share-with is repeatable', () => {
+		const upload = commandNamed(buildProgram(), 'upload')
+		let captured: string[] | undefined
+		upload.action((_file: string, options: { shareWith?: string[] }) => {
+			captured = options.shareWith
+		})
+		upload.exitOverride()
+		upload.parse(
+			['plan.html', '--share-with', 'reader-a', '--share-with', 'reader-b'],
+			{ from: 'user' },
+		)
+		expect(captured).toEqual(['reader-a', 'reader-b'])
 	})
 
 	test('an unknown command is an error, not a silent no-op', () => {

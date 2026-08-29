@@ -46,7 +46,7 @@ type ListState =
   | { phase: "checking" }
   | { phase: "idle" }
   | { phase: "connecting" }
-  | { phase: "no-wallet" }
+  | { phase: "wallet-error" }
   | { phase: "loaded"; rows: DraftRow[] };
 
 async function toRow(wallet: DraftsWallet, coin: DraftCoin): Promise<DraftRow> {
@@ -112,7 +112,7 @@ export function DraftsList() {
       const wallet = await connectBrowserWallet();
       setState({ phase: "loaded", rows: await loadRows(wallet) });
     } catch {
-      setState({ phase: "no-wallet" });
+      setState({ phase: "wallet-error" });
     }
   }, []);
 
@@ -247,7 +247,7 @@ function ConnectEmpty({
   state,
 }: {
   onConnect: () => void;
-  state: "idle" | "connecting" | "no-wallet";
+  state: "idle" | "connecting" | "wallet-error";
 }) {
   return (
     <Empty className="border border-dashed">
@@ -268,9 +268,10 @@ function ConnectEmpty({
         >
           {state === "connecting" ? "Connecting…" : "Connect wallet"}
         </Button>
-        {state === "no-wallet" ? (
+        {state === "wallet-error" ? (
           <p className="text-muted-foreground text-sm">
-            No wallet answered. Start BSV Desktop and try again.
+            Could not connect to or read from the wallet. Start or unlock a
+            compatible BRC-100 wallet, such as BSV Desktop, and try again.
           </p>
         ) : null}
       </EmptyContent>

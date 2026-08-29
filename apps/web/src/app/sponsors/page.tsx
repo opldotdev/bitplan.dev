@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 
 import { SponsorSlot } from "@/components/sponsor-slot";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardAction,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { SPONSOR_TIERS, type SponsorTier } from "@/lib/sponsors";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   description:
-    "One-time BSV sponsorships paid from a BRC-100 wallet. Logo and name on this page, a link to your site, and a mention in major release notes.",
+    "Preview BitPlan's planned sponsorship tiers. Payments are not yet available.",
   title: "Sponsors",
 };
 
@@ -32,7 +40,6 @@ function SponsorSection({ tier }: { tier: SponsorTier }) {
               slotClassName={tier.slotClassName}
               slotId={slotId}
               tierName={tier.name}
-              usd={tier.priceUsd}
             />
           </li>
         ))}
@@ -52,14 +59,27 @@ export default function SponsorsPage() {
           </p>
           <h1 className="font-medium text-4xl">Sponsor BitPlan</h1>
           <p className="max-w-xl text-balance text-muted-foreground">
-            Keep encrypted plan documents on Bitcoin. Each tier is a one-time
-            BSV payment from your BRC-100 wallet. Your name and logo go on this
-            page, with a link to your site, and you get a mention in major
-            release notes.
+            Help keep encrypted plan documents on Bitcoin. The planned tiers
+            include your name and logo on this page, a link to your site, and a
+            mention in major release notes.
           </p>
         </header>
 
         <div className="flex flex-col gap-12">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sponsorships are not open yet</CardTitle>
+              <CardDescription>
+                No payments are accepted from this page. Sponsorships will open
+                after every payment can reserve a specific slot and collect the
+                details needed to publish it.
+              </CardDescription>
+              <CardAction>
+                <Badge variant="secondary">Payments paused</Badge>
+              </CardAction>
+            </CardHeader>
+          </Card>
+
           {SPONSOR_TIERS.map((tier) => (
             <SponsorSection key={tier.id} tier={tier} />
           ))}

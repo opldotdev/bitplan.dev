@@ -10,16 +10,24 @@ const COMMANDS = [
     hint: "Optional label, shown in list and My drafts.",
   },
   {
+    cmd: "npx bitplan upload ./plan.html --share-with <identity-key>",
+    hint: "Publish the next version for this wallet and the named reader.",
+  },
+  {
     cmd: "npx bitplan list",
     hint: "Drafts this wallet holds.",
   },
   {
     cmd: "npx bitplan whoami",
-    hint: "Check the wallet.",
+    hint: "Check the wallet and print its identity key.",
   },
   {
     cmd: "npx bitplan fetch <origin>",
     hint: "Decrypt HTML to stdout.",
+  },
+  {
+    cmd: "npx bitplan version",
+    hint: "Print the installed CLI version.",
   },
 ] as const;
 

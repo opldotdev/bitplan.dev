@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "root": true,
-  "extends": ["ultracite/biome/core", "ultracite/biome/next"]
+  "extends": ["ultracite/biome/core", "ultracite/biome/next"],
+  "files": {
+    "includes": ["!src/components/ui", "!src/hooks/use-mobile.ts"]
+  }
 }

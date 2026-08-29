@@ -1,72 +1,40 @@
-# The bitplan envelope, version 1
+# The BitPlan envelope
 
-This is the on-chain format bitplan publishes. It is a public specification:
-anything that can read a 1Sat Ordinal and talk to a BRC-100 wallet can
-implement it. The reference implementation is `packages/cli` in this
-repository.
-
-bitplan v1 is **encrypted-only**. There is no cleartext code path, and a
-conforming implementation must not add one.
+This is the encrypted on-chain format BitPlan publishes. Anything that can
+read a 1Sat Ordinal and talk to a BRC-100 wallet can implement it. There is no
+cleartext document mode.
 
 ## Where it lives
 
-A bitplan draft is a 1Sat Ordinal.
+A draft is a versioned 1Sat Ordinal:
 
-- **Content type:** `application/x-bitplan` — constant for every version of
-  every draft. The type describes the envelope, not the payload.
-- **Inscription content:** the envelope bytes described below.
-- **MAP metadata (cleartext, on chain):**
+- Content type: `application/x-bitplan`.
+- Content: the envelope below.
+- Cleartext MAP: `{ "app": "bitplan", "type": "plan", "enc": "1" }`.
 
-  ```json
-  { "app": "bitplan", "type": "plan", "enc": "1" }
-  ```
+The first inscription's outpoint is the stable origin. Each update spends the
+current 1-sat output and puts the next envelope on its replacement. Holding the
+coin authorizes publishing; holding an encryption relationship authorizes
+reading. Those are separate capabilities.
 
-  Nothing else. Titles, descriptions, repository names and commit subjects are
-  metadata about a private document, so they live inside the ciphertext.
-
-## Versioning is reinscription
-
-The first publish inscribes a fresh 1-satoshi output. Every later publish
-spends that same satoshi back to its owner with a new envelope on the output.
-The coin — and therefore the origin chain — carries forward, so:
-
-- the **origin** (the genesis outpoint, `txid_vout`) is the stable identity of
-  a draft, for its whole life;
-- each spend of the coin is one **version**; ORDFS sequence 0 is version 1;
-- only the wallet holding the coin can publish the next version.
-
-Per BRC-147, a reinscribed output keeps the **genesis** `origin:` and `type:`
-tags as the collectable's identity — it is not retagged with the new content
-type. Because bitplan's content type never varies, `type:application/x-bitplan`
-is a reliable filter for every version of every bitplan draft in a wallet.
-
-## Binary layout
+## Binary frame
 
 All multi-byte integers are little-endian.
 
+```text
++--------+---------+-------------------+------------------+-----------------+
+| 'BPLN' | version | uint32-LE         | header           | ciphertext body |
+| 4 B    | 1 B     | 4 B: header bytes | UTF-8 JSON       | to end          |
++--------+---------+-------------------+------------------+-----------------+
 ```
-+--------+---------+-------------------+------------------+---------------+
-| 'BPLN' | 0x01    | uint32-LE         | header           | ciphertext    |
-| 4 B    | 1 B     | 4 B: header bytes | UTF-8 JSON       | to end        |
-+--------+---------+-------------------+------------------+---------------+
-```
 
-| Field       | Size    | Value                                              |
-| ----------- | ------- | -------------------------------------------------- |
-| magic       | 4 bytes | ASCII `BPLN` (`0x42 0x50 0x4C 0x4E`)                |
-| version     | 1 byte  | `0x01`                                              |
-| header size | 4 bytes | uint32-LE byte length of the header JSON            |
-| header      | varies  | UTF-8 JSON, exactly `header size` bytes             |
-| ciphertext  | rest    | BRC-2 output of `wallet.encrypt`                    |
+The version byte is `0x01` for a private envelope and `0x02` for a shared
+envelope. Readers reject unknown versions, bad magic, invalid headers, buffer
+overruns, and empty ciphertext.
 
-A reader must reject anything whose magic is not `BPLN`, whose version byte it
-does not implement, whose header size overruns the buffer, or that carries no
-ciphertext.
+## Version 1: wallet only
 
-## Header
-
-The header is cleartext. It names the BRC-2 protocol and keyID a reader must
-pass to `wallet.decrypt`. It is not a second cipher.
+Private drafts retain the compact original format:
 
 ```json
 {
@@ -74,39 +42,76 @@ pass to `wallet.decrypt`. It is not a second cipher.
   "key": {
     "mode": "brc2-self",
     "protocolID": [2, "bitplan"],
-    "keyID": "<uuid string>"
+    "keyID": "<per-draft UUID>"
   }
 }
 ```
 
-| Field            | Meaning                                                             |
-| ---------------- | ------------------------------------------------------------------- |
-| `v`              | Header version. `1`.                                                 |
-| `key.mode`       | How the body is encrypted. `brc2-self` is the only v1 mode.          |
-| `key.protocolID` | BRC-2 protocol: `[securityLevel, name]`. bitplan uses `[2, "bitplan"]`. |
-| `key.keyID`      | BRC-2 key id. Minted per draft, **reused for every version**.        |
+The body is one complete result from:
 
-`keyID` is a derivation label, not a secret. A reader must use the header's
-`protocolID` and `keyID` when decrypting, not its own constants.
-
-## Ciphertext
-
-The body is the UTF-8 JSON plaintext, encrypted with the BRC-100 wallet:
-
-```
+```ts
 wallet.encrypt({
-  protocolID:   header.key.protocolID,
-  keyID:        header.key.keyID,
+  protocolID: header.key.protocolID,
+  keyID: header.key.keyID,
   counterparty: "self",
-  plaintext:    <UTF-8 JSON bytes>
+  plaintext
 })
 ```
 
-Decrypt with `wallet.decrypt` and the same parameters. The wallet implements
-BRC-2 (Type-42 derived keys, AES-256-GCM). The publishing client does not
-choose an IV, a content key, or a second AES pass.
+The same wallet decrypts it with `counterparty: "self"`.
+
+## Version 2: named readers
+
+Shared drafts encrypt the document once with the SDK's `SymmetricKey`. The
+wallet then encrypts only that 32-byte document key for each reader. The first
+slot is the publisher's self-encrypted key; each remaining slot is a key wrap
+for one recipient identity public key.
+
+```json
+{
+  "v": 2,
+  "key": {
+    "mode": "brc2-multi",
+    "protocolID": [2, "bitplan"],
+    "keyID": "<per-draft UUID>",
+    "payloadLength": 1282,
+    "senderIdentityKey": "<compressed public key>",
+    "slots": [
+      { "identityKey": "<sender>", "offset": 1282, "length": 80 },
+      { "identityKey": "<recipient>", "offset": 1362, "length": 80 }
+    ]
+  }
+}
+```
+
+The body starts with `payloadLength` bytes of AES-256-GCM ciphertext produced by
+`SymmetricKey.encrypt`. Wrapped-key slots follow in header order. Slot offsets
+are absolute body offsets, contiguous, and cover the rest of the body.
+
+For the owner and each recipient, the publisher calls:
+
+```ts
+wallet.encrypt({
+  protocolID: header.key.protocolID,
+  keyID: header.key.keyID,
+  counterparty: recipientIdentityKey,
+  plaintext: documentKeyBytes
+})
+```
+
+The recipient selects its slot and calls `wallet.decrypt` with the publisher's
+`senderIdentityKey` as `counterparty`. The publisher uses `counterparty:
+"self"`. The returned 32-byte key decrypts the single payload with SDK
+`SymmetricKey.decrypt`.
+
+This is the hybrid pattern already used by `@bsv/sdk` certificate keyrings:
+SDK AES-GCM for the payload, BRC-100 wallet encryption for the small revelation
+key. BitPlan never receives an identity private key or implements cryptography
+itself. `keyID` is a public BRC-2 derivation label, not key material.
 
 ## Plaintext
+
+The private body or shared payload decrypts to this UTF-8 JSON:
 
 ```json
 {
@@ -121,27 +126,21 @@ choose an IV, a content key, or a second AES pass.
     "gitCommitSubject": "string | null",
     "gitDirty": "boolean | null",
     "cliVersion": "string",
-    "fileSha256": "string",
+    "fileSha256": "hex SHA-256",
     "createdAt": "ISO 8601 string"
   },
   "html": "<the document>"
 }
 ```
 
-`fileSha256` is the SHA-256 of the HTML document as UTF-8, hex encoded.
-`gitDirty` is `null` outside a git repository, and `true`/`false` inside one.
+## Privacy and permanence
 
-## What is public
+In v1, only the envelope parameters and ciphertext are public. In v2, the
+publisher and recipient identity public keys are also public so a reader can
+locate its slot. This reveals the access graph, and size and inscription cost
+grow only by one small wrapped key and header entry per reader. BitPlan caps a
+shared version at 128 additional readers.
 
-The ciphertext and the three MAP fields are public; everything else rides
-inside the encrypted payload. Nothing published can be edited or deleted,
-so a conforming publisher scans the **plaintext** for credentials before
-sealing it — defense in depth for a document that lives forever — and keeps
-the on-chain MAP metadata to three fields.
-
-## Reserved for later versions
-
-- Version byte `0x02` and above, and `key.mode` values other than
-  `brc2-self`, are reserved. A v1 reader must reject them rather than guess.
-- `TransferItem.signWithBAP` (Sigma-signed envelopes) exists upstream but is
-  **not** used by bitplan v1.
+Publishing a later private version does not revoke access to an older shared
+version. No inscription can be edited or deleted. BitPlan therefore scans the
+plaintext for credentials before asking the wallet to encrypt it.

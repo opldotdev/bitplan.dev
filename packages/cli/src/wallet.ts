@@ -1,11 +1,12 @@
 /**
  * Wallet access.
  *
- * bitplan is a pure BRC-100 client: it holds no keys, derives nothing, and
- * signs nothing itself. Every key operation — encrypt, decrypt, getPublicKey,
- * createAction, signAction — is a call to the user's wallet over the local
- * BRC-100 JSON API. There is no embedded wallet and no fallback: if nothing
- * answers on the bridge, the command fails and says so.
+ * bitplan is a BRC-100 client: it never receives an identity private key,
+ * derives an identity key, or signs anything itself. Identity-key operations
+ * and transaction calls go to the user's wallet over the local BRC-100 JSON
+ * API. Shared envelopes do use a transient SDK-generated document key. There
+ * is no embedded wallet and no fallback: if nothing answers on the bridge, the
+ * command fails and says so.
  */
 
 import { HTTPWalletJSON, WalletClient, type WalletInterface } from '@bsv/sdk'

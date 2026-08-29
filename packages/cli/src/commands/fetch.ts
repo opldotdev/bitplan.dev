@@ -1,5 +1,5 @@
 import { isBitplanContentType } from '../constants.js'
-import { openEnvelope } from '../envelope.js'
+import { openEnvelope, sharedWith } from '../envelope.js'
 import { CliError } from '../errors.js'
 import { fetchLatest, originFromReference } from '../ordfs.js'
 import { connectWallet } from '../wallet.js'
@@ -61,7 +61,16 @@ export async function fetchCommand(
 					outpoint: content.outpoint,
 					version,
 					contentType: content.contentType,
+					envelopeVersion: header.v,
 					keyID: header.key.keyID,
+					access:
+						header.v === 1
+							? { mode: 'wallet-only', readers: [] }
+							: {
+									mode: 'shared',
+									senderIdentityKey: header.key.senderIdentityKey,
+									readers: sharedWith(header),
+								},
 					meta: plaintext.meta,
 				},
 				null,

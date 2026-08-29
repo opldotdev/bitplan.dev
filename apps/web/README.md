@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BitPlan web
 
-## Getting Started
+The Next.js viewer and documentation site for BitPlan.
 
-First, run the development server:
+The site resolves encrypted BitPlan inscriptions through OrdFS. The connected
+BSV wallet decrypts private drafts or unwraps a shared document key; shared
+payload decryption then runs locally with `@bsv/sdk`. Plaintext drafts are not
+sent to or stored by the application server.
+
+## Development
+
+From the repository root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
+bun run --cwd apps/web dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The development server is normally available at <http://localhost:3000>.
+Do not start another server if one is already running.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Checks
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+bun run --cwd apps/web check
+bun run --cwd apps/web build
+bun test apps/web/src
+```
 
-## Learn More
+The files in `src/components/ui` are stock shadcn registry components. Product
+components should compose those primitives rather than duplicating them.
 
-To learn more about Next.js, take a look at the following resources:
+## Important boundaries
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Draft routes are under `/d/<origin>`.
+- `/ordfs/*` is a read-only rewrite to `https://api.1sat.app`.
+- Identity-key cryptography belongs to BRC-100 wallet APIs. Shared payloads use
+  `@bsv/sdk`'s `SymmetricKey`; the web app must not implement its own cipher.
+- Publishing is permanent. Never add a cleartext publishing path.

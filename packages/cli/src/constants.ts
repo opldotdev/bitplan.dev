@@ -19,8 +19,8 @@ export function isBitplanContentType(contentType: string): boolean {
 export const TYPE_TAG = `type:${CONTENT_TYPE}`
 
 /**
- * BRC-2 protocol for the content-key wrap. Security level 2 = the wallet asks
- * the user per counterparty per app.
+ * BRC-2 protocol for private document encryption and shared content-key wraps.
+ * Security level 2 lets the wallet ask per counterparty per app.
  */
 export const BITPLAN_PROTOCOL: WalletProtocol = [2 as SecurityLevel, 'bitplan']
 

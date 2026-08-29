@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   description:
-    "Encrypt an HTML plan to your wallet and inscribe it on Bitcoin. bitplan.dev is the viewer.",
+    "Publish encrypted HTML plans through a BRC-100 wallet on Bitcoin. bitplan.dev is the viewer.",
   metadataBase: new URL("https://bitplan.dev"),
   title: {
     default: "BitPlan",

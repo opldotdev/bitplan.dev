@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   description:
-    "Encrypt an HTML plan to your wallet and inscribe it on Bitcoin.",
+    "Publish encrypted HTML plans through a BRC-100 wallet on Bitcoin.",
   title: "Docs",
 };
 
@@ -15,10 +15,11 @@ export default function DocsIntroPage() {
     <>
       <h1>BitPlan</h1>
       <p>
-        The CLI encrypts a self-contained HTML document and inscribes it as a
-        1Sat Ordinal. Upload the same file again and bitplan reinscribes the
-        same satoshi. One origin outpoint is the draft&apos;s identity and its
-        version history. This site is the viewer. It stores nothing.
+        The CLI packages a self-contained HTML document and asks your BRC-100
+        wallet to publish it as an encrypted 1Sat Ordinal. Upload it again to
+        reinscribe the same satoshi. One origin outpoint identifies the draft
+        and its version history. This site is the viewer. It stores no drafts
+        server-side.
       </p>
       <div className="not-typeset mt-5">
         <CommandCopy command="npx bitplan" />

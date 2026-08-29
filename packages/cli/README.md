@@ -2,15 +2,17 @@
 
 Publish plan documents to Bitcoin as 1Sat Ordinals. Encrypted by default.
 
-The CLI validates a self-contained HTML document, then asks your wallet to
-encrypt and inscribe it on BSV. Upload the same file again and the wallet spends
-the current draft coin with a new inscription, so one origin outpoint identifies
-the draft and its version history.
+The CLI validates a self-contained HTML document, encrypts it with standard
+`@bsv/sdk` and BRC-100 wallet operations, then asks the wallet to inscribe it on
+BSV. Upload the same file again and the wallet spends the current draft coin
+with a new inscription, so one origin outpoint identifies the draft and its
+version history.
 
 ## Requirements
 
-A running BRC-100 wallet on this machine. bitplan holds no keys: encryption,
-decryption, signing, and funding are calls into your wallet. [BSV
+A running BRC-100 wallet on this machine. bitplan never receives identity
+private keys: BRC-2 wrapping, unwrapping, signing, and funding are wallet calls.
+The shared document key exists transiently in the CLI. [BSV
 Desktop](https://desktop.bsvb.tech/) serves the JSON API on
 `127.0.0.1:3321`, which is where bitplan looks by default.
 
@@ -38,7 +40,26 @@ Confirm the wallet is there:
 ```sh
 npx bitplan auth
 npx bitplan whoami
+npx bitplan version
 ```
+
+Share the next version with one or more wallet identity public keys. Existing
+readers remain authorized unless you explicitly publish a private version:
+
+```sh
+npx bitplan upload ./plan.html --share-with <identity-key>
+npx bitplan upload ./plan.html \
+  --share-with <identity-key-a> \
+  --share-with <identity-key-b>
+npx bitplan upload ./plan.html --private
+```
+
+`bitplan whoami` prints the connected wallet's identity key. A shared version
+stores the encrypted document once, then asks the wallet to wrap its 32-byte
+document key for each reader. Identity keys and the access list are public, and
+`--private` only affects the new version; older shared inscriptions remain
+readable by their original recipients. Security level 2 lets the wallet ask for
+permission for each new reader.
 
 List the drafts this wallet holds. The default table shortens origins and
 outpoints. `--verbose` switches to one labeled detail block per draft so full
@@ -49,7 +70,8 @@ npx bitplan list
 npx bitplan list --verbose
 ```
 
-Read one back (HTML to stdout, metadata to stderr with `--meta`):
+Read one back (HTML to stdout, metadata to stderr with `--meta`). Metadata
+includes the envelope version, access mode, and public reader list:
 
 ```sh
 npx bitplan fetch <origin> --meta > plan.html
@@ -78,6 +100,8 @@ bitplan upload <file>
   --draft <origin>         Update a specific draft
   --new                    Always create a new draft
   --description <text>     Set a short description
+  --share-with <key>       Add a reader identity key (repeatable)
+  --private                Make the new version wallet-only
   -y, --yes                Skip the confirmation prompt
   --allow-finding <id>     Waive one secret-scanner finding (repeatable)
 
@@ -89,13 +113,16 @@ bitplan list
 bitplan fetch <origin|url>
   --meta
   --version <n>
+
+bitplan version
 ```
 
 ## How it works
 
-- **Encryption.** The document is BRC-2 encrypted by your wallet
-  (`wallet.encrypt`, counterparty `self`). The envelope header only names the
-  protocol and keyID so a reader can call `wallet.decrypt`. See
+- **Encryption.** Private drafts use one BRC-2 `wallet.encrypt` call with
+  `counterparty: self`. Shared drafts use the SDK's `SymmetricKey` to encrypt
+  the document once, then BRC-2-wrap that key for the owner and each recipient.
+  The CLI never handles identity private keys or implements its own cipher. See
   [ENVELOPE.md](./ENVELOPE.md) for the byte layout.
 - **Versioning.** The first publish inscribes a 1-satoshi output. Later
   publishes spend that satoshi back to you carrying a new envelope. Only the

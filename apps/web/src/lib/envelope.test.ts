@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { PrivateKey, ProtoWallet, SymmetricKey } from "@bsv/sdk";
 
 import {
   type DraftPlaintext,
   ENVELOPE_VERSION,
+  EnvelopeAccessError,
   EnvelopeError,
   type EnvelopeHeader,
   type EnvelopeWallet,
@@ -10,17 +12,22 @@ import {
   MAGIC,
   openEnvelope,
   parseEnvelope,
+  sharedWith,
 } from "./envelope";
 
 const BAD_WRAP_MODE = /key mode/;
 const NO_KEY_ID = /keyID is missing/;
 const BAD_MAGIC = /magic/;
-const BAD_VERSION = /version 0x02/;
+const BAD_VERSION = /version 0x03/;
 const TOO_SHORT = /too short/;
 const TRUNCATED = /Truncated/;
 const NO_CIPHERTEXT = /no ciphertext/;
 const NOT_JSON = /not valid JSON/;
 const TAMPERED = /not valid JSON|no html document/;
+const VERSION_MISMATCH = /does not match/;
+const WRONG_PROTOCOL = /must be \[2, bitplan\]/;
+const INVALID_CURVE_POINT = /secp256k1 point/;
+const NONCONTIGUOUS = /not contiguous/;
 
 const PAD = Uint8Array.from(
   Array.from({ length: 32 }, (_, i) => ((i * 37 + 11) % 251) + 1)
@@ -89,6 +96,12 @@ function createMockWallet(): {
         protocolID: args.protocolID,
       });
       return Promise.resolve({ ciphertext: xorPad(args.plaintext) });
+    },
+    getPublicKey() {
+      return Promise.resolve({
+        publicKey:
+          "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      });
     },
   };
 
@@ -199,6 +212,93 @@ describe("envelope round trip", () => {
     await openEnvelope(wallet, envelope);
     expect(calls.decrypt[0]?.protocolID).toEqual([2, "bitplan"]);
   });
+
+  test("opens a shared slot for the owner and a recipient", async () => {
+    const owner = new ProtoWallet(new PrivateKey(1));
+    const recipient = new ProtoWallet(new PrivateKey(2));
+    const recipientIdentity = (
+      await recipient.getPublicKey({ identityKey: true })
+    ).publicKey;
+    const body = Array.from(
+      new TextEncoder().encode(JSON.stringify(PLAINTEXT))
+    );
+    const contentKey = SymmetricKey.fromRandom();
+    const payload = contentKey.encrypt(body) as number[];
+    const contentKeyBytes = contentKey.toArray("be", 32);
+    const ownerIdentity = (await owner.getPublicKey({ identityKey: true }))
+      .publicKey;
+    const ownerCiphertext = (
+      await owner.encrypt({
+        counterparty: "self",
+        keyID: "shared-key",
+        plaintext: contentKeyBytes,
+        protocolID: [2, "bitplan"],
+      })
+    ).ciphertext;
+    const recipientCiphertext = (
+      await owner.encrypt({
+        counterparty: recipientIdentity,
+        keyID: "shared-key",
+        plaintext: contentKeyBytes,
+        protocolID: [2, "bitplan"],
+      })
+    ).ciphertext;
+    const combined = Uint8Array.from([
+      ...payload,
+      ...ownerCiphertext,
+      ...recipientCiphertext,
+    ]);
+    const envelope = frameEnvelope(
+      {
+        key: {
+          keyID: "shared-key",
+          mode: "brc2-multi",
+          payloadLength: payload.length,
+          protocolID: [2, "bitplan"],
+          senderIdentityKey: ownerIdentity,
+          slots: [
+            {
+              identityKey: ownerIdentity,
+              length: ownerCiphertext.length,
+              offset: payload.length,
+            },
+            {
+              identityKey: recipientIdentity,
+              length: recipientCiphertext.length,
+              offset: payload.length + ownerCiphertext.length,
+            },
+          ],
+        },
+        v: 2,
+      },
+      combined
+    );
+
+    const parsed = parseEnvelope(envelope);
+    expect(sharedWith(parsed.header)).toEqual([recipientIdentity]);
+    expect((await openEnvelope(owner, envelope)).plaintext).toEqual(PLAINTEXT);
+    let recipientCounterparty: string | undefined;
+    const recipientWallet: EnvelopeWallet = {
+      decrypt: (args) => {
+        recipientCounterparty = args.counterparty;
+        return recipient.decrypt(args);
+      },
+      getPublicKey: (args) => recipient.getPublicKey(args),
+    };
+    expect((await openEnvelope(recipientWallet, envelope)).plaintext).toEqual(
+      PLAINTEXT
+    );
+    expect(recipientCounterparty).toBe(ownerIdentity);
+
+    const outsider = new ProtoWallet(new PrivateKey(3));
+    try {
+      await openEnvelope(outsider, envelope);
+      throw new Error("expected outsider rejection");
+    } catch (error) {
+      expect(error).toBeInstanceOf(EnvelopeAccessError);
+      expect((error as EnvelopeAccessError).issue).toBe("not-authorized");
+    }
+  });
 });
 
 describe("envelope header parsing", () => {
@@ -212,8 +312,14 @@ describe("envelope header parsing", () => {
 
   test("rejects an unknown version byte", () => {
     const envelope = frameEnvelope(validHeader(), new Uint8Array([1, 2, 3]));
-    envelope[4] = 0x02;
+    envelope[4] = 0x03;
     expect(() => parseEnvelope(envelope)).toThrow(BAD_VERSION);
+  });
+
+  test("rejects a binary/header version mismatch", () => {
+    const envelope = frameEnvelope(validHeader(), new Uint8Array([1, 2, 3]));
+    envelope[4] = 2;
+    expect(() => parseEnvelope(envelope)).toThrow(VERSION_MISMATCH);
   });
 
   test("rejects a buffer too short to hold a header", () => {
@@ -260,5 +366,59 @@ describe("envelope header parsing", () => {
       new Uint8Array([1, 2, 3])
     );
     expect(() => parseEnvelope(envelope)).toThrow(NO_KEY_ID);
+  });
+
+  test("rejects another wallet protocol before decryption", () => {
+    const header = validHeader();
+    const envelope = frameEnvelope(
+      { ...header, key: { ...header.key, protocolID: [2, "other"] } },
+      new Uint8Array([1, 2, 3])
+    );
+    expect(() => parseEnvelope(envelope)).toThrow(WRONG_PROTOCOL);
+  });
+
+  test("rejects malformed shared identities and slot coverage", () => {
+    const owner =
+      "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+    const header: EnvelopeHeader = {
+      key: {
+        keyID: "shared-key",
+        mode: "brc2-multi",
+        payloadLength: 48,
+        protocolID: [2, "bitplan"],
+        senderIdentityKey: owner,
+        slots: [{ identityKey: owner, length: 1, offset: 48 }],
+      },
+      v: 2,
+    };
+    const body = new Uint8Array(49);
+    expect(() => parseEnvelope(frameEnvelope(header, body))).not.toThrow();
+
+    const invalidIdentity = structuredClone(header);
+    if (invalidIdentity.v !== 2) {
+      throw new Error("expected shared header");
+    }
+    invalidIdentity.key.senderIdentityKey = `02${"f".repeat(64)}`;
+    const [invalidSlot] = invalidIdentity.key.slots;
+    if (!invalidSlot) {
+      throw new Error("expected shared slot");
+    }
+    invalidSlot.identityKey = `02${"f".repeat(64)}`;
+    expect(() => parseEnvelope(frameEnvelope(invalidIdentity, body))).toThrow(
+      INVALID_CURVE_POINT
+    );
+
+    const gap = structuredClone(header);
+    if (gap.v !== 2) {
+      throw new Error("expected shared header");
+    }
+    const [gapSlot] = gap.key.slots;
+    if (!gapSlot) {
+      throw new Error("expected shared slot");
+    }
+    gapSlot.offset = 49;
+    expect(() => parseEnvelope(frameEnvelope(gap, body))).toThrow(
+      NONCONTIGUOUS
+    );
   });
 });

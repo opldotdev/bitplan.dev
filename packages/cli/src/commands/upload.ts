@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline/promises'
+import type { WalletInterface } from '@bsv/sdk'
 import {
 	ENVELOPE_OVERHEAD_ESTIMATE,
 	FEE_SATS_PER_KB,
@@ -11,9 +12,12 @@ import {
 import {
 	type DraftMeta,
 	type DraftPlaintext,
+	MAX_SHARED_RECIPIENTS,
 	newKeyId,
-	parseEnvelope,
+	normalizeIdentityKey,
+	openEnvelope,
 	sealEnvelope,
+	sharedWith as sharedWithHeader,
 } from '../envelope.js'
 import { CliError } from '../errors.js'
 import { collectGitMetadata } from '../git.js'
@@ -34,7 +38,7 @@ import {
 	saveDraftRecord,
 } from '../state.js'
 import { CLI_VERSION } from '../version.js'
-import { connectWallet } from '../wallet.js'
+import { connectWallet, identityKey } from '../wallet.js'
 
 export interface UploadOptions {
 	draft?: string
@@ -42,6 +46,8 @@ export interface UploadOptions {
 	description?: string
 	yes?: boolean
 	allowFinding?: string[]
+	shareWith?: string[]
+	private?: boolean
 	walletUrl?: string
 	ordfsUrl?: string
 }
@@ -53,6 +59,12 @@ export async function uploadCommand(
 	if (options.new && options.draft) {
 		throw new CliError('--new and --draft cannot be used together.')
 	}
+	if (options.private && (options.shareWith?.length ?? 0) > 0) {
+		throw new CliError('--private and --share-with cannot be used together.')
+	}
+	const requestedRecipients = [
+		...new Set((options.shareWith ?? []).map(normalizeIdentityKey)),
+	]
 
 	const resolvedFile = path.resolve(file)
 	if (!fs.existsSync(resolvedFile)) {
@@ -101,40 +113,6 @@ export async function uploadCommand(
 	}
 	const plaintext: DraftPlaintext = { meta, html }
 
-	// The scan runs on the plaintext, not on what goes on chain. Everything
-	// bitplan publishes is encrypted, but the ciphertext is public forever —
-	// so a secret sealed today is a secret leaked the day the cipher or the
-	// key wrap breaks, and an inscription cannot be taken back.
-	const findings = scanForSecrets([
-		{ source: path.basename(resolvedFile), text: html },
-		{ source: 'metadata', text: JSON.stringify(meta, null, 1) },
-	])
-	const waived = new Set(options.allowFinding ?? [])
-	const blocking = findings.filter((finding) => !waived.has(finding.id))
-	if (blocking.length > 0) {
-		const lines = blocking.map(
-			(finding) =>
-				`  ${finding.source}:${finding.line}  ${finding.description}\n` +
-				`    match: ${finding.excerpt}\n` +
-				`    waive: --allow-finding ${finding.id}`,
-		)
-		throw new CliError(
-			[
-				`The secret scanner found ${blocking.length} thing${blocking.length === 1 ? '' : 's'} that should not be published:`,
-				'',
-				...lines,
-				'',
-				'Remove them from the document, or waive each one individually.',
-			].join('\n'),
-		)
-	}
-	const waivedCount = findings.length - blocking.length
-	if (waivedCount > 0) {
-		console.warn(
-			`Warning: ${waivedCount} secret-scanner finding${waivedCount === 1 ? '' : 's'} waived by --allow-finding.`,
-		)
-	}
-
 	const { wallet, url } = await connectWallet(options.walletUrl)
 
 	// Resolve what we are updating before showing the confirmation, so the
@@ -142,48 +120,108 @@ export async function uploadCommand(
 	let coin: BitplanCoin | null = null
 	let keyID: string
 	let nextVersion: number | null
+	let previousRecipients: string[] = []
 	if (targetOrigin) {
 		coin = await findCoinByOrigin(wallet, targetOrigin)
 		const local = targetLocal
-		if (local) {
+		if (local && local.latestOutpoint === coin.outpoint) {
 			keyID = local.keyID
 			nextVersion =
 				local.latestVersion === null ? null : local.latestVersion + 1
+			previousRecipients = local.sharedWith ?? []
 		} else {
 			// Adopting a draft with no local history. The keyID it was sealed
 			// with lives in the header of the published envelope — that is why
 			// the header carries it in cleartext — and the version number comes
 			// from the chain position ORDFS reports: genesis is sequence 0 and
 			// version 1, so the version about to be written is sequence + 2.
-			const adopted = await adoptFromChain(targetOrigin, options.ordfsUrl)
+			const adopted = await adoptFromChain(
+				wallet,
+				targetOrigin,
+				coin.outpoint,
+				options.ordfsUrl,
+			)
 			keyID = adopted.keyID
 			nextVersion = adopted.sequence === null ? null : adopted.sequence + 2
+			previousRecipients = adopted.sharedWith
+			if (options.description === undefined) {
+				meta.description = adopted.description
+			}
 		}
 	} else {
 		keyID = newKeyId()
 		nextVersion = 1
 	}
+	let sharedWith = options.private
+		? []
+		: [
+				...new Set(
+					[...previousRecipients, ...requestedRecipients].map(
+						normalizeIdentityKey,
+					),
+				),
+			]
+	if (sharedWith.length > MAX_SHARED_RECIPIENTS) {
+		throw new CliError(
+			`A shared draft supports at most ${MAX_SHARED_RECIPIENTS} recipient identities; got ${sharedWith.length}.`,
+		)
+	}
+	scanPlaintext(plaintext, resolvedFile, options.allowFinding)
 
 	// Confirm before sealing: sealing triggers the wallet's own BRC-2
 	// permission dialog, which must not appear for a publish the user has
 	// not yet agreed to. Size shown is plaintext + a small envelope overhead.
+	const plaintextBytes = new TextEncoder().encode(
+		JSON.stringify(plaintext),
+	).length
 	await confirmPublish({
 		file: resolvedFile,
 		title: meta.title,
-		envelopeBytes:
-			new TextEncoder().encode(JSON.stringify(plaintext)).length +
-			ENVELOPE_OVERHEAD_ESTIMATE,
+		envelopeBytes: estimateEnvelopeBytes(plaintextBytes, sharedWith.length),
 		origin: targetOrigin,
 		version: nextVersion,
 		walletUrl: url,
+		sharedWith,
+		privateReset: options.private === true && previousRecipients.length > 0,
 		skip: options.yes === true,
 	})
 
-	const envelope = await sealEnvelope(wallet, plaintext, keyID)
+	let ownerIdentityKey: string | undefined
+	if (sharedWith.length > 0) {
+		try {
+			ownerIdentityKey = normalizeIdentityKey(await identityKey(wallet))
+		} catch (error) {
+			throw new CliError(
+				`The wallet could not provide its identity key for sharing: ${error instanceof Error ? error.message : String(error)}`,
+			)
+		}
+		sharedWith = sharedWith.filter(
+			(recipientIdentityKey) => recipientIdentityKey !== ownerIdentityKey,
+		)
+	}
+
+	const envelope = await sealEnvelope(
+		wallet,
+		plaintext,
+		keyID,
+		sharedWith,
+		ownerIdentityKey,
+	)
 
 	const published = coin
 		? await publishVersion(wallet, coin, envelope)
 		: await publishGenesis(wallet, envelope)
+
+	console.log(coin ? 'Published a new version.' : 'Published a new draft.')
+	console.log(`Origin:   ${published.origin}`)
+	console.log(`Outpoint: ${published.outpoint}`)
+	console.log(`Version:  ${nextVersion ?? 'unknown (no local history)'}`)
+	console.log(
+		sharedWith.length === 0
+			? 'Access:   This wallet only'
+			: `Access:   This wallet + ${sharedWith.length} shared identit${sharedWith.length === 1 ? 'y' : 'ies'}`,
+	)
+	console.log(`Viewer:   ${viewerUrl(published.origin)}`)
 
 	const record: DraftRecord = {
 		origin: published.origin,
@@ -193,14 +231,18 @@ export async function uploadCommand(
 		updatedAt: new Date().toISOString(),
 		title: meta.title,
 		description: meta.description,
+		sharedWith,
 	}
-	saveDraftRecord(resolvedFile, record)
-
-	console.log(coin ? 'Published a new version.' : 'Published a new draft.')
-	console.log(`Origin:   ${published.origin}`)
-	console.log(`Outpoint: ${published.outpoint}`)
-	console.log(`Version:  ${nextVersion ?? 'unknown (no local history)'}`)
-	console.log(`Viewer:   ${viewerUrl(published.origin)}`)
+	try {
+		saveDraftRecord(resolvedFile, record)
+	} catch (error) {
+		console.warn(
+			`Warning: the draft was published, but local state was not saved: ${error instanceof Error ? error.message : String(error)}`,
+		)
+		console.warn(
+			`Keep the origin and outpoint above. A retry would publish another version.`,
+		)
+	}
 }
 
 export function resolveDescription(
@@ -219,18 +261,108 @@ export function estimateFeeSats(bytes: number): number {
 	return Math.max(1, Math.ceil((bytes / 1000) * FEE_SATS_PER_KB))
 }
 
+/** Approximation shown before wallet encryption prompts. */
+export function estimateEnvelopeBytes(
+	plaintextBytes: number,
+	recipientCount: number,
+): number {
+	if (recipientCount === 0) {
+		return plaintextBytes + ENVELOPE_OVERHEAD_ESTIMATE + 48
+	}
+	const readerCount = recipientCount + 1
+	const wrappedContentKeys = (32 + 48) * readerCount
+	const sharedHeaderOverhead = readerCount * 160
+	return (
+		plaintextBytes +
+		48 +
+		ENVELOPE_OVERHEAD_ESTIMATE +
+		wrappedContentKeys +
+		sharedHeaderOverhead
+	)
+}
+
 async function adoptFromChain(
+	wallet: WalletInterface,
 	origin: string,
+	expectedOutpoint: string,
 	ordfsUrl: string | undefined,
-): Promise<{ keyID: string; sequence: number | null }> {
+): Promise<{
+	keyID: string
+	sequence: number | null
+	sharedWith: string[]
+	description: string | null
+}> {
 	const content = await fetchLatest(origin, { baseUrl: ordfsUrl })
 	if (!isBitplanContentType(content.contentType)) {
 		throw new CliError(
 			`${origin} is a ${content.contentType} inscription, not a bitplan draft.`,
 		)
 	}
-	const { header } = parseEnvelope(content.bytes)
-	return { keyID: header.key.keyID, sequence: content.sequence }
+	if (
+		!matchesOutpoint(content.origin, origin) ||
+		!matchesOutpoint(content.outpoint, expectedOutpoint)
+	) {
+		throw new CliError(
+			`ORDFS has not caught up to the wallet's current draft coin. Refusing to inherit an older access list; wait for indexing and try again.`,
+		)
+	}
+	const { header, plaintext } = await openEnvelope(wallet, content.bytes)
+	return {
+		keyID: header.key.keyID,
+		sequence: content.sequence,
+		sharedWith: sharedWithHeader(header),
+		description:
+			typeof plaintext.meta.description === 'string' ||
+			plaintext.meta.description === null
+				? plaintext.meta.description
+				: null,
+	}
+}
+
+function matchesOutpoint(actual: string | null, expected: string): boolean {
+	if (!actual) return false
+	try {
+		return toOrdinalOutpoint(actual) === toOrdinalOutpoint(expected)
+	} catch {
+		return false
+	}
+}
+
+function scanPlaintext(
+	plaintext: DraftPlaintext,
+	file: string,
+	allowFinding: string[] | undefined,
+): void {
+	// The scan runs on plaintext. Ciphertext is permanent, so secrets still
+	// block publication unless each finding is explicitly waived.
+	const findings = scanForSecrets([
+		{ source: path.basename(file), text: plaintext.html },
+		{ source: 'metadata', text: JSON.stringify(plaintext.meta, null, 1) },
+	])
+	const waived = new Set(allowFinding ?? [])
+	const blocking = findings.filter((finding) => !waived.has(finding.id))
+	if (blocking.length > 0) {
+		const lines = blocking.map(
+			(finding) =>
+				`  ${finding.source}:${finding.line}  ${finding.description}\n` +
+				`    match: ${finding.excerpt}\n` +
+				`    waive: --allow-finding ${finding.id}`,
+		)
+		throw new CliError(
+			[
+				`The secret scanner found ${blocking.length} thing${blocking.length === 1 ? '' : 's'} that should not be published:`,
+				'',
+				...lines,
+				'',
+				'Remove them from the document, or waive each one individually.',
+			].join('\n'),
+		)
+	}
+	if (findings.length > 0) {
+		console.warn(
+			`Warning: ${findings.length} secret-scanner finding${findings.length === 1 ? '' : 's'} waived by --allow-finding.`,
+		)
+	}
 }
 
 interface ConfirmInput {
@@ -240,6 +372,8 @@ interface ConfirmInput {
 	origin: string | null
 	version: number | null
 	walletUrl: string
+	sharedWith: string[]
+	privateReset: boolean
 	skip: boolean
 }
 
@@ -259,6 +393,22 @@ async function confirmPublish(input: ConfirmInput): Promise<void> {
 		console.log(`Version:  ${input.version ?? 'unknown (no local history)'}`)
 	}
 	console.log(`Wallet:   ${input.walletUrl}`)
+	if (input.sharedWith.length === 0) {
+		console.log('Access:   This wallet only')
+	} else {
+		console.log(
+			`Access:   This wallet + ${input.sharedWith.length} shared identit${input.sharedWith.length === 1 ? 'y' : 'ies'}`,
+		)
+		for (const identityKey of input.sharedWith) {
+			console.log(`          ${identityKey}`)
+		}
+		console.log('          Recipient identity keys are public in the envelope.')
+	}
+	if (input.privateReset) {
+		console.log(
+			'          This version removes prior recipients; older shared versions remain readable.',
+		)
+	}
 	console.log('')
 	console.log(
 		'Publishing is permanent. The content is encrypted, but the ciphertext',

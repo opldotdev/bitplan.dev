@@ -48,6 +48,7 @@ function adopt(wallet: WalletInterface): DraftsWallet {
         keyID: args.keyID,
         protocolID: args.protocolID as [0 | 1 | 2, string],
       }),
+    getPublicKey: (args) => wallet.getPublicKey(args),
     listOutputs: (args) => wallet.listOutputs(args),
   };
   notify();
@@ -118,100 +119,6 @@ export async function connectBrowserWallet(): Promise<DraftsWallet> {
     connectInFlight = null;
   });
   return connectInFlight;
-}
-
-function unwrapWalletJson(text: string): string {
-  const start = text.indexOf("{");
-  if (start < 0) {
-    return text;
-  }
-  try {
-    const parsed = JSON.parse(text.slice(start)) as { message?: unknown };
-    if (typeof parsed.message === "string" && parsed.message.length > 0) {
-      return parsed.message;
-    }
-  } catch {
-    // The payload was not a wallet JSON envelope.
-  }
-  return text;
-}
-
-function extractWalletMessage(caught: unknown): string {
-  if (caught instanceof Error) {
-    return unwrapWalletJson(caught.message);
-  }
-  if (typeof caught === "string") {
-    return unwrapWalletJson(caught);
-  }
-  if (caught && typeof caught === "object" && "message" in caught) {
-    const { message } = caught as { message: unknown };
-    if (typeof message === "string") {
-      return unwrapWalletJson(message);
-    }
-  }
-  return "";
-}
-
-/** Short copy for wallet failures. Never return the raw createAction JSON. */
-export function walletErrorMessage(caught: unknown): string {
-  const raw = extractWalletMessage(caught);
-  const lower = raw.toLowerCase();
-  if (
-    lower.includes("insufficient funds") ||
-    lower.includes("more satoshis are needed")
-  ) {
-    return "Not enough BSV in this wallet.";
-  }
-  if (
-    lower.includes("cancel") ||
-    lower.includes("abort") ||
-    lower.includes("denied") ||
-    lower.includes("user declined")
-  ) {
-    return "Payment cancelled.";
-  }
-  if (
-    lower.includes("no wallet") ||
-    lower.includes("not authenticated") ||
-    lower.includes("communication substrate")
-  ) {
-    return "No wallet answered. Start BSV Desktop and try again.";
-  }
-  if (!raw || raw.startsWith("{") || raw.length > 140) {
-    return "Payment failed.";
-  }
-  return raw;
-}
-
-export async function sendSponsorshipPayment(input: {
-  address: string;
-  description: string;
-  outputDescription: string;
-  satoshis: number;
-}): Promise<{ txid: string }> {
-  await connectBrowserWallet();
-  const wallet = cachedClient;
-  if (!wallet) {
-    throw new Error("Wallet connected without a client.");
-  }
-  const { P2PKH } = await import("@bsv/sdk");
-  const lockingScript = new P2PKH().lock(input.address).toHex();
-  const result = await wallet.createAction({
-    description: input.description,
-    labels: ["bitplan", "sponsor"],
-    outputs: [
-      {
-        lockingScript,
-        outputDescription: input.outputDescription,
-        satoshis: input.satoshis,
-        tags: ["bitplan", "sponsor"],
-      },
-    ],
-  });
-  if (!result.txid) {
-    throw new Error("Wallet returned no transaction id.");
-  }
-  return { txid: result.txid };
 }
 
 /** Clears the tab-local cache. Tests only. */

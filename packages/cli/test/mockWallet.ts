@@ -19,15 +19,22 @@ export function xorPad(bytes: number[]): number[] {
 export interface MockWalletCalls {
 	encrypt: Array<{ protocolID: unknown; keyID: string; counterparty?: string }>
 	decrypt: Array<{ protocolID: unknown; keyID: string; counterparty?: string }>
+	getPublicKey: number
 }
 
-export function createMockWallet(): {
+export function createMockWallet(
+	identityKey = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+): {
 	wallet: WalletInterface
 	calls: MockWalletCalls
 } {
-	const calls: MockWalletCalls = { encrypt: [], decrypt: [] }
+	const calls: MockWalletCalls = { encrypt: [], decrypt: [], getPublicKey: 0 }
 
 	const wallet = {
+		async getPublicKey() {
+			calls.getPublicKey += 1
+			return { publicKey: identityKey }
+		},
 		async encrypt(args: {
 			protocolID: unknown
 			keyID: string

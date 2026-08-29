@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.0.6
+
+### Added
+
+- `bitplan version` prints the installed package version.
+- `upload --share-with <identity-key>` grants named wallet identities read
+  access by BRC-2-wrapping a shared document key for each reader.
+- `upload --private` makes the newly published version wallet-only without
+  pretending it can revoke access to older inscriptions.
+
+### Changed
+
+- Shared envelopes use v2: the SDK encrypts the payload once and the BRC-100
+  wallet wraps its 32-byte key for the owner and each named reader. Reading a
+  shared envelope requires BitPlan 0.0.6 or a current bitplan.dev viewer.
+- The CLI preserves a draft's current reader list on later versions and records
+  it in local metadata; recipient identity keys remain public in the envelope.
+
 ## 0.0.5
 
 ### Changed

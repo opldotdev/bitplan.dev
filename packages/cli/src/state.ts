@@ -16,6 +16,7 @@ import { isOutpoint } from './outpoint.js'
 
 export const STATE_DIR_MODE = 0o700
 export const STATE_FILE_MODE = 0o600
+const COMPRESSED_IDENTITY_KEY = /^(02|03)[0-9a-f]{64}$/i
 
 export interface DraftRecord {
 	/** Genesis outpoint of the origin chain, `txid_vout`. */
@@ -29,6 +30,8 @@ export interface DraftRecord {
 	updatedAt: string
 	title?: string | null
 	description?: string | null
+	/** Additional identity public keys authorized on the latest local version. */
+	sharedWith?: string[]
 }
 
 export interface DraftsFile {
@@ -243,6 +246,21 @@ function validateDraftRecord(
 			throw invalidState(
 				file,
 				`record for ${JSON.stringify(filePath)} has a non-string ${field}`,
+			)
+		}
+	}
+	if (value.sharedWith !== undefined) {
+		if (
+			!Array.isArray(value.sharedWith) ||
+			value.sharedWith.some(
+				(identityKey) =>
+					typeof identityKey !== 'string' ||
+					!COMPRESSED_IDENTITY_KEY.test(identityKey),
+			)
+		) {
+			throw invalidState(
+				file,
+				`record for ${JSON.stringify(filePath)} has invalid sharedWith identity keys`,
 			)
 		}
 	}

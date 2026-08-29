@@ -7,8 +7,11 @@
 	],
 	"scripts": {
 		"build": "bun run --filter '*' build",
-		"lint": "biome check .",
-		"lint:fix": "biome check --write .",
+		"lint": "bun run lint:root && bun run lint:web",
+		"lint:fix": "bun run lint:fix:root && bun run --cwd apps/web fix",
+		"lint:fix:root": "biome check --write .",
+		"lint:root": "biome check .",
+		"lint:web": "bun run --cwd apps/web check",
 		"test": "bun test"
 	},
 	"devDependencies": {

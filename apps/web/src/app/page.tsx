@@ -12,9 +12,10 @@ export default function Home() {
             Plan documents on Bitcoin.
           </h1>
           <p className="text-muted-foreground">
-            The CLI encrypts an HTML file to your wallet and inscribes it as a
-            1Sat Ordinal. Later uploads of the same file become new versions of
-            the same coin. This site is the viewer. It stores nothing.
+            Publish an encrypted HTML file as a 1Sat Ordinal. Your BRC-100
+            wallet protects the identity keys and publishes each version. This
+            site asks it to open private drafts or unlock shared drafts. It
+            stores no drafts server-side.
           </p>
         </div>
 
@@ -28,7 +29,7 @@ export default function Home() {
         </div>
 
         <div className="space-y-2">
-          <CommandCopy command="npx bitplan" />
+          <CommandCopy command="npx bitplan auth" />
           <p className="text-muted-foreground text-sm">
             Needs a BRC-100 wallet on this machine, unlocked.
           </p>

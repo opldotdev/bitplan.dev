@@ -61,37 +61,3 @@ export const SPONSOR_TIERS: readonly SponsorTier[] = [
     slots: 12,
   }),
 ];
-
-/** Convert a USD sponsorship amount to satoshis at a USD-per-BSV rate. */
-export function usdToSatoshis(usd: number, usdPerBsv: number): number {
-  if (!(usd > 0)) {
-    throw new Error("Sponsorship amount must be positive.");
-  }
-  if (!(usdPerBsv > 0)) {
-    throw new Error("BSV price is not a positive number.");
-  }
-  return Math.max(1, Math.ceil((usd / usdPerBsv) * 100_000_000));
-}
-
-export async function fetchBsvUsdRate(): Promise<number> {
-  const response = await fetch(
-    "https://api.whatsonchain.com/v1/bsv/main/exchangerate",
-    { cache: "no-store" }
-  );
-  if (!response.ok) {
-    throw new Error(`WhatsOnChain exchangerate HTTP ${response.status}`);
-  }
-  const body = (await response.json()) as { rate?: unknown };
-  if (typeof body.rate !== "number" || !(body.rate > 0)) {
-    throw new Error("WhatsOnChain exchangerate did not return a USD rate.");
-  }
-  return body.rate;
-}
-
-export function sponsorAddress(): string {
-  const address = process.env.NEXT_PUBLIC_BITPLAN_SPONSOR_ADDRESS;
-  if (!address) {
-    throw new Error("NEXT_PUBLIC_BITPLAN_SPONSOR_ADDRESS is not set");
-  }
-  return address;
-}

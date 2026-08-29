@@ -36,12 +36,29 @@ export function buildProgram(): Command {
 		.action(whoamiCommand)
 
 	program
+		.command('version')
+		.description('Print the installed bitplan version.')
+		.action(() => {
+			console.log(CLI_VERSION)
+		})
+
+	program
 		.command('upload')
 		.description('Upload or update an HTML draft.')
 		.argument('<file>', 'HTML file path')
 		.option('--draft <origin>', 'Update a specific draft origin')
 		.option('--new', 'Always create a new draft')
 		.option('--description <text>', 'Set a short description for the draft')
+		.option(
+			'--share-with <identity-key>',
+			'Grant read access to an identity key (repeatable)',
+			collect,
+			[],
+		)
+		.option(
+			'--private',
+			'Remove shared readers from the new version (older versions stay shared)',
+		)
 		.option('-y, --yes', 'Skip the confirmation prompt')
 		.option(
 			'--allow-finding <id>',

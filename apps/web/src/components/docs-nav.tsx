@@ -2,8 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { CSSProperties } from "react";
 
-import { buttonVariants } from "@/components/ui/button";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from "@/components/ui/sidebar";
 import { DOCS_NAV } from "@/lib/site-nav";
 import { cn } from "@/lib/utils";
 
@@ -17,36 +28,45 @@ export function DocsNav({ className, layout = "rail" }: DocsNavProps) {
   const isWrap = layout === "wrap";
 
   return (
-    <nav
-      aria-label="Docs"
-      className={cn(isWrap ? null : "sticky top-8", className)}
+    <SidebarProvider
+      className={cn("min-h-0", isWrap ? null : "sticky top-8", className)}
+      style={
+        {
+          "--sidebar-width": isWrap ? "100%" : "11rem",
+        } as CSSProperties
+      }
     >
-      {isWrap ? null : (
-        <p className="mb-3 px-2 font-medium text-foreground text-sm">Docs</p>
-      )}
-      <ul
-        className={cn(isWrap ? "flex flex-wrap gap-1" : "flex flex-col gap-1")}
+      <Sidebar
+        aria-label="Documentation"
+        className="h-fit w-full rounded-lg border"
+        collapsible="none"
       >
-        {DOCS_NAV.map((item) => {
-          const isActive = pathname === item.href;
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Docs</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {DOCS_NAV.map((item) => {
+                  const isActive = pathname === item.href;
 
-          return (
-            <li key={item.href}>
-              <Link
-                aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  buttonVariants({ size: "sm", variant: "ghost" }),
-                  isWrap ? null : "w-full justify-start",
-                  isActive && "bg-muted text-foreground"
-                )}
-                href={item.href}
-              >
-                {item.label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton asChild isActive={isActive}>
+                        <Link
+                          aria-current={isActive ? "page" : undefined}
+                          href={item.href}
+                        >
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      </Sidebar>
+    </SidebarProvider>
   );
 }

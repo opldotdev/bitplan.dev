@@ -14,9 +14,10 @@ export default function CliSetupPage() {
     <>
       <h1>CLI setup</h1>
       <p>
-        bitplan talks to a BRC-100 wallet on this machine. Encryption,
-        decryption, signing, and funding are wallet calls. The CLI holds no
-        keys.
+        bitplan talks to a BRC-100 wallet on this machine. The wallet owns every
+        identity key and handles BRC-2 wrapping, unwrapping, signing, and
+        funding. Shared payloads use the standard SDK symmetric cipher; the CLI
+        holds no identity private keys.
       </p>
       <section id="start-the-wallet">
         <h2>Start the wallet</h2>
@@ -28,8 +29,13 @@ export default function CliSetupPage() {
           >
             BSV Desktop
           </a>{" "}
-          is the usual one. Any wallet serving the JSON API on{" "}
-          <code>127.0.0.1:3321</code> works. Unlock it so the API is listening.
+          is the usual one. The CLI defaults to a BRC-100-compatible JSON
+          endpoint at <code>http://127.0.0.1:3321</code>. Use{" "}
+          <code>--wallet-url</code> for another endpoint; start and unlock the
+          wallet before key or spending commands. Shared uploads use ordinary
+          BRC-100 <code>encrypt</code> requests for a 32-byte document key.
+          Because BitPlan uses security level 2, the wallet can ask for
+          permission for each new reader.
         </p>
       </section>
       <section id="check-the-connection">
@@ -42,6 +48,9 @@ export default function CliSetupPage() {
         </p>
         <div className="not-typeset mt-4">
           <CommandCopy command="npx bitplan whoami" />
+        </div>
+        <div className="not-typeset mt-4">
+          <CommandCopy command="npx bitplan version" />
         </div>
       </section>
       <p>

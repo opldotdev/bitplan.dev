@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 const LAYOUT = [
   { field: "magic", size: "4 bytes", value: "ASCII BPLN" },
-  { field: "version", size: "1 byte", value: "0x01" },
+  { field: "version", size: "1 byte", value: "0x01 private / 0x02 shared" },
   {
     field: "header size",
     size: "4 bytes",
@@ -27,7 +27,7 @@ const LAYOUT = [
   {
     field: "ciphertext",
     size: "rest",
-    value: "BRC-2 ciphertext from wallet.encrypt",
+    value: "document ciphertext, then wrapped document keys",
   },
 ] as const;
 
@@ -38,8 +38,8 @@ export default function EnvelopePage() {
       <p>
         This is the on-chain format bitplan publishes. Anything that can read a
         1Sat Ordinal and talk to a BRC-100 wallet can implement it. The body is
-        BRC-2, the encryption the wallet already implements. There is no
-        cleartext path.
+        either wallet BRC-2 ciphertext or an SDK-encrypted payload with BRC-2
+        key wraps. There is no cleartext path.
       </p>
       <section id="where-it-lives">
         <h2>Where it lives</h2>
@@ -96,11 +96,23 @@ export default function EnvelopePage() {
       <section id="content-key">
         <h2>BRC-2</h2>
         <p>
-          The header names the protocol and keyID. The rest is{" "}
-          <code>wallet.encrypt</code> of the UTF-8 JSON document, with{" "}
-          <code>counterparty: &quot;self&quot;</code>. Decrypt with the
-          header&apos;s protocolID and keyID, not client constants. The CLI does
-          not pick an IV or a second AES key.
+          The header names the fixed <code>[2, &quot;bitplan&quot;]</code>
+          protocol and keyID. Private v1 contains one{" "}
+          <code>wallet.encrypt</code> result with{" "}
+          <code>counterparty: &quot;self&quot;</code>. Shared v2 contains one
+          document encrypted by the SDK&apos;s AES-GCM <code>SymmetricKey</code>
+          , then uses the wallet to wrap only that key for each reader. The CLI
+          never receives an identity private key or implements its own cipher.
+        </p>
+      </section>
+      <section id="sharing">
+        <h2>Shared readers</h2>
+        <p>
+          A v2 header records the payload length, publisher identity key, and a
+          wrapped-key range for each reader. A recipient asks its wallet to
+          unwrap its range with the publisher as counterparty, then decrypts the
+          one payload locally. Identity keys and the access list are public; the
+          document and its key remain encrypted.
         </p>
       </section>
     </>

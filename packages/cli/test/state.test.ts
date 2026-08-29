@@ -96,8 +96,26 @@ describe('state store', () => {
 	})
 
 	test('round-trips a draft record', () => {
-		saveDraftRecord('/plans/one.html', RECORD, draftsFile)
-		expect(findDraftByFile('/plans/one.html', draftsFile)).toEqual(RECORD)
+		const record = {
+			...RECORD,
+			sharedWith: [
+				'02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5',
+			],
+		}
+		saveDraftRecord('/plans/one.html', record, draftsFile)
+		expect(findDraftByFile('/plans/one.html', draftsFile)).toEqual(record)
+	})
+
+	test('rejects malformed shared identity keys', () => {
+		fs.writeFileSync(
+			draftsFile,
+			JSON.stringify({
+				files: {
+					'/plans/one.html': { ...RECORD, sharedWith: ['not-a-public-key'] },
+				},
+			}),
+		)
+		expect(() => readDrafts(draftsFile)).toThrow(/sharedWith/)
 	})
 
 	test('finds a draft by origin, whichever file wrote it', () => {
