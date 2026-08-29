@@ -27,9 +27,10 @@ export function SponsorSlot({
           href={slot.sponsor.url}
           rel="sponsored noopener noreferrer"
           target="_blank"
+          title={slot.sponsor.name}
         >
           <Image
-            alt={`${slot.sponsor.name} logo`}
+            alt={slot.sponsor.name}
             className="size-full object-cover"
             height={tier.imageHeight}
             src={sponsorImageUrl(slot.slotId)}

@@ -52,7 +52,8 @@ describe("SponsorSlot", () => {
       />
     );
 
-    expect(markup).toContain("Acme logo");
+    expect(markup).toContain('alt="Acme"');
+    expect(markup).toContain('title="Acme"');
     expect(markup).toContain('rel="sponsored noopener noreferrer"');
     expect(markup).toContain("/api/sponsors/silver-1/image");
   });
