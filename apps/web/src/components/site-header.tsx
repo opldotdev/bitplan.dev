@@ -63,8 +63,8 @@ export function SiteHeader() {
 
   return (
     <header>
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+      <div className="mx-auto grid h-14 w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
           <Sheet onOpenChange={setMenuOpen} open={menuOpen}>
             <SheetTrigger asChild>
               <Button
@@ -111,30 +111,27 @@ export function SiteHeader() {
             BitPlan
             <span className="text-primary">.</span>
           </Link>
-          <nav
-            aria-label="Primary"
-            className="hidden items-center gap-1 md:flex"
-          >
-            {SITE_LINKS.map((link) => {
-              const isActive = isActivePath(pathname, link.href);
-              return (
-                <Link
-                  aria-current={isActive ? "page" : undefined}
-                  className={cn(
-                    buttonVariants({ size: "sm", variant: "ghost" }),
-                    "px-2 sm:px-4",
-                    isActive && "bg-muted text-foreground"
-                  )}
-                  href={link.href}
-                  key={link.href}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
         </div>
-        <div className="flex items-center gap-1 sm:gap-2">
+        <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
+          {SITE_LINKS.map((link) => {
+            const isActive = isActivePath(pathname, link.href);
+            return (
+              <Link
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  buttonVariants({ size: "sm", variant: "ghost" }),
+                  "px-2 sm:px-4",
+                  isActive && "bg-muted text-foreground"
+                )}
+                href={link.href}
+                key={link.href}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="flex items-center gap-1 justify-self-end sm:gap-2">
           {connected ? null : (
             <Button
               disabled={connecting}
