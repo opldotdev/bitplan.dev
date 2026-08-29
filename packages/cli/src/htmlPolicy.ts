@@ -1,7 +1,7 @@
 /*
  * Ported from postplan (MIT) — src/html-policy.js, by t3dotgg and contributors.
  *
- * Copyright (c) postplan contributors
+ * Copyright (c) 2026 t3dotgg and contributors
  * Licensed under the MIT License.
  *
  * Translated to TypeScript for bitplan. The rules are unchanged: the same

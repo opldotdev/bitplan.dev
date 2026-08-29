@@ -114,12 +114,19 @@ export async function sealEnvelope(
 		await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, body),
 	)
 
-	const wrapped = await wallet.encrypt({
-		protocolID: BITPLAN_PROTOCOL,
-		keyID,
-		counterparty: 'self',
-		plaintext: Array.from(contentKey),
-	})
+	let wrapped: Awaited<ReturnType<typeof wallet.encrypt>>
+	try {
+		wrapped = await wallet.encrypt({
+			protocolID: BITPLAN_PROTOCOL,
+			keyID,
+			counterparty: 'self',
+			plaintext: Array.from(contentKey),
+		})
+	} catch (error) {
+		throw new CliError(
+			`The wallet refused to wrap this draft's content key (protocol bitplan, keyID ${keyID}): ${error instanceof Error ? error.message : String(error)}`,
+		)
+	}
 	contentKey.fill(0)
 
 	const header: EnvelopeHeader = {
@@ -306,12 +313,19 @@ export async function openEnvelope(
 		)
 	}
 
-	const unwrapped = await wallet.decrypt({
-		protocolID: [level, header.key.protocolID[1]],
-		keyID: header.key.keyID,
-		counterparty: 'self',
-		ciphertext: Array.from(fromBase64(header.key.ciphertext)),
-	})
+	let unwrapped: Awaited<ReturnType<typeof wallet.decrypt>>
+	try {
+		unwrapped = await wallet.decrypt({
+			protocolID: [level, header.key.protocolID[1]],
+			keyID: header.key.keyID,
+			counterparty: 'self',
+			ciphertext: Array.from(fromBase64(header.key.ciphertext)),
+		})
+	} catch (error) {
+		throw new CliError(
+			`The wallet refused to unwrap this draft's content key (protocol ${header.key.protocolID[1]}, keyID ${header.key.keyID}): ${error instanceof Error ? error.message : String(error)}`,
+		)
+	}
 	const contentKey = Uint8Array.from(unwrapped.plaintext)
 	if (contentKey.length !== CONTENT_KEY_BYTES) {
 		throw new CliError(

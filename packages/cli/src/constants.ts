@@ -37,3 +37,11 @@ export const DEFAULT_ORDFS_URL = 'https://ordfs.network'
 
 /** Fee estimate shown before publishing, in satoshis per 1000 bytes. */
 export const FEE_SATS_PER_KB = 1
+
+/**
+ * Approximate bytes the BPLN envelope adds on top of the plaintext: magic +
+ * version + header length + JSON header (base64 wrapped key dominates) + GCM
+ * tag. Used only for the pre-confirmation size/fee estimate — the exact size
+ * is known after sealing.
+ */
+export const ENVELOPE_OVERHEAD_ESTIMATE = 700

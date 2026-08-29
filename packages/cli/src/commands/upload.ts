@@ -2,7 +2,12 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline/promises'
-import { CONTENT_TYPE, FEE_SATS_PER_KB, VIEWER_BASE_URL } from '../constants.js'
+import {
+	CONTENT_TYPE,
+	ENVELOPE_OVERHEAD_ESTIMATE,
+	FEE_SATS_PER_KB,
+	VIEWER_BASE_URL,
+} from '../constants.js'
 import {
 	type DraftMeta,
 	type DraftPlaintext,
@@ -142,17 +147,22 @@ export async function uploadCommand(
 		nextVersion = 1
 	}
 
-	const envelope = await sealEnvelope(wallet, plaintext, keyID)
-
+	// Confirm before sealing: sealing triggers the wallet's own BRC-2
+	// permission dialog, which must not appear for a publish the user has
+	// not yet agreed to. Size shown is plaintext + a small envelope overhead.
 	await confirmPublish({
 		file: resolvedFile,
 		title: meta.title,
-		envelopeBytes: envelope.length,
+		envelopeBytes:
+			new TextEncoder().encode(JSON.stringify(plaintext)).length +
+			ENVELOPE_OVERHEAD_ESTIMATE,
 		origin: targetOrigin,
 		version: nextVersion,
 		walletUrl: url,
 		skip: options.yes === true,
 	})
+
+	const envelope = await sealEnvelope(wallet, plaintext, keyID)
 
 	const published = coin
 		? await publishVersion(wallet, coin, envelope)
