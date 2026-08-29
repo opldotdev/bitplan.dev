@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.9
+
+### Changed
+
+- Envelope spec headings say Private and Shared instead of Version 1 / Version
+  2, matching how the CLI talks about those drafts.
+- The unused `setupSponsorSlot` helper is no longer in the CLI package.
+  Sponsor checkout is on bitplan.dev.
+
 ## 0.0.8
 
 ### Changed
