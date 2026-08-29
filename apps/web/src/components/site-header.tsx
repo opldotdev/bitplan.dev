@@ -19,7 +19,6 @@ import { isActivePath, SITE_LINKS } from "@/lib/site-nav";
 import { cn } from "@/lib/utils";
 import {
   connectBrowserWallet,
-  isWalletAvailable,
   isWalletConnected,
   onWalletChange,
   reconnectAuthenticatedWallet,
@@ -35,11 +34,6 @@ export function SiteHeader() {
   const connected = useSyncExternalStore(
     subscribeConnected,
     isWalletConnected,
-    serverSnapshot
-  );
-  const walletAvailable = useSyncExternalStore(
-    subscribeConnected,
-    isWalletAvailable,
     serverSnapshot
   );
   const pathname = usePathname();
@@ -150,7 +144,7 @@ export function SiteHeader() {
         <div className="col-start-3 flex items-center gap-1 justify-self-end sm:gap-2">
           {connected ? null : (
             <Button
-              className={cn(!walletAvailable && "hidden md:inline-flex")}
+              className="hidden md:inline-flex"
               disabled={connecting}
               onClick={connect}
               size="sm"

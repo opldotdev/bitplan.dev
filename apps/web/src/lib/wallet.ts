@@ -105,12 +105,17 @@ export function reconnectAuthenticatedWallet(): Promise<DraftsWallet | null> {
   reconnectInFlight = (async () => {
     try {
       const wallet = await openClient();
-      markSubstrateAvailable();
-      const status = await wallet.isAuthenticated({});
-      if (!isGranted(status)) {
-        return null;
+      // Mark availability only after the auth probe settles so a granted
+      // wallet renders as connected in the same pass, never as connectable.
+      try {
+        const status = await wallet.isAuthenticated({});
+        if (!isGranted(status)) {
+          return null;
+        }
+        return adopt(wallet);
+      } finally {
+        markSubstrateAvailable();
       }
-      return adopt(wallet);
     } catch {
       return null;
     } finally {

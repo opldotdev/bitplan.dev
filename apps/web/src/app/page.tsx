@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { CommandCopy } from "@/components/command-copy";
-import { Button } from "@/components/ui/button";
+import { HomeCta } from "@/components/home-cta";
 
 export const metadata: Metadata = {
   description:
@@ -46,14 +46,7 @@ export default function Home() {
               Publish an encrypted HTML file as a 1Sat Ordinal. Your wallet
               encrypts and publishes. This site is the viewer.
             </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-              <Button asChild>
-                <Link href="/docs">Get started</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/drafts">My drafts</Link>
-              </Button>
-            </div>
+            <HomeCta />
           </div>
         </div>
       </section>

@@ -87,6 +87,14 @@ describe("reconnectAuthenticatedWallet", () => {
     expect(isWalletConnected()).toBe(false);
   });
 
+  test("marks the substrate available when the auth probe itself fails", async () => {
+    isAuthenticatedImpl = () => Promise.reject(new Error("probe failed"));
+    const wallet = await reconnectAuthenticatedWallet();
+    expect(wallet).toBeNull();
+    expect(isWalletAvailable()).toBe(true);
+    expect(isWalletConnected()).toBe(false);
+  });
+
   test("returns null when no wallet answers", async () => {
     connectImpl = () =>
       Promise.reject(
