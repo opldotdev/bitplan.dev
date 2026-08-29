@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type ChangeEvent, useCallback, useEffect, useState } from "react";
+import {
+  type ChangeEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import Cropper, { type Area, type Point } from "react-easy-crop";
 import { toast } from "sonner";
 
@@ -30,6 +36,7 @@ import {
   type SourceCrop,
 } from "@/lib/sponsor-image";
 import {
+  SPONSOR_LINK_MAX_BLURB_LENGTH,
   type SponsorQuote,
   type SponsorSlotState,
   type SponsorTier,
@@ -38,6 +45,7 @@ import {
 import { connectBrowserWalletClient } from "@/lib/wallet";
 
 const DEFAULT_CROP: Point = { x: 0, y: 0 };
+const MAX_CROP_ZOOM = 8;
 const TRAILING_DECIMAL_PATTERN = /\.$/;
 const TRAILING_ZERO_PATTERN = /0+$/;
 
@@ -105,8 +113,13 @@ async function finalizeCheckout(
   });
   const result: unknown = await response.json().catch(() => undefined);
   if (response.status === 409) {
+    const serverMessage =
+      result && typeof result === "object" && "error" in result
+        ? String(result.error)
+        : null;
     throw new DiscardSponsorCheckoutError(
-      "This slot was claimed first. Your transaction was not sent."
+      serverMessage ??
+        "This slot was claimed first. Your transaction was not sent."
     );
   }
   if (response.status === 400) {
@@ -136,6 +149,7 @@ async function finalizeCheckout(
 
 async function prepareCheckout({
   area,
+  blurb,
   image,
   name,
   onStatus,
@@ -144,6 +158,7 @@ async function prepareCheckout({
   url,
 }: {
   area: SourceCrop;
+  blurb: string;
   image: LoadedSponsorImage;
   name: string;
   onStatus: (message: string) => void;
@@ -162,6 +177,7 @@ async function prepareCheckout({
   try {
     const wallet = await connectBrowserWalletClient();
     return await createSponsorCheckout({
+      ...(blurb ? { blurb } : {}),
       image: new Uint8Array(await webp.arrayBuffer()),
       name: name.trim(),
       quote,
@@ -178,11 +194,14 @@ async function prepareCheckout({
 export function SponsorDialog({
   slot,
   tier,
+  trigger,
 }: {
   slot: SponsorSlotState;
   tier: SponsorTier;
+  trigger?: ReactNode;
 }) {
   const router = useRouter();
+  const [blurb, setBlurb] = useState("");
   const [busy, setBusy] = useState(false);
   const [crop, setCrop] = useState(DEFAULT_CROP);
   const [croppedArea, setCroppedArea] = useState<SourceCrop>();
@@ -192,6 +211,7 @@ export function SponsorDialog({
   const [status, setStatus] = useState<string>();
   const [url, setUrl] = useState("");
   const [zoom, setZoom] = useState(1);
+  const isLink = tier.id === "link";
 
   useEffect(
     () => () => {
@@ -223,6 +243,11 @@ export function SponsorDialog({
     []
   );
 
+  const trimmedBlurb = isLink ? blurb.trim() : "";
+  const successMessage = isLink
+    ? "Published. Your link is on the list."
+    : "Published. Your sponsor is live.";
+
   const publishSponsor = useCallback(async () => {
     const selectedArea = croppedArea;
     const selectedImage = image;
@@ -238,6 +263,7 @@ export function SponsorDialog({
         }
         checkout = await prepareCheckout({
           area: selectedArea,
+          blurb: trimmedBlurb,
           image: selectedImage,
           name,
           onStatus: setStatus,
@@ -258,7 +284,7 @@ export function SponsorDialog({
       }
       setPendingCheckout(undefined);
       setStatus(undefined);
-      toast.success("Published. Your sponsor is live.");
+      toast.success(successMessage);
       router.refresh();
     } catch (error) {
       setPendingCheckout((checkout) => checkoutAfterError(error, checkout));
@@ -275,9 +301,15 @@ export function SponsorDialog({
     pendingCheckout,
     router,
     slot.slotId,
+    successMessage,
     tier,
+    trimmedBlurb,
     url,
   ]);
+
+  const changeBlurb = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setBlurb(event.target.value);
+  }, []);
 
   const changeName = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setName(event.target.value);
@@ -310,21 +342,24 @@ export function SponsorDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button
-          className="size-full cursor-pointer rounded-none border-border/60 border-dashed bg-transparent font-mono text-muted-foreground text-xs uppercase tracking-wide hover:border-foreground/50 hover:bg-muted/30 hover:text-foreground"
-          variant="outline"
-        >
-          Be here
-        </Button>
+        {trigger ?? (
+          <Button
+            className="size-full cursor-pointer rounded-none border-border/60 border-dashed bg-transparent font-mono text-muted-foreground text-xs uppercase tracking-wide hover:border-foreground/50 hover:bg-muted/30 hover:text-foreground"
+            variant="outline"
+          >
+            Be here
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-h-[calc(100dvh-2rem)] sm:max-w-xl sm:overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {tier.name} sponsor · {slot.slotId}
+            {isLink ? "Sponsor link" : `${tier.name} sponsor · ${slot.slotId}`}
           </DialogTitle>
           <DialogDescription>
-            Your wallet creates one transaction containing the permanent WebP
-            and payment. The first valid transaction received wins this slot.
+            {isLink
+              ? "Your wallet creates one transaction containing the permanent icon and payment. Your link joins the list and rotates hourly."
+              : "Your wallet creates one transaction containing the permanent WebP and payment. The first valid transaction received wins this slot."}
           </DialogDescription>
         </DialogHeader>
 
@@ -350,8 +385,22 @@ export function SponsorDialog({
               value={url}
             />
           </div>
+          {isLink ? (
+            <div className="grid gap-2">
+              <Label htmlFor={`${slot.slotId}-blurb`}>Tagline (optional)</Label>
+              <Input
+                id={`${slot.slotId}-blurb`}
+                maxLength={SPONSOR_LINK_MAX_BLURB_LENGTH}
+                onChange={changeBlurb}
+                placeholder="One short line about what you do"
+                value={blurb}
+              />
+            </div>
+          ) : null}
           <div className="grid gap-2">
-            <Label htmlFor={`${slot.slotId}-image`}>Image</Label>
+            <Label htmlFor={`${slot.slotId}-image`}>
+              {isLink ? "Icon" : "Image"}
+            </Label>
             <Input
               accept="image/avif,image/gif,image/jpeg,image/png,image/webp"
               id={`${slot.slotId}-image`}
@@ -366,8 +415,11 @@ export function SponsorDialog({
 
           {image ? (
             <div className="grid gap-4">
+              {/* On phones the crop viewport takes real height instead of the
+                  slot's aspect strip, so there is room to pan and pinch a
+                  screenshot down to the region you want. */}
               <div
-                className="relative w-full touch-none overflow-hidden rounded-lg border bg-black"
+                className="relative h-[44vh] w-full touch-none overflow-hidden rounded-lg border bg-black sm:h-auto"
                 style={{
                   aspectRatio: `${tier.imageWidth} / ${tier.imageHeight}`,
                 }}
@@ -376,6 +428,7 @@ export function SponsorDialog({
                   aspect={tier.imageWidth / tier.imageHeight}
                   crop={crop}
                   image={image.url}
+                  maxZoom={MAX_CROP_ZOOM}
                   onCropChange={setCrop}
                   onCropComplete={completeCrop}
                   onZoomChange={setZoom}
@@ -384,14 +437,15 @@ export function SponsorDialog({
                 />
               </div>
               <p className="text-muted-foreground text-xs">
-                Drag to reposition. Scroll or pinch to zoom.
+                Drag to reposition. Pinch, scroll, or use the slider to zoom
+                into just the part you want.
               </p>
               <div className="grid gap-2">
                 <Label htmlFor={`${slot.slotId}-zoom`}>Zoom</Label>
                 <Slider
                   aria-label="Crop zoom"
                   id={`${slot.slotId}-zoom`}
-                  max={3}
+                  max={MAX_CROP_ZOOM}
                   min={1}
                   onValueChange={changeZoom}
                   step={0.05}

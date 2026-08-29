@@ -31,6 +31,7 @@ export function sponsorWalletErrorMessage(error: unknown): string {
 }
 
 export async function createSponsorCheckout({
+  blurb,
   image,
   name,
   quote,
@@ -39,6 +40,7 @@ export async function createSponsorCheckout({
   url,
   wallet,
 }: {
+  blurb?: string;
   image: Uint8Array;
   name: string;
   quote: SponsorQuote;
@@ -62,6 +64,7 @@ export async function createSponsorCheckout({
       name,
       subType: sponsorSubtype(slotId),
       subTypeData: JSON.stringify({
+        ...(blurb ? { blurb } : {}),
         href: url,
         priceSats: quote.priceSats,
         priceUsd: quote.priceUsd,

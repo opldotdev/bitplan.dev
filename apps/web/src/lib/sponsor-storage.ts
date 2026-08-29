@@ -85,7 +85,7 @@ export interface StoredSponsorReceipt {
   etag: string;
 }
 
-async function readStoredBeef(
+export async function readStoredBeef(
   pathname: string
 ): Promise<StoredSponsorReceipt | null> {
   let result: Awaited<ReturnType<typeof get>>;

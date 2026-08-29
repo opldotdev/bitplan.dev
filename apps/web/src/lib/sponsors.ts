@@ -4,7 +4,7 @@ export const SPONSOR_PAYMENT_ADDRESS = "14iPT5Yqcz3qUHxRo7vqNoxmvxr4P6J9Ah";
 export const SPONSOR_SUBTYPE = "bitplanSponsorSlot";
 export const SPONSOR_TEST_SLOT_ID = "silver-1";
 
-export type SponsorTierId = "diamond" | "gold" | "platinum" | "silver";
+export type SponsorTierId = "diamond" | "gold" | "link" | "platinum" | "silver";
 
 export interface SponsorTier {
   gridClassName: string;
@@ -95,6 +95,50 @@ export const SPONSOR_TIERS: readonly SponsorTier[] = [
 ];
 
 export const SPONSOR_SLOT_IDS = SPONSOR_TIERS.flatMap((tier) => tier.slotIds);
+
+/**
+ * The unlimited text-link placement. Every purchase mints a new entry keyed
+ * by its txid rather than competing for a fixed slot, so the shared slot id
+ * appears in each receipt but never in SPONSOR_SLOT_IDS.
+ */
+export const SPONSOR_LINK_SLOT_ID = "link";
+export const SPONSOR_LINK_MAX_BLURB_LENGTH = 80;
+
+export const SPONSOR_LINK_TIER: SponsorTier = {
+  gridClassName: "grid-cols-1",
+  id: "link",
+  imageHeight: 64,
+  imageWidth: 64,
+  name: "Links",
+  priceUsd: 10,
+  slotClassName: "aspect-square",
+  slotIds: [SPONSOR_LINK_SLOT_ID],
+};
+
+export interface SponsorLink {
+  blurb?: string;
+  href: string;
+  iconUrl: string;
+  name: string;
+  txid: string;
+}
+
+/**
+ * Identity keys for duplicate-sponsor detection: the same organization is
+ * recognized by its site host (www stripped) or by its display name.
+ */
+export function sponsorHostKey(href: string): string | null {
+  try {
+    const host = new URL(href).hostname.toLowerCase();
+    return host.startsWith("www.") ? host.slice(4) : host;
+  } catch {
+    return null;
+  }
+}
+
+export function sponsorNameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
 
 export function sponsorImageUrl(slotId: string): string {
   return `/api/sponsors/${encodeURIComponent(slotId)}/image`;
