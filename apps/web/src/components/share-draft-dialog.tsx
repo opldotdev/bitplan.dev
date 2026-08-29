@@ -58,7 +58,7 @@ export function ShareDraftDialog({ origin }: { origin: string }) {
     <Dialog onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button size="sm" type="button" variant="ghost">
-          <Share2 />
+          <Share2 data-icon="inline-start" />
           Share
         </Button>
       </DialogTrigger>
@@ -105,7 +105,11 @@ export function ShareDraftDialog({ origin }: { origin: string }) {
         </div>
         <DialogFooter showCloseButton>
           <Button disabled={!canCopy} onClick={handleCopy} type="button">
-            {copied ? <Check /> : <Share2 />}
+            {copied ? (
+              <Check data-icon="inline-start" />
+            ) : (
+              <Share2 data-icon="inline-start" />
+            )}
             {copied ? "Copied" : "Copy agent instructions"}
           </Button>
         </DialogFooter>

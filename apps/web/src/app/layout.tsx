@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { CommandMenu } from "@/components/command-menu";
 import { SiteChrome } from "@/components/site-chrome";
 import { SiteJsonLd } from "@/components/site-json-ld";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeProvider>
           <TooltipProvider>
             <SiteChrome>{children}</SiteChrome>
+            <CommandMenu />
             <Toaster />
           </TooltipProvider>
         </ThemeProvider>

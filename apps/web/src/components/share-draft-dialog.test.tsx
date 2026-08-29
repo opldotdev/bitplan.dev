@@ -11,5 +11,6 @@ describe("ShareDraftDialog", () => {
 
     expect(markup).toContain("Share");
     expect(markup).toContain('data-slot="dialog-trigger"');
+    expect(markup).toContain('data-icon="inline-start"');
   });
 });
