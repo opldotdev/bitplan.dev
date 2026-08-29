@@ -7,7 +7,7 @@ import { HomeCta } from "@/components/home-cta";
 
 export const metadata: Metadata = {
   description:
-    "Publish an encrypted HTML file as a 1Sat Ordinal. Your wallet encrypts and publishes. This site is the viewer.",
+    "Encrypted by your wallet, inscribed as a 1Sat Ordinal. This site is just the viewer.",
   title: {
     absolute: "BitPlan",
   },
@@ -46,9 +46,9 @@ export default function Home() {
                 <span className="text-primary">.</span>
               </span>
             </h1>
-            <p className="mx-auto mt-4 max-w-[36rem] text-foreground/75 md:text-lg">
-              Publish an encrypted HTML file as a 1Sat Ordinal. Your wallet
-              encrypts and publishes. This site is the viewer.
+            <p className="mx-auto mt-4 max-w-[36rem] text-balance text-foreground/75 md:text-lg">
+              Encrypted by your wallet, inscribed as a 1Sat Ordinal. This site
+              is just the viewer.
             </p>
             <HomeCta />
           </div>
