@@ -30,7 +30,6 @@ import {
   type SourceCrop,
 } from "@/lib/sponsor-image";
 import {
-  SPONSOR_TEST_SLOT_ID,
   type SponsorQuote,
   type SponsorSlotState,
   type SponsorTier,
@@ -301,9 +300,6 @@ export function SponsorDialog({
       !busy
   );
   const priceUsd = sponsorPriceUsd(slot.slotId, tier);
-  const triggerLabel = `${
-    slot.slotId === SPONSOR_TEST_SLOT_ID ? "Test slot" : "Sponsor"
-  } · $${priceUsd}`;
   let submitLabel = `Pay $${priceUsd} and publish`;
   if (busy) {
     submitLabel = "Working…";
@@ -315,10 +311,10 @@ export function SponsorDialog({
     <Dialog>
       <DialogTrigger asChild>
         <Button
-          className="size-full cursor-pointer hover:border-foreground/50"
+          className="size-full cursor-pointer rounded-none border-border/60 border-dashed bg-transparent font-mono text-muted-foreground text-xs uppercase tracking-wide hover:border-foreground/50 hover:bg-muted/30 hover:text-foreground"
           variant="outline"
         >
-          {triggerLabel}
+          Be here
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">

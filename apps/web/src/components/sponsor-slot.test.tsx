@@ -29,7 +29,8 @@ describe("SponsorSlot", () => {
     );
 
     expect(markup).not.toContain('disabled=""');
-    expect(markup).toContain("Test slot · $0.25");
+    expect(markup).toContain("Be here");
+    expect(markup).not.toContain("$0.25");
     expect(markup).toContain("cursor-pointer");
   });
 

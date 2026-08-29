@@ -27,7 +27,7 @@ npx bitplan version
 ## How it works
 
 ```mermaid
-flowchart LR
+flowchart TD
     Plan[HTML plan] --> CLI[BitPlan CLI]
     CLI -->|Encrypt this plan| Wallet[BRC-100 wallet]
     Wallet -->|Sign and publish| Bitcoin[Bitcoin]
@@ -43,8 +43,8 @@ loads the encrypted document through OrdFS and asks your wallet to decrypt it.
 Versions keep the same origin:
 
 ```mermaid
-flowchart LR
-    V1[Version 1<br/>origin] --> V2[Version 2] --> V3[Version 3] --> Latest[Latest]
+flowchart TD
+    V1[Version 1<br/>origin] --> V2[Version 2] --> V3[Latest]
 ```
 
 ## Share a plan
