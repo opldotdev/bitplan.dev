@@ -12,6 +12,7 @@ import type { DraftsWallet } from "@/lib/drafts";
  */
 let cachedClient: WalletInterface | null = null;
 let cached: DraftsWallet | null = null;
+let substrateAvailable = false;
 let reconnectInFlight: Promise<DraftsWallet | null> | null = null;
 let connectInFlight: Promise<DraftsWallet> | null = null;
 const listeners = new Set<() => void>();
@@ -40,6 +41,22 @@ export function getConnectedWalletClient(): WalletInterface | null {
 
 export function isWalletConnected(): boolean {
   return cached !== null;
+}
+
+/**
+ * True once a BRC-100 substrate has answered in this tab, whether or not the
+ * origin is authenticated yet. Stays false in browsers with no wallet.
+ */
+export function isWalletAvailable(): boolean {
+  return substrateAvailable;
+}
+
+function markSubstrateAvailable(): void {
+  if (substrateAvailable) {
+    return;
+  }
+  substrateAvailable = true;
+  notify();
 }
 
 function adopt(wallet: WalletInterface): DraftsWallet {
@@ -88,6 +105,7 @@ export function reconnectAuthenticatedWallet(): Promise<DraftsWallet | null> {
   reconnectInFlight = (async () => {
     try {
       const wallet = await openClient();
+      markSubstrateAvailable();
       const status = await wallet.isAuthenticated({});
       if (!isGranted(status)) {
         return null;
@@ -117,6 +135,7 @@ export async function connectBrowserWallet(): Promise<DraftsWallet> {
   }
   connectInFlight = (async () => {
     const wallet = await openClient();
+    markSubstrateAvailable();
     await wallet.waitForAuthentication({});
     return adopt(wallet);
   })().finally(() => {
@@ -138,6 +157,7 @@ export async function connectBrowserWalletClient(): Promise<WalletInterface> {
 export function resetWalletConnection(): void {
   cachedClient = null;
   cached = null;
+  substrateAvailable = false;
   reconnectInFlight = null;
   connectInFlight = null;
   notify();

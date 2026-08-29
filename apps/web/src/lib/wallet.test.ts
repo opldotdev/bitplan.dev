@@ -41,6 +41,7 @@ const {
   connectBrowserWalletClient,
   getConnectedWallet,
   getConnectedWalletClient,
+  isWalletAvailable,
   isWalletConnected,
   reconnectAuthenticatedWallet,
   resetWalletConnection,
@@ -78,6 +79,14 @@ describe("reconnectAuthenticatedWallet", () => {
     expect(waitForAuthenticationCalls).toBe(0);
   });
 
+  test("marks the substrate available even when the origin is not granted", async () => {
+    isAuthenticatedImpl = () => Promise.resolve({ authenticated: false });
+    expect(isWalletAvailable()).toBe(false);
+    await reconnectAuthenticatedWallet();
+    expect(isWalletAvailable()).toBe(true);
+    expect(isWalletConnected()).toBe(false);
+  });
+
   test("returns null when no wallet answers", async () => {
     connectImpl = () =>
       Promise.reject(
@@ -86,6 +95,7 @@ describe("reconnectAuthenticatedWallet", () => {
     const wallet = await reconnectAuthenticatedWallet();
     expect(wallet).toBeNull();
     expect(isWalletConnected()).toBe(false);
+    expect(isWalletAvailable()).toBe(false);
     expect(isAuthenticatedCalls).toBe(0);
   });
 

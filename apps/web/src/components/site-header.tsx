@@ -19,6 +19,7 @@ import { isActivePath, SITE_LINKS } from "@/lib/site-nav";
 import { cn } from "@/lib/utils";
 import {
   connectBrowserWallet,
+  isWalletAvailable,
   isWalletConnected,
   onWalletChange,
   reconnectAuthenticatedWallet,
@@ -34,6 +35,11 @@ export function SiteHeader() {
   const connected = useSyncExternalStore(
     subscribeConnected,
     isWalletConnected,
+    serverSnapshot
+  );
+  const walletAvailable = useSyncExternalStore(
+    subscribeConnected,
+    isWalletAvailable,
     serverSnapshot
   );
   const pathname = usePathname();
@@ -119,7 +125,10 @@ export function SiteHeader() {
             <span className="text-primary">.</span>
           </Link>
         </div>
-        <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
+        <nav
+          aria-label="Primary"
+          className="col-start-2 hidden items-center gap-1 md:flex"
+        >
           {SITE_LINKS.map((link) => {
             const isActive = isActivePath(pathname, link.href);
             return (
@@ -138,9 +147,10 @@ export function SiteHeader() {
             );
           })}
         </nav>
-        <div className="flex items-center gap-1 justify-self-end sm:gap-2">
+        <div className="col-start-3 flex items-center gap-1 justify-self-end sm:gap-2">
           {connected ? null : (
             <Button
+              className={cn(!walletAvailable && "hidden md:inline-flex")}
               disabled={connecting}
               onClick={connect}
               size="sm"
