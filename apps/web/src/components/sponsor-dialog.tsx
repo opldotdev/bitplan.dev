@@ -317,7 +317,7 @@ export function SponsorDialog({
           Be here
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="sm:max-h-[calc(100dvh-2rem)] sm:max-w-xl sm:overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {tier.name} sponsor · {slot.slotId}
@@ -360,8 +360,7 @@ export function SponsorDialog({
             />
             <p className="text-muted-foreground text-xs">
               Up to 20 MiB. Exported as one {tier.imageWidth} ×{" "}
-              {tier.imageHeight}
-              WebP no larger than 200 KiB.
+              {tier.imageHeight} WebP no larger than 200 KiB.
             </p>
           </div>
 
