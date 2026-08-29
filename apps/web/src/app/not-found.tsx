@@ -16,7 +16,9 @@ export default function NotFound() {
         <EmptyHeader>
           <EmptyTitle>Page not found</EmptyTitle>
           <EmptyDescription>
-            That URL is not a BitPlan page. Check the path, or go back home.
+            That URL is not a BitPlan page. Try <Link href="/docs">docs</Link>,
+            the <Link href="/sitemap.xml">sitemap</Link>, or{" "}
+            <Link href="/llms.txt">llms.txt</Link>.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>

@@ -10,6 +10,9 @@ const PUBLIC_PATHS = [
   "/docs/commands",
   "/docs/envelope",
   "/sponsors",
+  "/about",
+  "/privacy",
+  "/contact",
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

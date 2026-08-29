@@ -21,6 +21,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  alternates: {
+    canonical: "./",
+    types: {
+      "text/markdown": "./",
+    },
+  },
   description:
     "Publish encrypted HTML plans through a BRC-100 wallet on Bitcoin. bitplan.dev is the viewer.",
   metadataBase: new URL(SITE_URL),

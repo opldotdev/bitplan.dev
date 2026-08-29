@@ -24,7 +24,10 @@ export default function Home() {
             Publish an encrypted HTML file as a 1Sat Ordinal. Your BRC-100
             wallet protects the identity keys and publishes each version. This
             site asks it to open private drafts or unlock shared drafts. It
-            stores no drafts server-side.
+            stores no drafts server-side. The CLI is the npm package bitplan:
+            run npx bitplan auth, then npx bitplan upload ./plan.html. Upload
+            the same file again to reinscribe the same satoshi. One origin
+            outpoint is the draft and its version history.
           </p>
         </div>
 
