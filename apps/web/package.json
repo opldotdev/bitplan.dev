@@ -44,6 +44,7 @@
     "@types/node": "26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "shiki": "4.4.3",
     "tailwindcss": "^4.3.3",
     "typescript": "7.0.2",
     "ultracite": "7.10.7"

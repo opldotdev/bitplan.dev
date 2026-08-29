@@ -12,7 +12,13 @@
 
 import { Buffer } from 'node:buffer'
 import { webcrypto } from 'node:crypto'
-import { PublicKey, SymmetricKey, type WalletInterface } from '@bsv/sdk'
+import {
+	Hash,
+	PublicKey,
+	SymmetricKey,
+	Utils,
+	type WalletInterface,
+} from '@bsv/sdk'
 import { BITPLAN_PROTOCOL } from './constants.js'
 import { CliError } from './errors.js'
 
@@ -26,6 +32,7 @@ const MAX_HEADER_BYTES = 64 * 1024
 export const MAX_SHARED_RECIPIENTS = 128
 const CONTENT_KEY_BYTES = 32
 const SYMMETRIC_CIPHERTEXT_OVERHEAD = 48
+const HEADER_SHA256_PLACEHOLDER = '0'.repeat(64)
 
 export interface PrivateEnvelopeKey {
 	/** BRC-2 self-encryption through the author's wallet. */
@@ -84,6 +91,8 @@ export interface DraftMeta {
 export interface DraftPlaintext {
 	meta: DraftMeta
 	html: string
+	/** Present on new shared envelopes to bind the public header to the payload. */
+	headerSha256?: string
 }
 
 export interface ParsedEnvelope {
@@ -132,6 +141,27 @@ export function toBase64(bytes: Uint8Array): string {
 
 export function fromBase64(value: string): Uint8Array {
 	return new Uint8Array(Buffer.from(value, 'base64'))
+}
+
+function headerSha256(header: EnvelopeHeader): string {
+	const bytes = new TextEncoder().encode(canonicalJson(header))
+	return Utils.toHex(Hash.sha256(Array.from(bytes)))
+}
+
+function canonicalJson(value: unknown): string {
+	return JSON.stringify(value, (_key, item) =>
+		item && typeof item === 'object' && !Array.isArray(item)
+			? Object.fromEntries(
+					Object.entries(item).sort(([a], [b]) => compareKeys(a, b)),
+				)
+			: item,
+	)
+}
+
+function compareKeys(a: string, b: string): number {
+	if (a < b) return -1
+	if (a > b) return 1
+	return 0
 }
 
 /**
@@ -223,12 +253,8 @@ async function sealSharedEnvelope(
 	]
 	const contentKey = SymmetricKey.fromRandom()
 	const contentKeyBytes = contentKey.toArray('be', CONTENT_KEY_BYTES)
-	const payload = Uint8Array.from(
-		contentKey.encrypt(Array.from(body)) as number[],
-	)
-	const chunks: Uint8Array[] = [payload]
-	const slots: SharedEnvelopeSlot[] = []
-	let offset = payload.length
+	const wrappedKeys: Uint8Array[] = []
+	const wrappedKeyLengths: number[] = []
 
 	for (const identityKey of readers) {
 		let encrypted: Awaited<ReturnType<typeof wallet.encrypt>>
@@ -245,23 +271,45 @@ async function sealSharedEnvelope(
 			)
 		}
 		const ciphertext = Uint8Array.from(encrypted.ciphertext)
-		chunks.push(ciphertext)
-		slots.push({ identityKey, offset, length: ciphertext.length })
-		offset += ciphertext.length
+		wrappedKeys.push(ciphertext)
+		wrappedKeyLengths.push(ciphertext.length)
 	}
 
+	const boundPlaintext = {
+		...(JSON.parse(new TextDecoder().decode(body)) as DraftPlaintext),
+		headerSha256: HEADER_SHA256_PLACEHOLDER,
+	}
+	const predictedPayloadLength =
+		new TextEncoder().encode(JSON.stringify(boundPlaintext)).length +
+		SYMMETRIC_CIPHERTEXT_OVERHEAD
+	let offset = predictedPayloadLength
+	const slots = readers.map((identityKey, index): SharedEnvelopeSlot => {
+		const length = wrappedKeyLengths[index] ?? 0
+		const slot = { identityKey, offset, length }
+		offset += length
+		return slot
+	})
 	const header: SharedEnvelopeHeader = {
 		v: 2,
 		key: {
 			mode: 'brc2-multi',
 			protocolID: [BITPLAN_PROTOCOL[0], BITPLAN_PROTOCOL[1]],
 			keyID,
-			payloadLength: payload.length,
+			payloadLength: predictedPayloadLength,
 			senderIdentityKey,
 			slots,
 		},
 	}
-	return frameEnvelope(header, concatenate(chunks, offset))
+	boundPlaintext.headerSha256 = headerSha256(header)
+	const payload = Uint8Array.from(
+		contentKey.encrypt(
+			Array.from(new TextEncoder().encode(JSON.stringify(boundPlaintext))),
+		) as number[],
+	)
+	if (payload.length !== predictedPayloadLength) {
+		throw new CliError('Could not bind the shared envelope header.')
+	}
+	return frameEnvelope(header, concatenate([payload, ...wrappedKeys], offset))
 }
 
 function concatenate(
@@ -639,5 +687,14 @@ export async function openEnvelope(
 		)
 	}
 
-	return { header, plaintext: assertPlaintext(parsed) }
+	const plaintext = assertPlaintext(parsed)
+	if (header.v === 2) {
+		if (plaintext.headerSha256 !== headerSha256(header)) {
+			throw new CliError(
+				'The shared draft header does not match its authenticated payload.',
+			)
+		}
+	}
+	const { headerSha256: _headerSha256, ...document } = plaintext
+	return { header, plaintext: document }
 }

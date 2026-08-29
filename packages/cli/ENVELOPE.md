@@ -19,6 +19,9 @@ reading. Those are separate capabilities.
 
 ## Binary frame
 
+The envelope is a container, not an encryption algorithm. Its framing and JSON
+header are public. Encryption protects the document in the body.
+
 All multi-byte integers are little-endian.
 
 ```text
@@ -31,10 +34,12 @@ All multi-byte integers are little-endian.
 The version byte is `0x01` for a private envelope and `0x02` for a shared
 envelope. Readers reject unknown versions, bad magic, invalid headers, buffer
 overruns, headers larger than 64 KiB, and empty ciphertext.
+`brc2-self` and `brc2-multi` are BitPlan wire labels; `brc2-multi`
+describes BitPlan's shared layout.
 
 ## Private
 
-Private drafts retain the compact original format:
+Private drafts use this compact format:
 
 ```json
 {
@@ -87,6 +92,15 @@ for one recipient identity public key.
 The body starts with `payloadLength` bytes of AES-256-GCM ciphertext produced by
 `SymmetricKey.encrypt`. Wrapped-key slots follow in header order. Slot offsets
 are absolute body offsets, contiguous, and cover the rest of the body.
+`SymmetricKey` gets the 32-byte document key and a fresh 32-byte IV from the
+operating system CSPRNG. It throws instead of falling back to insecure
+randomness.
+
+Before encrypting, the publisher hashes the canonical header with SHA-256 and
+stores the hex digest as `headerSha256` inside the encrypted plaintext. Object
+keys are sorted lexicographically at every level; array order is preserved.
+Readers recompute the hash and reject a mismatch. This binds the reader list,
+publisher identity, key parameters, and body layout to the encrypted payload.
 
 For the owner and each recipient, the publisher calls:
 
@@ -104,10 +118,10 @@ The recipient selects its slot and calls `wallet.decrypt` with the publisher's
 "self"`. The returned 32-byte key decrypts the single payload with SDK
 `SymmetricKey.decrypt`.
 
-This is the hybrid pattern already used by `@bsv/sdk` certificate keyrings:
-SDK AES-GCM for the payload, BRC-100 wallet encryption for the small revelation
-key. BitPlan never receives an identity private key or implements cryptography
-itself. `keyID` is a public BRC-2 derivation label, not key material.
+BitPlan uses SDK AES-GCM for the payload and BRC-100 wallet encryption for the
+small document key. It never receives an identity private key or implements
+cryptography itself. `keyID` is a public wallet derivation label, not key
+material. The identity key names the counterparty; it is not the document key.
 
 ## Plaintext
 
@@ -133,6 +147,9 @@ The private body or shared payload decrypts to this UTF-8 JSON:
 }
 ```
 
+Shared plaintext also has a top-level `headerSha256` field. It is checked and
+removed before the document is returned to the CLI or viewer.
+
 ## Privacy and permanence
 
 With private plans, only the envelope parameters and ciphertext are public.
@@ -144,3 +161,6 @@ shared version at 128 additional readers.
 Publishing a later private version does not revoke access to an older shared
 version. No inscription can be edited or deleted. BitPlan therefore scans the
 plaintext for credentials before asking the wallet to encrypt it.
+
+The envelope does not prove who published it. Publishing authority comes from
+the ordinal origin and transaction chain.

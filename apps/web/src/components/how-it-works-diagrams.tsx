@@ -41,6 +41,74 @@ export function ArchitectureDiagram() {
   );
 }
 
+function EncryptionStep({
+  children,
+  detail,
+}: {
+  children: React.ReactNode;
+  detail?: string;
+}) {
+  return (
+    <div className="rounded-md border bg-background px-3 py-2 text-center">
+      <p className="font-mono font-semibold text-xs">{children}</p>
+      {detail ? (
+        <p className="font-mono text-[11px] text-muted-foreground">{detail}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function DownArrow() {
+  return (
+    <p aria-hidden="true" className="my-1 text-center font-mono text-primary">
+      ↓
+    </p>
+  );
+}
+
+export function EncryptionDiagram() {
+  return (
+    <figure>
+      <div
+        aria-label="Private plans are encrypted entirely by the wallet. Shared plans are encrypted once with a fresh document key, then the wallet encrypts that key for the owner and every reader. Both become BPLN envelopes on-chain."
+        className="not-typeset grid gap-3 sm:grid-cols-2"
+        role="img"
+      >
+        <div className="rounded-lg border bg-card p-3">
+          <p className="mb-3 font-semibold text-sm">Private</p>
+          <EncryptionStep>Plan JSON</EncryptionStep>
+          <DownArrow />
+          <EncryptionStep detail={'[2, "bitplan"] · keyID · self'}>
+            wallet.encrypt
+          </EncryptionStep>
+          <DownArrow />
+          <EncryptionStep detail="public header + encrypted body">
+            BPLN v1
+          </EncryptionStep>
+        </div>
+        <div className="rounded-lg border bg-card p-3">
+          <p className="mb-3 font-semibold text-sm">Shared</p>
+          <EncryptionStep detail="fresh random 32-byte document key">
+            Plan JSON
+          </EncryptionStep>
+          <DownArrow />
+          <EncryptionStep detail="one authenticated ciphertext">
+            SDK AES-256-GCM
+          </EncryptionStep>
+          <DownArrow />
+          <EncryptionStep detail="wallet-wrapped key per identity">
+            BPLN v2
+          </EncryptionStep>
+        </div>
+      </div>
+      <figcaption className="sr-only">
+        The envelope is a container around the encrypted data. It is not an
+        encryption algorithm.
+      </figcaption>
+    </figure>
+  );
+}
+
 function BitPlanStackDiagram() {
   return (
     <svg

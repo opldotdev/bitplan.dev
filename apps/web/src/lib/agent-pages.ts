@@ -74,7 +74,7 @@ Docs: ${SITE_URL}/docs/commands
 `,
   "/docs/envelope": `# Envelopes · BitPlan
 
-On-chain format for a BitPlan draft: BPLN magic, JSON header, and BRC-2 ciphertext. Envelopes can be private or shared.
+The envelope is the on-chain container: BPLN framing, a public JSON header, and an encrypted body. It is not the encryption key. Envelopes can be private or shared.
 
 Docs: ${SITE_URL}/docs/envelope
 `,
@@ -83,6 +83,8 @@ Docs: ${SITE_URL}/docs/envelope
 BitPlan publishes encrypted HTML drafts as versioned 1Sat Ordinals. Private drafts are encrypted by the wallet. For sharing, the CLI encrypts the document once and asks the wallet to wrap its key for each reader.
 
 bitplan.dev fetches public ciphertext from 1Sat. In the browser, the connected wallet decrypts.
+
+Private plans use BRC-100 wallet encryption with [2, "bitplan"], a public keyID, and counterparty self. Shared plans use a fresh random 32-byte document key and @bsv/sdk AES-256-GCM, then wallet-encrypt that key once per reader. The authenticated payload commits the exact public header. Wallet private keys never leave the wallet. Shared reader identity keys are public.
 
 See ${SITE_URL}/docs/how-it-works
 `,

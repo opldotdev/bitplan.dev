@@ -11,7 +11,7 @@ import {
 
 export const metadata: Metadata = {
   description:
-    "On-chain format for a bitplan draft: BPLN envelope, MAP fields, and BRC-2 ciphertext.",
+    "On-chain format for a BitPlan draft: BPLN framing, public headers, and encrypted bodies.",
   title: "Envelopes",
 };
 
@@ -27,7 +27,7 @@ const LAYOUT = [
   {
     field: "ciphertext",
     size: "rest",
-    value: "document ciphertext, then wrapped document keys",
+    value: "private ciphertext, or shared payload followed by wrapped keys",
   },
 ] as const;
 
@@ -36,10 +36,10 @@ export default function EnvelopePage() {
     <>
       <h1>Envelopes</h1>
       <p>
-        This is the on-chain format bitplan publishes. Anything that can read a
-        1Sat Ordinal and talk to a BRC-100 wallet can implement it. The body is
-        either wallet BRC-2 ciphertext or an SDK-encrypted payload with BRC-2
-        key wraps. There is no cleartext path.
+        The envelope packages encrypted data so another BitPlan reader can open
+        it. It provides framing and public decryption parameters; encryption
+        protects the plan inside it. Anything that can read a 1Sat Ordinal and
+        talk to a BRC-100 wallet can implement the format.
       </p>
       <section id="where-it-lives">
         <h2>Where it lives</h2>
@@ -97,16 +97,33 @@ export default function EnvelopePage() {
         <h2>Private</h2>
         <p>
           The header names the fixed <code>[2, &quot;bitplan&quot;]</code>
-          protocol and keyID. The wallet encrypts and decrypts the plan with{" "}
-          <code>counterparty: &quot;self&quot;</code>.
+          protocol and <code>keyID</code>. The wallet derives the encryption key
+          internally and encrypts the complete plan with{" "}
+          <code>counterparty: &quot;self&quot;</code>. The <code>keyID</code> is
+          a public derivation label, not key material.
         </p>
       </section>
       <section id="sharing">
         <h2>Shared</h2>
         <p>
-          The SDK encrypts the plan once. The wallet wraps its key for each
-          reader. A reader asks their wallet to unwrap the key, then decrypts
-          the plan locally. Identity keys are public; the plan stays encrypted.
+          The SDK encrypts the plan once with a fresh random 32-byte key and
+          AES-256-GCM. The wallet encrypts that key for the owner and each
+          reader. A reader asks their wallet for their copy, then decrypts the
+          plan locally. Identity keys are public; private keys stay in the
+          wallet. The SDK gets the document key and each IV from the operating
+          system&apos;s secure random generator and fails if none is available.
+          Each IV is 32 bytes.
+        </p>
+      </section>
+      <section id="security">
+        <h2>Security properties</h2>
+        <p>
+          AES-GCM provides confidentiality and tamper detection. The wallet will
+          fail on the wrong protocol, <code>keyID</code>, counterparty, or
+          ciphertext. A shared payload includes a SHA-256 commitment to its
+          canonical header, so its public access list and key parameters cannot
+          be changed unnoticed. The envelope does not prove authorship by
+          itself; the ordinal&apos;s origin and transaction chain do that.
         </p>
       </section>
     </>

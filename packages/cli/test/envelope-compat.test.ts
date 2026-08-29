@@ -2,7 +2,12 @@ import { describe, expect, test } from 'bun:test'
 import { PrivateKey, ProtoWallet } from '@bsv/sdk'
 
 import { openEnvelope as openWebEnvelope } from '../../../apps/web/src/lib/envelope'
-import { type DraftPlaintext, sealEnvelope } from '../src/envelope.js'
+import {
+	type DraftPlaintext,
+	frameEnvelope,
+	parseEnvelope,
+	sealEnvelope,
+} from '../src/envelope.js'
 
 const PLAINTEXT: DraftPlaintext = {
 	html: '<!doctype html><title>Cross-reader fixture</title>',
@@ -48,5 +53,15 @@ describe('CLI and website envelope compatibility', () => {
 		expect(
 			(await openWebEnvelope(recipient, sharedEnvelope)).plaintext,
 		).toEqual(PLAINTEXT)
+
+		const parsed = parseEnvelope(sharedEnvelope)
+		if (parsed.header.v !== 2) throw new Error('expected shared header')
+		const tamperedHeader = structuredClone(parsed.header)
+		const recipientSlot = tamperedHeader.key.slots[1]
+		if (!recipientSlot) throw new Error('expected recipient slot')
+		recipientSlot.identityKey = new PrivateKey(23).toPublicKey().toString()
+		await expect(
+			openWebEnvelope(owner, frameEnvelope(tamperedHeader, parsed.ciphertext)),
+		).rejects.toThrow(/header does not match/)
 	})
 })

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { PrivateKey, ProtoWallet, SymmetricKey } from "@bsv/sdk";
+import { PrivateKey, ProtoWallet } from "@bsv/sdk";
+
+import { sealEnvelope as sealCliEnvelope } from "../../../../packages/cli/src/envelope";
 
 import {
   type DraftPlaintext,
@@ -219,59 +221,14 @@ describe("envelope round trip", () => {
     const recipientIdentity = (
       await recipient.getPublicKey({ identityKey: true })
     ).publicKey;
-    const body = Array.from(
-      new TextEncoder().encode(JSON.stringify(PLAINTEXT))
-    );
-    const contentKey = SymmetricKey.fromRandom();
-    const payload = contentKey.encrypt(body) as number[];
-    const contentKeyBytes = contentKey.toArray("be", 32);
     const ownerIdentity = (await owner.getPublicKey({ identityKey: true }))
       .publicKey;
-    const ownerCiphertext = (
-      await owner.encrypt({
-        counterparty: "self",
-        keyID: "shared-key",
-        plaintext: contentKeyBytes,
-        protocolID: [2, "bitplan"],
-      })
-    ).ciphertext;
-    const recipientCiphertext = (
-      await owner.encrypt({
-        counterparty: recipientIdentity,
-        keyID: "shared-key",
-        plaintext: contentKeyBytes,
-        protocolID: [2, "bitplan"],
-      })
-    ).ciphertext;
-    const combined = Uint8Array.from([
-      ...payload,
-      ...ownerCiphertext,
-      ...recipientCiphertext,
-    ]);
-    const envelope = frameEnvelope(
-      {
-        key: {
-          keyID: "shared-key",
-          mode: "brc2-multi",
-          payloadLength: payload.length,
-          protocolID: [2, "bitplan"],
-          senderIdentityKey: ownerIdentity,
-          slots: [
-            {
-              identityKey: ownerIdentity,
-              length: ownerCiphertext.length,
-              offset: payload.length,
-            },
-            {
-              identityKey: recipientIdentity,
-              length: recipientCiphertext.length,
-              offset: payload.length + ownerCiphertext.length,
-            },
-          ],
-        },
-        v: 2,
-      },
-      combined
+    const envelope = await sealCliEnvelope(
+      owner,
+      PLAINTEXT,
+      "shared-key",
+      [recipientIdentity],
+      ownerIdentity
     );
 
     const parsed = parseEnvelope(envelope);

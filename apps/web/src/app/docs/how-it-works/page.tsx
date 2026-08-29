@@ -1,10 +1,61 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { CodeExample } from "@/components/code-example";
 import {
   ArchitectureDiagram,
+  EncryptionDiagram,
   ReinscriptionDiagram,
 } from "@/components/how-it-works-diagrams";
+
+const PRIVATE_CODE = `
+const protocolID = [2, "bitplan"]
+
+const { ciphertext } = await wallet.encrypt({
+  protocolID,
+  keyID,
+  counterparty: "self",
+  plaintext: planBytes,
+})
+
+const { plaintext } = await wallet.decrypt({
+  protocolID,
+  keyID,
+  counterparty: "self",
+  ciphertext,
+})
+`;
+
+const SHARED_CODE = `
+import { SymmetricKey } from "@bsv/sdk"
+
+const documentKey = SymmetricKey.fromRandom()
+
+const { ciphertext: wrappedKey } = await wallet.encrypt({
+  protocolID: [2, "bitplan"],
+  keyID,
+  counterparty:
+    readerIdentityKey === publisherIdentityKey ? "self" : readerIdentityKey,
+  plaintext: documentKey.toArray("be", 32),
+})
+
+const header = buildHeader([wrappedKey, ...otherWrappedKeys])
+const payload = documentKey.encrypt(encode({
+  ...plan,
+  headerSha256: sha256(canonicalJson(header)),
+}))
+
+const { plaintext: keyBytes } = await readerWallet.decrypt({
+  protocolID: [2, "bitplan"],
+  keyID,
+  counterparty:
+    readerIdentityKey === publisherIdentityKey ? "self" : publisherIdentityKey,
+  ciphertext: wrappedKey,
+})
+
+const plaintext = new SymmetricKey(keyBytes).decrypt(payload)
+assert(plaintext.headerSha256 === sha256(canonicalJson(header)))
+`;
 
 export const metadata: Metadata = {
   description:
@@ -30,6 +81,50 @@ export default function HowItWorksPage() {
         key. The site has no drafts database, and plaintext never reaches its
         server.
       </p>
+      <section id="encryption">
+        <h2>Encryption</h2>
+        <p>
+          A BitPlan <Link href="/docs/envelope">envelope</Link> is a container.
+          Its <code>BPLN</code> marker, version, and JSON header tell a reader
+          how to open the encrypted body. The header is public and contains no
+          secret key.
+        </p>
+        <EncryptionDiagram />
+        <h3>Private</h3>
+        <p>
+          The wallet encrypts the complete plan through the BRC-100{" "}
+          <code>encrypt</code> method. It derives the key from the wallet root,
+          <code> [2, &quot;bitplan&quot;]</code>, the draft&apos;s{" "}
+          <code>keyID</code>, and <code>counterparty: &quot;self&quot;</code>.
+          The root key and derived key stay in the wallet. The{" "}
+          <code>keyID</code> is a public label, not a key.
+        </p>
+        <CodeExample code={PRIVATE_CODE} label="See the private wallet calls" />
+        <h3>Shared</h3>
+        <p>
+          The CLI creates a fresh random 32-byte document key and encrypts the
+          plan once with the <code>@bsv/sdk</code> AES-256-GCM implementation.
+          The wallet then encrypts that small key for the owner and each reader.
+          A reader&apos;s identity key selects their copy; their wallet derives
+          the matching key with the publisher as counterparty.
+        </p>
+        <p>
+          The SDK gets both the document key and a fresh AES-GCM IV from the
+          operating system&apos;s secure random generator. It stops with an
+          error if secure randomness is unavailable. The encrypted plan also
+          commits the exact public header, so changing the access list or key
+          parameters makes decryption fail.
+        </p>
+        <CodeExample code={SHARED_CODE} label="See the shared key flow" />
+        <h3>What this protects</h3>
+        <p>
+          AES-GCM hides the plan and detects changes to its ciphertext. A wrong
+          wallet, key, or counterparty cannot decrypt it. The chain still
+          reveals the envelope size and version. Shared envelopes also reveal
+          the publisher and reader identity keys. Access to an older shared
+          version cannot be revoked because that inscription is permanent.
+        </p>
+      </section>
       <section id="publishing">
         <h2>Publishing</h2>
         <ol>
@@ -43,11 +138,11 @@ export default function HowItWorksPage() {
             and content fee, then asks for confirmation.
           </li>
           <li>
-            <strong>Encrypt.</strong> A private draft is one BRC-2{" "}
+            <strong>Encrypt.</strong> A private draft is one BRC-100 wallet{" "}
             <code>wallet.encrypt</code> call. A shared draft is encrypted once
-            with the SDK, then the wallet BRC-2-wraps its 32-byte key for the
-            owner and each reader. The wallet keeps every identity private key.
-            The CLI builds the <Link href="/docs/envelope">envelope</Link>.
+            with the SDK, then the wallet wraps its 32-byte key for the owner
+            and each reader. The wallet keeps every identity private key. The
+            CLI builds the <Link href="/docs/envelope">envelope</Link>.
           </li>
           <li>
             <strong>Publish through the wallet.</strong> The wallet signs and
@@ -108,11 +203,11 @@ export default function HowItWorksPage() {
       <section id="the-wallet">
         <h2>Control and recovery</h2>
         <p>
-          The current coin controls publishing; the BRC-2 keys control reading.
+          The current coin controls publishing; wallet keys control reading.
           Those capabilities can diverge. Sharing grants read access; it does
           not grant the recipient the draft coin or permission to publish the
-          next version. BitPlan does not provide key rotation, recovery, or
-          ownership transfer.
+          next version. The envelope does not sign authorship; the draft&apos;s
+          origin and transaction chain establish who controls publishing.
         </p>
         <p>
           Ciphertext is public and permanent. Encryption does not restore a

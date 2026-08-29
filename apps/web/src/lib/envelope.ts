@@ -9,7 +9,7 @@
  * wrapped-key slot per authorized identity and one SDK-encrypted payload.
  */
 
-import { SymmetricKey, type WalletInterface } from "@bsv/sdk";
+import { Hash, SymmetricKey, Utils, type WalletInterface } from "@bsv/sdk";
 
 import { normalizeIdentityKey } from "@/lib/sharing";
 
@@ -22,6 +22,7 @@ export const SHARED_ENVELOPE_VERSION = 0x02;
 const MAX_HEADER_BYTES = 64 * 1024;
 const BITPLAN_PROTOCOL = [2, "bitplan"] as const;
 const CONTENT_KEY_BYTES = 32;
+const MAX_SHARED_RECIPIENTS = 128;
 const MIN_SYMMETRIC_CIPHERTEXT_BYTES = 48;
 
 export class EnvelopeError extends Error {
@@ -93,6 +94,7 @@ export interface DraftMeta {
 
 /** The JSON that lives inside the ciphertext. */
 export interface DraftPlaintext {
+  headerSha256?: string;
   html: string;
   meta: DraftMeta;
 }
@@ -133,6 +135,31 @@ export function fromBase64(value: string): Uint8Array {
     out[i] = binary.charCodeAt(i);
   }
   return out;
+}
+
+function headerSha256(header: EnvelopeHeader): string {
+  const bytes = new TextEncoder().encode(canonicalJson(header));
+  return Utils.toHex(Hash.sha256(Array.from(bytes)));
+}
+
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.entries(item).sort(([a], [b]) => compareKeys(a, b))
+        )
+      : item
+  );
+}
+
+function compareKeys(a: string, b: string): number {
+  if (a < b) {
+    return -1;
+  }
+  if (a > b) {
+    return 1;
+  }
+  return 0;
 }
 
 /** Assemble magic + version + header length + header + ciphertext. */
@@ -310,6 +337,7 @@ function assertHeader(value: unknown): EnvelopeHeader {
   if (!Array.isArray(k.slots) || k.slots.length === 0) {
     throw new EnvelopeError("Malformed bitplan envelope: key.slots is empty.");
   }
+  assertSharedSlotCount(k.slots);
   const seen = new Set<string>();
   const slots = k.slots.map((slotValue, index): SharedEnvelopeSlot => {
     if (typeof slotValue !== "object" || slotValue === null) {
@@ -360,6 +388,14 @@ function assertHeader(value: unknown): EnvelopeHeader {
     },
     v: 2,
   };
+}
+
+function assertSharedSlotCount(slots: unknown[]): void {
+  if (slots.length > MAX_SHARED_RECIPIENTS + 1) {
+    throw new EnvelopeError(
+      `Malformed bitplan envelope: key.slots exceeds ${MAX_SHARED_RECIPIENTS + 1} readers.`
+    );
+  }
 }
 
 function assertIdentityKey(value: unknown, field: string): string {
@@ -421,6 +457,17 @@ function assertPlaintext(value: unknown): DraftPlaintext {
     );
   }
   return value as DraftPlaintext;
+}
+
+function assertHeaderBinding(
+  header: EnvelopeHeader,
+  plaintext: DraftPlaintext
+): void {
+  if (header.v === 2 && plaintext.headerSha256 !== headerSha256(header)) {
+    throw new EnvelopeError(
+      "The shared draft header does not match its authenticated payload."
+    );
+  }
 }
 
 /**
@@ -520,5 +567,8 @@ export async function openEnvelope(
     );
   }
 
-  return { header, plaintext: assertPlaintext(parsed) };
+  const plaintext = assertPlaintext(parsed);
+  assertHeaderBinding(header, plaintext);
+  const { headerSha256: _headerSha256, ...document } = plaintext;
+  return { header, plaintext: document };
 }

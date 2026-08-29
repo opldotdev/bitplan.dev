@@ -172,12 +172,14 @@ describe('envelope round trip', () => {
 		])
 		if (parsed.header.v !== 2) throw new Error('expected shared header')
 		expect(parsed.header.key.mode).toBe('brc2-multi')
-		expect(parsed.header.key.payloadLength).toBe(plaintextBytes + 48)
+		expect(parsed.header.key.payloadLength).toBeGreaterThan(plaintextBytes + 48)
 		expect(parsed.header.key.slots).toHaveLength(3)
 		expect(parsed.header.key.slots.map((slot) => slot.length)).toEqual([
 			80, 80, 80,
 		])
-		expect(parsed.ciphertext.length).toBe(plaintextBytes + 48 + 80 * 3)
+		expect(parsed.ciphertext.length).toBe(
+			parsed.header.key.payloadLength + 80 * 3,
+		)
 		expect(envelope.length).toBeLessThan(plaintextBytes + 2000)
 		expect((await openEnvelope(owner, envelope)).plaintext).toEqual(
 			largePlaintext,
@@ -206,6 +208,42 @@ describe('envelope round trip', () => {
 		expect(parseEnvelope(envelope).header.v).toBe(2)
 		expect(calls.getPublicKey).toBe(0)
 		expect(calls.encrypt).toHaveLength(2)
+	})
+
+	test('binds the shared reader list to the authenticated payload', async () => {
+		const owner = new ProtoWallet(new PrivateKey(1))
+		const recipient = new ProtoWallet(new PrivateKey(2))
+		const replacement = new PrivateKey(3).toPublicKey().toString()
+		const recipientIdentity = (
+			await recipient.getPublicKey({ identityKey: true })
+		).publicKey
+		const envelope = await sealEnvelope(owner, PLAINTEXT, 'shared-key', [
+			recipientIdentity,
+		])
+		const parsed = parseEnvelope(envelope)
+		if (parsed.header.v !== 2) throw new Error('expected shared header')
+		const tamperedHeader = structuredClone(parsed.header)
+		const recipientSlot = tamperedHeader.key.slots[1]
+		if (!recipientSlot) throw new Error('expected recipient slot')
+		recipientSlot.identityKey = replacement
+
+		await expect(
+			openEnvelope(owner, frameEnvelope(tamperedHeader, parsed.ciphertext)),
+		).rejects.toThrow(/header does not match/)
+	})
+
+	test('uses fresh randomness for every shared envelope', async () => {
+		const owner = new ProtoWallet(new PrivateKey(1))
+		const recipient = new PrivateKey(2).toPublicKey().toString()
+		const first = parseEnvelope(
+			await sealEnvelope(owner, PLAINTEXT, 'shared-key', [recipient]),
+		)
+		const second = parseEnvelope(
+			await sealEnvelope(owner, PLAINTEXT, 'shared-key', [recipient]),
+		)
+		expect(Array.from(first.ciphertext)).not.toEqual(
+			Array.from(second.ciphertext),
+		)
 	})
 
 	test('rejects more than 128 recipients before making wallet calls', async () => {
