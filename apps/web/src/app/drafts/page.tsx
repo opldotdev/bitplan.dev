@@ -4,7 +4,7 @@ import { DraftsList } from "@/components/drafts-list";
 
 export const metadata: Metadata = {
   robots: { follow: false, index: false },
-  title: "My drafts — BitPlan",
+  title: "My drafts",
 };
 
 export default function DraftsPage() {

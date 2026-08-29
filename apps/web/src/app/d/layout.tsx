@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   robots: { follow: false, index: false },
-  title: "Encrypted draft — BitPlan",
+  title: "Encrypted draft",
 };
 
 export default function DraftLayout({

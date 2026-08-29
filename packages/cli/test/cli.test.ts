@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import type { Command } from 'commander'
 import { estimateFeeSats, viewerUrl } from '../src/commands/upload.js'
-import { buildProgram } from '../src/index.js'
+import { buildProgram, main } from '../src/index.js'
 import { originFromReference } from '../src/ordfs.js'
 import {
 	isOutpoint,
@@ -42,13 +45,36 @@ describe('cli surface', () => {
 		expect(CLI_VERSION).toMatch(/^\d+\.\d+\.\d+/)
 	})
 
-	test('exposes exactly the four v1 commands', () => {
-		expect(program.commands.map((c) => c.name()).sort()).toEqual([
-			'fetch',
-			'list',
-			'upload',
+	test('exposes the postplan command set plus fetch', () => {
+		expect(program.commands.map((c) => c.name())).toEqual([
+			'auth',
 			'whoami',
+			'upload',
+			'list',
+			'fetch',
 		])
+		const auth = commandNamed(program, 'auth')
+		expect(auth.commands.map((c) => c.name())).toEqual(['login'])
+	})
+
+	test('bare invocation prints usage, not a silent exit', async () => {
+		const chunks: string[] = []
+		const orig = process.stdout.write.bind(process.stdout)
+		process.stdout.write = ((chunk: string | Uint8Array) => {
+			chunks.push(
+				typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString(),
+			)
+			return true
+		}) as typeof process.stdout.write
+		try {
+			await main(['node', 'bitplan'])
+		} finally {
+			process.stdout.write = orig
+		}
+		const out = chunks.join('')
+		expect(out).toMatch(/Usage: bitplan/)
+		expect(out).toMatch(/upload/)
+		expect(out).toMatch(/auth/)
 	})
 
 	test('upload takes a file and the documented flags', () => {
@@ -98,6 +124,44 @@ describe('cli surface', () => {
 		// without the loop in main() this would call process.exit() instead.
 		const p = overridden()
 		expect(() => p.parse(['list', '--not-a-flag'], { from: 'user' })).toThrow()
+	})
+})
+
+describe('npx and bunx bin runners', () => {
+	const cliSrc = path.join(import.meta.dir, '../src/cli.ts')
+	const dist = path.join(import.meta.dir, '../dist/bitplan.js')
+
+	function run(runtime: 'bun' | 'node', file: string): string {
+		const result = Bun.spawnSync([runtime, file], {
+			stderr: 'pipe',
+			stdout: 'pipe',
+		})
+		const out = `${result.stdout.toString()}${result.stderr.toString()}`
+		expect(result.exitCode).toBe(0)
+		expect(out).toMatch(/Usage: bitplan/)
+		expect(out).not.toMatch(/\(outputHelp\)/)
+		return out
+	}
+
+	test('bun src/cli.ts prints usage', () => {
+		run('bun', cliSrc)
+	})
+
+	test('node and bun print usage through a .bin-style symlink', () => {
+		if (!fs.existsSync(dist)) {
+			throw new Error(
+				'dist/bitplan.js missing; run bun run --filter bitplan build',
+			)
+		}
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bitplan-bin-'))
+		const link = path.join(dir, 'bitplan')
+		try {
+			fs.symlinkSync(dist, link)
+			run('node', link)
+			run('bun', link)
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true })
+		}
 	})
 })
 

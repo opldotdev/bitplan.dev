@@ -6,14 +6,12 @@ import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-const COMMAND = "npx bitplan upload ./plan.html";
-
-export function CommandCopy() {
+export function CommandCopy({ command }: { command: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(COMMAND);
+      await navigator.clipboard.writeText(command);
       setCopied(true);
       window.setTimeout(() => {
         setCopied(false);
@@ -21,13 +19,13 @@ export function CommandCopy() {
     } catch {
       setCopied(false);
     }
-  }, []);
+  }, [command]);
 
   return (
     <Card size="sm">
       <CardContent className="flex items-center gap-3">
-        <code className="min-w-0 flex-1 overflow-x-auto font-mono text-sm">
-          {COMMAND}
+        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-sm">
+          {command}
         </code>
         <Button
           aria-label={copied ? "Copied" : "Copy command"}

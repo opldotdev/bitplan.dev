@@ -529,7 +529,7 @@ function metaRows(meta: DraftMeta): { label: string; value: string }[] {
   if (meta.gitCommitSha) {
     const shortSha = meta.gitCommitSha.slice(0, 7);
     const subject = meta.gitCommitSubject
-      ? `${shortSha} — ${meta.gitCommitSubject}`
+      ? `${shortSha} ${meta.gitCommitSubject}`
       : shortSha;
     rows.push({ label: "Commit", value: subject });
   }

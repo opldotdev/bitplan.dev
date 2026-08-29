@@ -20,8 +20,7 @@ function subscribeConnected(onStoreChange: () => void): () => void {
 const serverSnapshot = () => false;
 
 /**
- * Postplan-style auth-aware chrome: a visitor with no wallet connected sees
- * nothing they cannot use; once connected, "My drafts" appears.
+ * Wordmark, My drafts, GitHub, theme. Connect wallet is the sign-in.
  */
 export function SiteHeader() {
   const connected = useSyncExternalStore(
@@ -38,7 +37,7 @@ export function SiteHeader() {
       await connectBrowserWallet();
       router.push("/drafts");
     } catch {
-      // No wallet answered; stay put — /drafts explains how to fix it.
+      // No wallet answered. /drafts explains how to fix it.
       router.push("/drafts");
     } finally {
       setConnecting(false);
@@ -52,14 +51,12 @@ export function SiteHeader() {
           BitPlan
           <span className="text-primary">.</span>
         </Link>
-        {connected && (
-          <Link
-            className="text-muted-foreground text-sm no-underline hover:text-foreground"
-            href="/drafts"
-          >
-            My drafts
-          </Link>
-        )}
+        <Link
+          className="text-muted-foreground text-sm no-underline hover:text-foreground"
+          href="/drafts"
+        >
+          My drafts
+        </Link>
       </div>
       <div className="flex items-center gap-1">
         {!connected && (

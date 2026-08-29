@@ -123,10 +123,12 @@ function EmptyState() {
   return (
     <Card>
       <CardContent className="space-y-2 py-8 text-center">
-        <p>No bitplan drafts in this wallet yet.</p>
+        <p>No drafts in this wallet yet.</p>
         <p className="text-muted-foreground text-sm">
           Publish one with{" "}
           <code className="font-mono">npx bitplan upload ./plan.html</code>
+          {" or "}
+          <code className="font-mono">bunx bitplan upload ./plan.html</code>
         </p>
       </CardContent>
     </Card>
@@ -202,8 +204,8 @@ function ConnectCard({
       <CardContent className="space-y-4 py-8 text-center">
         <Wallet aria-hidden className="mx-auto size-6 text-muted-foreground" />
         <p className="text-muted-foreground text-sm">
-          Connect the wallet that published your drafts. bitplan.dev reads the
-          list from the wallet itself — there is no account.
+          Connect the wallet that published these drafts. The list comes from
+          the wallet.
         </p>
         <Button
           className="w-full"

@@ -1,55 +1,51 @@
-import { GitBranch, Lock, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
-import { CommandCopy } from "@/components/command-copy";
-
-const features = [
-  {
-    body: "AES-256-GCM, key wrapped to your wallet. The chain stores ciphertext; bitplan.dev stores nothing.",
-    icon: Lock,
-    title: "Encrypted.",
-  },
-  {
-    body: "Each revision respends the same satoshi with a new envelope. The origin outpoint is the draft's identity forever.",
-    icon: GitBranch,
-    title: "Versioned.",
-  },
-  {
-    body: "Only the wallet holding the coin can publish the next version. The wallet is the account; the signature is the API key.",
-    icon: ShieldCheck,
-    title: "Yours.",
-  },
-] as const;
+import { CliCommands } from "@/components/cli-commands";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-[42rem] flex-1 flex-col justify-center px-6 py-10">
+    <main className="mx-auto w-full max-w-[42rem] flex-1 px-6 py-10">
       <div className="space-y-10">
         <div className="space-y-3">
           <h1 className="font-semibold text-[2.5rem] leading-tight tracking-tight">
             Plan documents on Bitcoin.
           </h1>
           <p className="text-muted-foreground">
-            Encrypted by default. Versioned by reinscription. No servers hold
-            your content.
+            The CLI encrypts an HTML file to your wallet and inscribes it as a
+            1Sat Ordinal. Later uploads of the same file become new versions of
+            the same coin. This site is the viewer. It stores nothing.
           </p>
         </div>
 
-        <CommandCopy />
+        <section className="space-y-4">
+          <h2 className="font-semibold text-lg tracking-tight">CLI</h2>
+          <CliCommands />
+          <p className="text-muted-foreground text-sm">
+            Needs a BRC-100 wallet on this machine, unlocked.{" "}
+            <Link
+              className="text-primary underline-offset-4 hover:underline"
+              href="/cli"
+            >
+              CLI setup
+            </Link>
+          </p>
+        </section>
 
-        <ul className="space-y-6">
-          {features.map((feature) => (
-            <li className="flex gap-4" key={feature.title}>
-              <feature.icon
-                aria-hidden
-                className="mt-0.5 size-5 shrink-0 text-muted-foreground"
-              />
-              <p>
-                <span className="font-semibold">{feature.title} </span>
-                {feature.body}
-              </p>
-            </li>
-          ))}
-        </ul>
+        <p className="text-sm">
+          <Link
+            className="text-primary underline-offset-4 hover:underline"
+            href="/drafts"
+          >
+            My drafts
+          </Link>
+          <span className="text-muted-foreground"> · </span>
+          <Link
+            className="text-primary underline-offset-4 hover:underline"
+            href="/cli"
+          >
+            CLI setup
+          </Link>
+        </p>
 
         <p className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
           <a

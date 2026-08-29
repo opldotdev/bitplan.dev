@@ -7,10 +7,12 @@ import {
 	ensureStateDir,
 	findDraftByFile,
 	findDraftByOrigin,
+	readConfig,
 	readDrafts,
 	STATE_DIR_MODE,
 	STATE_FILE_MODE,
 	saveDraftRecord,
+	writeConfig,
 	writeDrafts,
 	writeJsonFile,
 } from '../src/state.js'
@@ -106,6 +108,13 @@ describe('state store', () => {
 			'/plans/one.html',
 			'/plans/two.html',
 		])
+	})
+
+	test('writeConfig round-trips walletUrl at 0600', () => {
+		const file = path.join(dir, 'config.json')
+		writeConfig({ walletUrl: 'http://127.0.0.1:3321' }, file)
+		expect(readConfig(file)).toEqual({ walletUrl: 'http://127.0.0.1:3321' })
+		expect(modeOf(file)).toBe(STATE_FILE_MODE)
 	})
 
 	test('no key material is ever written', () => {

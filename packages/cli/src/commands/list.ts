@@ -55,7 +55,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
 
 	if (drafts.length === 0) {
 		console.log('No bitplan drafts in this wallet yet.')
-		console.log('Publish one with: bitplan upload <file>')
+		console.log('Publish one with: npx bitplan upload ./plan.html')
 		return
 	}
 

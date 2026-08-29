@@ -19,9 +19,12 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   description:
-    "Encrypted by default. Versioned by reinscription. No servers hold your content.",
+    "Encrypt an HTML plan to your wallet and inscribe it on Bitcoin. bitplan.dev is the viewer.",
   metadataBase: new URL("https://bitplan.dev"),
-  title: "BitPlan — plan documents on Bitcoin",
+  title: {
+    default: "BitPlan",
+    template: "%s · BitPlan",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

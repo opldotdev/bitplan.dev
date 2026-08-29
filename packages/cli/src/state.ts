@@ -80,6 +80,13 @@ export function readConfig(file: string = configPath()): ConfigFile {
 	return readJsonFile<ConfigFile>(file, {})
 }
 
+export function writeConfig(
+	config: ConfigFile,
+	file: string = configPath(),
+): void {
+	writeJsonFile(file, config)
+}
+
 export function readDrafts(file: string = draftsPath()): DraftsFile {
 	const parsed = readJsonFile<Partial<DraftsFile>>(file, {})
 	return { files: parsed.files ?? {} }
