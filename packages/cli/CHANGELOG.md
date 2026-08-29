@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.4
+
+### Breaking Changes
+
+- Drafts encrypt with BRC-2 `wallet.encrypt` (`counterparty: "self"`), not a homemade AES-GCM wrap. Envelope v1 is this format. Ciphertext published by 0.0.3 will not open.
+
+### Changed
+
+- Version publishes go through `sendOrdinals.execute` so the new envelope lands on the same satoshi.
+- `bitplan list` prints a table (short origin/outpoint, time-ago). `--verbose` keeps full hashes and ISO timestamps. `--json` is unchanged.
+
 ## 0.0.3
 
 ### Fixed
