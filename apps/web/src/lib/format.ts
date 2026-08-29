@@ -10,11 +10,7 @@ export function formatByteSize(bytes: number): string {
 }
 
 /** Middle-truncate a long origin outpoint for display. */
-export function truncateMiddle(
-  value: string,
-  head = 10,
-  tail = 8
-): string {
+export function truncateMiddle(value: string, head = 10, tail = 8): string {
   if (value.length <= head + tail + 1) {
     return value;
   }

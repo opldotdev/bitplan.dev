@@ -13,6 +13,7 @@ import {
   versionToSeq,
 } from "./version";
 
+const NOT_OUTPOINT = /Not an outpoint/;
 const TXID = "a".repeat(64);
 
 describe("outpoint normalization", () => {
@@ -33,7 +34,7 @@ describe("outpoint normalization", () => {
     expect(isOutpoint("not-an-outpoint")).toBe(false);
     expect(isOutpoint("abc_0")).toBe(false);
     expect(isOutpoint(`${TXID}-0`)).toBe(false);
-    expect(() => toOrdinalOutpoint("nope")).toThrow(/Not an outpoint/);
+    expect(() => toOrdinalOutpoint("nope")).toThrow(NOT_OUTPOINT);
   });
 
   test("normalizeOrigin decodes a viewer path segment", () => {

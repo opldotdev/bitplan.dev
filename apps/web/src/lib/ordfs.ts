@@ -10,9 +10,9 @@ export const ORDFS_PROXY = "/ordfs";
 export interface OrdfsContent {
   bytes: Uint8Array;
   contentType: string;
+  origin: string | null;
   /** Outpoint the content was actually served from. */
   outpoint: string | null;
-  origin: string | null;
   /** Position in the transfer chain, when ORDFS reports one. */
   sequence: number | null;
 }
@@ -55,8 +55,8 @@ export async function fetchOrdfsContent(
     bytes: new Uint8Array(buffer),
     contentType:
       response.headers.get("content-type") ?? "application/octet-stream",
-    outpoint: response.headers.get("x-outpoint"),
     origin: response.headers.get("x-origin"),
+    outpoint: response.headers.get("x-outpoint"),
     sequence: Number.isFinite(parsedSequence) ? parsedSequence : null,
   };
 }

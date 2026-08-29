@@ -39,10 +39,10 @@ import { connectBrowserWallet } from "@/lib/wallet";
 type WalletIssue = "no-wallet" | "unwrap-refused";
 
 interface LoadedDraft {
-  origin: string;
   content: OrdfsContent;
-  latestVersion: number;
   currentVersion: number;
+  latestVersion: number;
+  origin: string;
 }
 
 export function DraftResolving() {
@@ -58,6 +58,88 @@ export function DraftResolving() {
         </div>
       </div>
     </div>
+  );
+}
+
+type ResolveResult =
+  | { state: "not-found"; origin: string }
+  | { state: "found"; draft: LoadedDraft };
+
+/** Resolve origin + requested version to the envelope bytes to display. */
+async function resolveDraft(
+  originParam: string,
+  requestedVersion: number | null
+): Promise<ResolveResult> {
+  const origin = normalizeOrigin(originParam);
+  if (!origin) {
+    return { origin: originParam, state: "not-found" };
+  }
+
+  const latest = await fetchOrdfsContent(origin, -1);
+  if (!latest) {
+    return { origin, state: "not-found" };
+  }
+
+  const latestVersion = seqToVersion(latest.sequence ?? 0);
+  const currentVersion = clampVersion(
+    requestedVersion ?? latestVersion,
+    latestVersion
+  );
+
+  let content = latest;
+  if (currentVersion !== latestVersion) {
+    const pinned = await fetchOrdfsContent(
+      origin,
+      versionToSeq(currentVersion)
+    );
+    if (!pinned) {
+      return { origin, state: "not-found" };
+    }
+    content = pinned;
+  }
+
+  return {
+    draft: { content, currentVersion, latestVersion, origin },
+    state: "found",
+  };
+}
+
+/** Re-open a draft with an already-connected wallet after a version switch. */
+async function reopenDraft(
+  wallet: EnvelopeWallet,
+  bytes: Uint8Array
+): Promise<{ plaintext: DraftPlaintext | null; issue: WalletIssue | null }> {
+  try {
+    const opened = await openEnvelope(wallet, bytes);
+    return { issue: null, plaintext: opened.plaintext };
+  } catch {
+    return { issue: "unwrap-refused", plaintext: null };
+  }
+}
+
+function VersionPill({
+  version,
+  current,
+  onVersion,
+}: {
+  version: number;
+  current: boolean;
+  onVersion: (version: number) => void;
+}) {
+  const handleClick = useCallback(
+    () => onVersion(version),
+    [onVersion, version]
+  );
+  return (
+    <Button
+      aria-current={current ? "page" : undefined}
+      onClick={handleClick}
+      size="xs"
+      type="button"
+      variant={current ? "secondary" : "ghost"}
+    >
+      v{version}
+    </Button>
   );
 }
 
@@ -86,81 +168,34 @@ export function DraftViewer() {
       setResolving(true);
       setNotFoundOrigin(null);
 
-      const origin = normalizeOrigin(originParam);
-      if (!origin) {
-        if (!cancelled) {
-          setLoaded(null);
-          setPlaintext(null);
-          setNotFoundOrigin(originParam);
-          setResolving(false);
-        }
-        return;
-      }
-
-      const latest = await fetchOrdfsContent(origin, -1);
+      const result = await resolveDraft(originParam, requestedVersion);
       if (cancelled) {
         return;
       }
-      if (!latest) {
+
+      if (result.state === "not-found") {
         setLoaded(null);
         setPlaintext(null);
-        setNotFoundOrigin(origin);
+        setNotFoundOrigin(result.origin);
         setResolving(false);
         return;
       }
 
-      const latestVersion = seqToVersion(latest.sequence ?? 0);
-      const currentVersion = clampVersion(
-        requestedVersion ?? latestVersion,
-        latestVersion
-      );
-
-      let content = latest;
-      if (currentVersion !== latestVersion) {
-        const pinned = await fetchOrdfsContent(
-          origin,
-          versionToSeq(currentVersion)
-        );
-        if (cancelled) {
-          return;
-        }
-        if (!pinned) {
-          setLoaded(null);
-          setPlaintext(null);
-          setNotFoundOrigin(origin);
-          setResolving(false);
-          return;
-        }
-        content = pinned;
-      }
-
-      const next: LoadedDraft = {
-        origin,
-        content,
-        latestVersion,
-        currentVersion,
-      };
-      setLoaded(next);
+      setLoaded(result.draft);
       setNotFoundOrigin(null);
       setWalletIssue(null);
 
-      if (decryptedRef.current && walletRef.current) {
-        try {
-          const opened = await openEnvelope(walletRef.current, content.bytes);
-          if (!cancelled) {
-            setPlaintext(opened.plaintext);
-          }
-        } catch {
-          if (!cancelled) {
-            setPlaintext(null);
-            setWalletIssue("unwrap-refused");
-          }
+      const reopened =
+        decryptedRef.current && walletRef.current
+          ? await reopenDraft(walletRef.current, result.draft.content.bytes)
+          : null;
+      if (!cancelled) {
+        setPlaintext(reopened?.plaintext ?? null);
+        if (reopened?.issue) {
+          setWalletIssue(reopened.issue);
         }
-      } else {
-        setPlaintext(null);
+        setResolving(false);
       }
-
-      setResolving(false);
     }
 
     load();
@@ -187,7 +222,10 @@ export function DraftViewer() {
     }
 
     try {
-      const opened = await openEnvelope(walletRef.current, loaded.content.bytes);
+      const opened = await openEnvelope(
+        walletRef.current,
+        loaded.content.bytes
+      );
       decryptedRef.current = true;
       setPlaintext(opened.plaintext);
       setWalletIssue(null);
@@ -305,10 +343,7 @@ function EncryptedView({
       <main className="mx-auto flex w-full max-w-[42rem] flex-1 flex-col justify-center px-6 py-10">
         <Card>
           <CardHeader className="items-center text-center">
-            <Lock
-              aria-hidden
-              className="size-6 text-muted-foreground"
-            />
+            <Lock aria-hidden className="size-6 text-muted-foreground" />
             <CardTitle>Encrypted draft</CardTitle>
             <OriginCopy origin={origin} />
           </CardHeader>
@@ -360,7 +395,7 @@ function DecryptedView({
   latestVersion: number;
   onVersion: (version: number) => void;
 }) {
-  const title = plaintext.meta.title;
+  const { title } = plaintext.meta;
   const versions = Array.from({ length: latestVersion }, (_, i) => i + 1);
 
   return (
@@ -368,21 +403,14 @@ function DecryptedView({
       <header className="flex shrink-0 items-center gap-3 border-border border-b px-4 py-2">
         <Wordmark />
         <nav aria-label="Draft versions" className="flex flex-wrap gap-1">
-          {versions.map((version) => {
-            const current = version === currentVersion;
-            return (
-              <Button
-                aria-current={current ? "page" : undefined}
-                key={version}
-                onClick={() => onVersion(version)}
-                size="xs"
-                type="button"
-                variant={current ? "secondary" : "ghost"}
-              >
-                v{version}
-              </Button>
-            );
-          })}
+          {versions.map((version) => (
+            <VersionPill
+              current={version === currentVersion}
+              key={version}
+              onVersion={onVersion}
+              version={version}
+            />
+          ))}
         </nav>
         {title ? (
           <p className="min-w-0 flex-1 truncate text-muted-foreground text-sm">
@@ -448,7 +476,12 @@ function MetaInfo({ meta }: { meta: DraftMeta }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button aria-label="Draft info" size="icon" type="button" variant="ghost">
+        <Button
+          aria-label="Draft info"
+          size="icon"
+          type="button"
+          variant="ghost"
+        >
           <Info />
         </Button>
       </PopoverTrigger>

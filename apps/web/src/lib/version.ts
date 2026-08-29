@@ -4,6 +4,8 @@
  */
 
 /** `?v=<n>` is 1-based. Returns null when absent or not a positive integer. */
+const POSITIVE_INT = /^[1-9]\d*$/;
+
 export function parseVersionQuery(
   value: string | string[] | null | undefined
 ): number | null {
@@ -11,7 +13,7 @@ export function parseVersionQuery(
   if (raw === null || raw === undefined || raw === "") {
     return null;
   }
-  if (!/^[1-9]\d*$/.test(raw)) {
+  if (!POSITIVE_INT.test(raw)) {
     return null;
   }
   return Number.parseInt(raw, 10);

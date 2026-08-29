@@ -26,7 +26,7 @@ export function splitOutpoint(outpoint: string): {
   }
   const txid = trimmed.slice(0, 64);
   const vout = Number.parseInt(trimmed.slice(65), 10);
-  if (!TXID_HEX.test(txid) || !Number.isInteger(vout) || vout < 0) {
+  if (!(TXID_HEX.test(txid) && Number.isInteger(vout)) || vout < 0) {
     throw new Error(`Not an outpoint: ${outpoint}`);
   }
   return { txid: txid.toLowerCase(), vout };

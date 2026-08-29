@@ -31,46 +31,46 @@ export class EnvelopeError extends Error {
 }
 
 export interface EnvelopeKeyWrap {
+  /** base64 of the wallet.encrypt output over the raw content key. */
+  ciphertext: string;
+  keyID: string;
   /** Only mode defined in v1: wrapped by the author's own wallet. */
   mode: "brc2-self";
   protocolID: [number, string];
-  keyID: string;
-  /** base64 of the wallet.encrypt output over the raw content key. */
-  ciphertext: string;
 }
 
 export interface EnvelopeHeader {
-  v: 1;
   alg: "aes-256-gcm";
   /** base64, 12 bytes. */
   iv: string;
   key: EnvelopeKeyWrap;
+  v: 1;
 }
 
 export interface DraftMeta {
-  title: string | null;
+  cliVersion: string;
+  createdAt: string;
   description: string | null;
-  repoOrg: string | null;
-  repoName: string | null;
-  repoHost: string | null;
+  fileSha256: string;
   gitBranch: string | null;
   gitCommitSha: string | null;
   gitCommitSubject: string | null;
   gitDirty: boolean | null;
-  cliVersion: string;
-  fileSha256: string;
-  createdAt: string;
+  repoHost: string | null;
+  repoName: string | null;
+  repoOrg: string | null;
+  title: string | null;
 }
 
 /** The JSON that lives inside the ciphertext. */
 export interface DraftPlaintext {
-  meta: DraftMeta;
   html: string;
+  meta: DraftMeta;
 }
 
 export interface ParsedEnvelope {
-  header: EnvelopeHeader;
   ciphertext: Uint8Array;
+  header: EnvelopeHeader;
 }
 
 /**
@@ -78,12 +78,12 @@ export interface ParsedEnvelope {
  * Satisfied by `@bsv/sdk` WalletClient and by the in-test XOR mock.
  */
 export interface EnvelopeWallet {
-  decrypt(args: {
+  decrypt: (args: {
     protocolID: [number, string];
     keyID: string;
     counterparty: "self";
     ciphertext: number[];
-  }): Promise<{ plaintext: number[] }>;
+  }) => Promise<{ plaintext: number[] }>;
 }
 
 export function toBase64(bytes: Uint8Array): string {
@@ -97,7 +97,7 @@ export function toBase64(bytes: Uint8Array): string {
 export function fromBase64(value: string): Uint8Array {
   const binary = atob(value);
   const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
+  for (let i = 0; i < binary.length; i += 1) {
     out[i] = binary.charCodeAt(i);
   }
   return out;
@@ -141,7 +141,7 @@ export function parseEnvelope(bytes: Uint8Array): ParsedEnvelope {
       `Not a bitplan envelope: ${bytes.length} bytes is too short to hold a header.`
     );
   }
-  for (let i = 0; i < MAGIC.length; i++) {
+  for (let i = 0; i < MAGIC.length; i += 1) {
     if (bytes[i] !== MAGIC[i]) {
       throw new EnvelopeError(
         "Not a bitplan envelope: missing 'BPLN' magic at the start of the content."
@@ -179,9 +179,12 @@ export function parseEnvelope(bytes: Uint8Array): ParsedEnvelope {
   let parsed: unknown;
   try {
     parsed = JSON.parse(headerJson);
-  } catch {
+  } catch (error) {
     throw new EnvelopeError(
-      "Malformed bitplan envelope: header is not valid JSON."
+      "Malformed bitplan envelope: header is not valid JSON.",
+      {
+        cause: error,
+      }
     );
   }
 
@@ -193,7 +196,7 @@ export function parseEnvelope(bytes: Uint8Array): ParsedEnvelope {
     );
   }
 
-  return { header, ciphertext };
+  return { ciphertext, header };
 }
 
 function assertHeader(value: unknown): EnvelopeHeader {
@@ -218,7 +221,7 @@ function assertHeader(value: unknown): EnvelopeHeader {
       `Malformed bitplan envelope: iv must be ${IV_BYTES} base64-encoded bytes.`
     );
   }
-  const key = h.key;
+  const { key } = h;
   if (typeof key !== "object" || key === null) {
     throw new EnvelopeError(
       "Malformed bitplan envelope: header has no key wrap."
@@ -241,7 +244,9 @@ function assertHeader(value: unknown): EnvelopeHeader {
     );
   }
   if (typeof k.keyID !== "string" || k.keyID.length === 0) {
-    throw new EnvelopeError("Malformed bitplan envelope: key.keyID is missing.");
+    throw new EnvelopeError(
+      "Malformed bitplan envelope: key.keyID is missing."
+    );
   }
   if (typeof k.ciphertext !== "string" || k.ciphertext.length === 0) {
     throw new EnvelopeError(
@@ -250,15 +255,15 @@ function assertHeader(value: unknown): EnvelopeHeader {
   }
 
   return {
-    v: 1,
     alg: "aes-256-gcm",
     iv: h.iv,
     key: {
+      ciphertext: k.ciphertext,
+      keyID: k.keyID,
       mode: "brc2-self",
       protocolID: [k.protocolID[0], k.protocolID[1]],
-      keyID: k.keyID,
-      ciphertext: k.ciphertext,
     },
+    v: 1,
   };
 }
 
@@ -275,7 +280,7 @@ export async function openEnvelope(
 ): Promise<{ header: EnvelopeHeader; plaintext: DraftPlaintext }> {
   const { header, ciphertext } = parseEnvelope(bytes);
 
-  const level = header.key.protocolID[0];
+  const [level] = header.key.protocolID;
   if (level !== 0 && level !== 1 && level !== 2) {
     throw new EnvelopeError(
       `Malformed bitplan envelope: key.protocolID security level ${level} is not 0, 1 or 2.`
@@ -285,14 +290,15 @@ export async function openEnvelope(
   let unwrapped: Awaited<ReturnType<EnvelopeWallet["decrypt"]>>;
   try {
     unwrapped = await wallet.decrypt({
-      protocolID: [level, header.key.protocolID[1]],
-      keyID: header.key.keyID,
-      counterparty: "self",
       ciphertext: Array.from(fromBase64(header.key.ciphertext)),
+      counterparty: "self",
+      keyID: header.key.keyID,
+      protocolID: [level, header.key.protocolID[1]],
     });
   } catch (error) {
     throw new EnvelopeError(
-      `The wallet refused to unwrap this draft's content key (protocol ${header.key.protocolID[1]}, keyID ${header.key.keyID}): ${error instanceof Error ? error.message : String(error)}`
+      `The wallet refused to unwrap this draft's content key (protocol ${header.key.protocolID[1]}, keyID ${header.key.keyID}): ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
   const contentKey = Uint8Array.from(unwrapped.plaintext);
@@ -313,14 +319,15 @@ export async function openEnvelope(
   try {
     body = new Uint8Array(
       await globalThis.crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: new Uint8Array(fromBase64(header.iv)) },
+        { iv: new Uint8Array(fromBase64(header.iv)), name: "AES-GCM" },
         cryptoKey,
         new Uint8Array(ciphertext)
       )
     );
-  } catch {
+  } catch (error) {
     throw new EnvelopeError(
-      "Could not decrypt this draft: the ciphertext failed its authentication tag. The content or the key wrap has been altered."
+      "Could not decrypt this draft: the ciphertext failed its authentication tag. The content or the key wrap has been altered.",
+      { cause: error }
     );
   } finally {
     contentKey.fill(0);
@@ -329,9 +336,12 @@ export async function openEnvelope(
   let plaintext: unknown;
   try {
     plaintext = JSON.parse(new TextDecoder().decode(body));
-  } catch {
+  } catch (error) {
     throw new EnvelopeError(
-      "Decrypted this draft but its plaintext is not valid JSON."
+      "Decrypted this draft but its plaintext is not valid JSON.",
+      {
+        cause: error,
+      }
     );
   }
   if (
