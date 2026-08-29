@@ -713,38 +713,30 @@ function MetaInfo({ meta }: { meta: DraftMeta }) {
   );
 }
 
-function metaRows(meta: DraftMeta): { label: string; value: string }[] {
-  const rows: { label: string; value: string }[] = [];
-  if (meta.description) {
-    rows.push({ label: "Description", value: meta.description });
-  }
-  if (meta.createdAt) {
-    const parsed = Date.parse(meta.createdAt);
-    rows.push({
-      label: "Created",
-      value: Number.isNaN(parsed)
-        ? meta.createdAt
-        : new Date(parsed).toLocaleString(),
-    });
-  }
+export function metaRows(meta: DraftMeta): { label: string; value: string }[] {
+  const parsedDate = Date.parse(meta.createdAt);
   const repo = [meta.repoHost, meta.repoOrg, meta.repoName]
     .filter(Boolean)
     .join("/");
-  if (repo) {
-    rows.push({ label: "Repo", value: repo });
+  let gitStatus = "Unknown";
+  if (meta.gitDirty !== null) {
+    gitStatus = meta.gitDirty ? "Dirty" : "Clean";
   }
-  if (meta.gitBranch) {
-    rows.push({ label: "Branch", value: meta.gitBranch });
-  }
-  if (meta.gitCommitSha) {
-    const shortSha = meta.gitCommitSha.slice(0, 7);
-    const subject = meta.gitCommitSubject
-      ? `${shortSha} ${meta.gitCommitSubject}`
-      : shortSha;
-    rows.push({ label: "Commit", value: subject });
-  }
-  if (meta.gitDirty === true) {
-    rows.push({ label: "Git", value: "working tree dirty" });
-  }
-  return rows;
+  return [
+    { label: "Title", value: meta.title ?? "Untitled" },
+    { label: "Description", value: meta.description ?? "None" },
+    {
+      label: "Created",
+      value: Number.isNaN(parsedDate)
+        ? meta.createdAt
+        : new Date(parsedDate).toLocaleString(),
+    },
+    { label: "Repository", value: repo || "None" },
+    { label: "Branch", value: meta.gitBranch ?? "None" },
+    { label: "Commit", value: meta.gitCommitSha ?? "None" },
+    { label: "Commit message", value: meta.gitCommitSubject ?? "None" },
+    { label: "Working tree", value: gitStatus },
+    { label: "CLI", value: meta.cliVersion },
+    { label: "File SHA-256", value: meta.fileSha256 },
+  ];
 }

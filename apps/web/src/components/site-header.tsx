@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
-import { GitHubIcon } from "@/components/github-icon";
+import { GitHubStars } from "@/components/github-stars";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -146,16 +146,7 @@ export function SiteHeader() {
               {connecting ? "Connecting…" : "Connect wallet"}
             </Button>
           )}
-          <Button asChild size="icon" variant="ghost">
-            <a
-              aria-label="GitHub"
-              href="https://github.com/opldotdev/bitplan.dev"
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              <GitHubIcon className="size-4" />
-            </a>
-          </Button>
+          <GitHubStars />
           <ThemeToggle />
         </div>
       </div>

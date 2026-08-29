@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   isViewerStateCurrent,
+  metaRows,
   type ViewerState,
   viewerRequestKey,
 } from "./draft-viewer";
@@ -65,5 +66,33 @@ describe("DraftViewer route state", () => {
     expect(isViewerStateCurrent(decryptedState(requestKey), requestKey)).toBe(
       true
     );
+  });
+});
+
+describe("Draft metadata", () => {
+  test("shows every envelope metadata field", () => {
+    const state = decryptedState("test");
+    if (state.phase !== "decrypted") {
+      throw new Error("Expected decrypted state.");
+    }
+    const rows = metaRows({
+      ...state.plaintext.meta,
+      cliVersion: "0.0.8",
+      fileSha256: "f".repeat(64),
+      gitCommitSha: "a".repeat(40),
+      gitCommitSubject: "Ship it",
+      gitDirty: false,
+    });
+
+    expect(rows).toContainEqual({ label: "Working tree", value: "Clean" });
+    expect(rows).toContainEqual({ label: "CLI", value: "0.0.8" });
+    expect(rows).toContainEqual({
+      label: "File SHA-256",
+      value: "f".repeat(64),
+    });
+    expect(rows).toContainEqual({
+      label: "Commit",
+      value: "a".repeat(40),
+    });
   });
 });
