@@ -9,52 +9,67 @@ import {
 } from "@/components/how-it-works-diagrams";
 
 const PRIVATE_CODE = `
-const protocolID = [2, "bitplan"]
+import type { WalletInterface } from "@bsv/sdk"
 
-const { ciphertext } = await wallet.encrypt({
-  protocolID,
-  keyID,
-  counterparty: "self",
-  plaintext: planBytes,
-})
+const protocolID: [2, string] = [2, "bitplan"]
+type Wallet = Pick<WalletInterface, "decrypt" | "encrypt">
 
-const { plaintext } = await wallet.decrypt({
-  protocolID,
-  keyID,
-  counterparty: "self",
-  ciphertext,
-})
+export async function encryptPrivate(
+  wallet: Wallet,
+  keyID: string,
+  planBytes: Uint8Array,
+) {
+  const { ciphertext } = await wallet.encrypt({
+    protocolID,
+    keyID,
+    counterparty: "self",
+    plaintext: Array.from(planBytes),
+  })
+  return Uint8Array.from(ciphertext)
+}
+
+export async function decryptPrivate(
+  wallet: Wallet,
+  keyID: string,
+  ciphertext: Uint8Array,
+) {
+  const { plaintext } = await wallet.decrypt({
+    protocolID,
+    keyID,
+    counterparty: "self",
+    ciphertext: Array.from(ciphertext),
+  })
+  return Uint8Array.from(plaintext)
+}
 `;
 
 const SHARED_CODE = `
-import { SymmetricKey } from "@bsv/sdk"
+import { SymmetricKey, type WalletInterface } from "@bsv/sdk"
+
+const protocolID: [2, string] = [2, "bitplan"]
+type Wallet = Pick<WalletInterface, "decrypt" | "encrypt">
 
 const documentKey = SymmetricKey.fromRandom()
+// boundPlanBytes includes headerSha256, which authenticates the public header.
+const encryptedPlan = documentKey.encrypt(Array.from(boundPlanBytes))
 
+const counterparty =
+  readerIdentityKey === publisherIdentityKey ? "self" : readerIdentityKey
 const { ciphertext: wrappedKey } = await wallet.encrypt({
-  protocolID: [2, "bitplan"],
+  protocolID,
   keyID,
-  counterparty:
-    readerIdentityKey === publisherIdentityKey ? "self" : readerIdentityKey,
+  counterparty,
   plaintext: documentKey.toArray("be", 32),
 })
 
-const header = buildHeader([wrappedKey, ...otherWrappedKeys])
-const payload = documentKey.encrypt(encode({
-  ...plan,
-  headerSha256: sha256(canonicalJson(header)),
-}))
-
 const { plaintext: keyBytes } = await readerWallet.decrypt({
-  protocolID: [2, "bitplan"],
+  protocolID,
   keyID,
-  counterparty:
-    readerIdentityKey === publisherIdentityKey ? "self" : publisherIdentityKey,
+  counterparty: publisherIdentityKey,
   ciphertext: wrappedKey,
 })
 
-const plaintext = new SymmetricKey(keyBytes).decrypt(payload)
-assert(plaintext.headerSha256 === sha256(canonicalJson(header)))
+const decryptedPlan = new SymmetricKey(keyBytes).decrypt(encryptedPlan)
 `;
 
 export const metadata: Metadata = {
@@ -99,7 +114,11 @@ export default function HowItWorksPage() {
           The root key and derived key stay in the wallet. The{" "}
           <code>keyID</code> is a public label, not a key.
         </p>
-        <CodeExample code={PRIVATE_CODE} label="See the private wallet calls" />
+        <CodeExample
+          code={PRIVATE_CODE}
+          filename="private-envelope.ts"
+          label="See the private wallet calls"
+        />
         <h3>Shared</h3>
         <p>
           The CLI creates a fresh random 32-byte document key and encrypts the
@@ -115,7 +134,11 @@ export default function HowItWorksPage() {
           commits the exact public header. Changes made without the document key
           fail authentication.
         </p>
-        <CodeExample code={SHARED_CODE} label="See the shared key flow" />
+        <CodeExample
+          code={SHARED_CODE}
+          filename="shared-envelope.ts"
+          label="See the shared key flow"
+        />
         <h3>What this protects</h3>
         <p>
           AES-GCM hides the plan and detects changes to its ciphertext. A wrong
