@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   description:
     "Publish encrypted HTML plans through a BRC-100 wallet on Bitcoin.",
   title: "Docs",
+  twitter: { card: "summary_large_image" },
 };
 
 export default function DocsIntroPage() {
