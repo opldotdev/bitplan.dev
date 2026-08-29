@@ -15,14 +15,14 @@ const tier = {
 };
 
 describe("SponsorSlot", () => {
-  test("renders an unavailable slot with no payment interaction", () => {
+  test("renders an opening-soon slot with no payment interaction", () => {
     const markup = renderToStaticMarkup(
       <SponsorSlot slotId="silver-1" tier={tier} />
     );
 
     expect(markup).toContain("disabled");
-    expect(markup).toContain("Unavailable");
-    expect(markup).toContain("sponsorship is unavailable");
+    expect(markup).toContain("Opening soon");
+    expect(markup).toContain("opening soon");
   });
 
   test("renders an on-chain sponsor as a sponsored link", () => {

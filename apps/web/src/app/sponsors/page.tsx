@@ -1,14 +1,6 @@
 import type { Metadata } from "next";
 
 import { SponsorSlot } from "@/components/sponsor-slot";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardAction,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   loadSponsorSlots,
@@ -41,7 +33,7 @@ function SponsorSection({
             {tier.name}
           </h2>
           <p className="font-mono font-semibold text-foreground text-xs">
-            ~${tier.priceUsd} · {tier.imageWidth} × {tier.imageHeight}
+            ~${tier.priceUsd}
           </p>
         </div>
         <Separator />
@@ -71,32 +63,13 @@ export default async function SponsorsPage() {
           </p>
           <h1 className="font-medium text-4xl">Sponsor BitPlan</h1>
           <p className="max-w-xl text-balance text-muted-foreground">
-            Buy a unique slot with your local BRC-100 wallet and publish one
-            permanent, optimized image on its 1Sat Ordinal.
+            {configured
+              ? "Buy a unique slot with your local BRC-100 wallet and publish one permanent, optimized image on its 1Sat Ordinal."
+              : "Permanent sponsor placements are opening soon. Checkout will use your local BRC-100 wallet, with no account or database."}
           </p>
         </header>
 
         <div className="flex flex-col gap-12">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {configured
-                  ? "On-chain sponsorships"
-                  : "Sponsorships are paused"}
-              </CardTitle>
-              <CardDescription>
-                {configured
-                  ? "Payment reserves the slot atomically. Your image, name, link, tier, and slot live in its Ordinal inscription and MAP metadata—no account or database required."
-                  : "No slots are configured, so this page cannot accept payments."}
-              </CardDescription>
-              <CardAction>
-                <Badge variant={configured ? "default" : "secondary"}>
-                  {configured ? "Wallet checkout" : "Payments paused"}
-                </Badge>
-              </CardAction>
-            </CardHeader>
-          </Card>
-
           {SPONSOR_TIERS.map((tier) => (
             <SponsorSection key={tier.id} slots={slots} tier={tier} />
           ))}

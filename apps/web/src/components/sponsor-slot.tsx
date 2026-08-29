@@ -49,9 +49,11 @@ export function SponsorSlot({
     );
   }
 
+  const unavailableLabel = slot ? "Unavailable" : "Opening soon";
+
   return (
     <Button
-      aria-label={`${tier.name} sponsor slot ${slotId}; sponsorship is unavailable`}
+      aria-label={`${tier.name} sponsor slot ${slotId}; ${unavailableLabel.toLowerCase()}`}
       className={cn(
         "h-auto w-full border-dashed px-2 text-muted-foreground uppercase",
         tier.slotClassName
@@ -61,7 +63,7 @@ export function SponsorSlot({
       type="button"
       variant="outline"
     >
-      Unavailable
+      {unavailableLabel}
     </Button>
   );
 }
