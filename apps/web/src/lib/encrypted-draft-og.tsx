@@ -1,13 +1,23 @@
-import { ImageResponse } from "next/og";
+import type { ImageResponse } from "next/og";
 
 import { formatByteSize, truncateMiddle } from "@/lib/format";
 import { fetchOrdfsMeta } from "@/lib/ordfs";
 import { normalizeOrigin } from "@/lib/outpoint";
+import {
+  OG_MUTED,
+  OgFrame,
+  OgHeadline,
+  OgPill,
+  OgWordmark,
+  ogImageResponse,
+  OG_SIZE as SHARED_OG_SIZE,
+  OG_TYPE as SHARED_OG_TYPE,
+} from "@/lib/site-og";
 import { seqToVersion } from "@/lib/version";
 
 export const OG_ALT = "Encrypted draft";
-export const OG_SIZE = { height: 630, width: 1200 };
-export const OG_TYPE = "image/png";
+export const OG_SIZE = SHARED_OG_SIZE;
+export const OG_TYPE = SHARED_OG_TYPE;
 
 export async function encryptedDraftOgImage(
   originParam: string
@@ -29,91 +39,50 @@ export async function encryptedDraftOgImage(
     typeof version === "number" ? `v${version}` : null,
   ].filter((part): part is string => Boolean(part));
 
-  return new ImageResponse(
-    <div
-      style={{
-        background:
-          "linear-gradient(165deg, #241c18 0%, #12100e 55%, #0c0b0a 100%)",
-        color: "#f4efe8",
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        justifyContent: "space-between",
-        padding: "72px 80px",
-        width: "100%",
-      }}
-    >
+  return ogImageResponse(
+    <OgFrame>
       <div
         style={{
           display: "flex",
-          fontFamily: "Geist",
-          fontSize: 32,
-          fontWeight: 600,
+          flexDirection: "column",
+          height: "100%",
+          justifyContent: "space-between",
         }}
       >
-        BitPlan
-        <span style={{ color: "#e8632c" }}>.</span>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        <div
-          style={{
-            display: "flex",
-            fontFamily: "Geist",
-            fontSize: 72,
-            fontWeight: 600,
-            letterSpacing: "-0.03em",
-            lineHeight: 1.05,
-          }}
-        >
-          {headline}
+        <OgWordmark />
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <OgHeadline fontSize={92} text={headline} />
+          {originLabel ? (
+            <div
+              style={{
+                color: OG_MUTED,
+                display: "flex",
+                fontFamily: "Geist Mono",
+                fontSize: 27,
+                marginTop: 22,
+              }}
+            >
+              {originLabel}
+            </div>
+          ) : null}
         </div>
-        {originLabel ? (
-          <div
-            style={{
-              color: "#9a9084",
-              display: "flex",
-              fontFamily: "Geist Mono",
-              fontSize: 28,
-              marginTop: 18,
-            }}
-          >
-            {originLabel}
-          </div>
-        ) : null}
+        <div style={{ display: "flex" }}>
+          {pillParts.length > 0 ? (
+            <OgPill text={pillParts.join("  ·  ")} />
+          ) : (
+            <div
+              style={{
+                color: OG_MUTED,
+                display: "flex",
+                fontSize: 27,
+                fontStyle: "italic",
+              }}
+            >
+              Connect a wallet to decrypt.
+            </div>
+          )}
+        </div>
       </div>
-      <div style={{ display: "flex" }}>
-        {pillParts.length > 0 ? (
-          <div
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 14,
-              color: "#d4cfc6",
-              display: "flex",
-              fontFamily: "Geist Mono",
-              fontSize: 26,
-              padding: "14px 22px",
-            }}
-          >
-            {pillParts.join("  ·  ")}
-          </div>
-        ) : (
-          <div
-            style={{
-              color: "#9a9084",
-              display: "flex",
-              fontFamily: "Geist",
-              fontSize: 24,
-            }}
-          >
-            Connect a wallet to decrypt.
-          </div>
-        )}
-      </div>
-    </div>,
-    {
-      height: OG_SIZE.height,
-      width: OG_SIZE.width,
-    }
+    </OgFrame>
   );
 }
