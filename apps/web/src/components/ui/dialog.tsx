@@ -51,9 +51,11 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  fullScreenOnMobile = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  fullScreenOnMobile?: boolean
 }) {
   return (
     <DialogPortal>
@@ -61,7 +63,14 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed z-50 gap-4 bg-popover p-4 text-sm text-popover-foreground outline-none data-open:animate-in data-closed:animate-out",
+          fullScreenOnMobile
+            ? [
+                // Full-screen sheet sliding up from the bottom on phones.
+                "inset-0 flex flex-col overflow-y-auto duration-300 ease-out data-open:slide-in-from-bottom-[100%] data-closed:duration-200 data-closed:ease-in data-closed:slide-out-to-bottom-[100%]",
+                "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:grid sm:w-full sm:max-w-sm sm:-translate-x-1/2 sm:-translate-y-1/2 sm:overflow-visible sm:rounded-xl sm:ring-1 sm:ring-foreground/10 sm:duration-100 sm:data-open:fade-in-0 sm:data-open:zoom-in-95 sm:data-open:slide-in-from-bottom-0 sm:data-closed:fade-out-0 sm:data-closed:zoom-out-95 sm:data-closed:slide-out-to-bottom-0",
+              ]
+            : "top-1/2 left-1/2 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl ring-1 ring-foreground/10 duration-100 sm:max-w-sm data-open:fade-in-0 data-open:zoom-in-95 data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -107,7 +116,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "-mx-4 -mb-4 sticky bottom-0 z-10 mt-auto flex flex-col-reverse gap-2 border-t bg-popover p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:mt-0 sm:flex-row sm:justify-end sm:rounded-b-xl sm:bg-muted/50 sm:pb-4",
         className
       )}
       {...props}

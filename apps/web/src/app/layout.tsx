@@ -23,6 +23,7 @@ const geistMono = Geist_Mono({
 
 const fraunces = Fraunces({
   axes: ["opsz"],
+  style: ["normal", "italic"],
   subsets: ["latin"],
   variable: "--font-fraunces",
 });
