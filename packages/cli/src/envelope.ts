@@ -1,15 +1,12 @@
 /**
  * The bitplan on-chain envelope.
  *
- * Binary layout (see ENVELOPE.md — that file is the public spec):
+ * Binary layout (see ENVELOPE.md):
  *
- *   'BPLN' (4 bytes ASCII) | version byte 0x01 | uint32-LE header length |
- *   UTF-8 JSON header | ciphertext
+ *   'BPLN' | 0x01 | uint32-LE header length | UTF-8 JSON header | ciphertext
  *
- * The ciphertext is AES-256-GCM (WebCrypto, 128-bit tag appended) over a
- * UTF-8 JSON plaintext. The content key is 32 random bytes, never persisted:
- * it only survives as the wrapped copy in the header, encrypted by the user's
- * wallet under BRC-2 self-encryption. The CLI holds no keys of its own.
+ * The ciphertext is the BRC-2 output of `wallet.encrypt` over the UTF-8 JSON
+ * plaintext. The CLI holds no keys; encryption and decryption are wallet calls.
  */
 
 import { Buffer } from 'node:buffer'
@@ -22,29 +19,19 @@ import { CliError } from './errors.js'
 export const MAGIC = Uint8Array.from([0x42, 0x50, 0x4c, 0x4e])
 export const ENVELOPE_VERSION = 0x01
 
-/** Byte length of the AES-GCM initialization vector. */
-export const IV_BYTES = 12
-/** Byte length of the AES-256 content key. */
-export const CONTENT_KEY_BYTES = 32
-
 /** Largest header we will parse; a real header is a few hundred bytes. */
 const MAX_HEADER_BYTES = 64 * 1024
 
-export interface EnvelopeKeyWrap {
-	/** Only mode defined in v1: wrapped by the author's own wallet. */
+export interface EnvelopeKey {
+	/** BRC-2 self-encryption through the author's wallet. */
 	mode: 'brc2-self'
 	protocolID: [number, string]
 	keyID: string
-	/** base64 of the wallet.encrypt output over the raw content key. */
-	ciphertext: string
 }
 
 export interface EnvelopeHeader {
 	v: 1
-	alg: 'aes-256-gcm'
-	/** base64, 12 bytes. */
-	iv: string
-	key: EnvelopeKeyWrap
+	key: EnvelopeKey
 }
 
 export interface DraftMeta {
@@ -89,59 +76,39 @@ export function fromBase64(value: string): Uint8Array {
 /**
  * Encrypt a plaintext document into a complete envelope.
  *
- * The content key is generated here, used once, wrapped by the wallet, and
- * dropped — it is never written to disk.
+ * The body is `wallet.encrypt` of the JSON. protocolID and keyID ride in the
+ * cleartext header so a reader can call `wallet.decrypt` without local state.
  */
 export async function sealEnvelope(
 	wallet: WalletInterface,
 	plaintext: DraftPlaintext,
 	keyID: string,
 ): Promise<Uint8Array> {
-	const contentKey = webcrypto.getRandomValues(
-		new Uint8Array(CONTENT_KEY_BYTES),
-	)
-	const iv = webcrypto.getRandomValues(new Uint8Array(IV_BYTES))
-
 	const body = new TextEncoder().encode(JSON.stringify(plaintext))
-	const cryptoKey = await webcrypto.subtle.importKey(
-		'raw',
-		contentKey,
-		{ name: 'AES-GCM' },
-		false,
-		['encrypt'],
-	)
-	const ciphertext = new Uint8Array(
-		await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, body),
-	)
-
-	let wrapped: Awaited<ReturnType<typeof wallet.encrypt>>
+	let encrypted: Awaited<ReturnType<typeof wallet.encrypt>>
 	try {
-		wrapped = await wallet.encrypt({
+		encrypted = await wallet.encrypt({
 			protocolID: BITPLAN_PROTOCOL,
 			keyID,
 			counterparty: 'self',
-			plaintext: Array.from(contentKey),
+			plaintext: Array.from(body),
 		})
 	} catch (error) {
 		throw new CliError(
-			`The wallet refused to wrap this draft's content key (protocol bitplan, keyID ${keyID}): ${error instanceof Error ? error.message : String(error)}`,
+			`The wallet refused to encrypt this draft (protocol bitplan, keyID ${keyID}): ${error instanceof Error ? error.message : String(error)}`,
 		)
 	}
-	contentKey.fill(0)
 
 	const header: EnvelopeHeader = {
 		v: 1,
-		alg: 'aes-256-gcm',
-		iv: toBase64(iv),
 		key: {
 			mode: 'brc2-self',
 			protocolID: [BITPLAN_PROTOCOL[0], BITPLAN_PROTOCOL[1]],
 			keyID,
-			ciphertext: toBase64(Uint8Array.from(wrapped.ciphertext)),
 		},
 	}
 
-	return frameEnvelope(header, ciphertext)
+	return frameEnvelope(header, Uint8Array.from(encrypted.ciphertext))
 }
 
 /** Assemble magic + version + header length + header + ciphertext. */
@@ -173,9 +140,7 @@ export function frameEnvelope(
 /**
  * Split a serialized envelope into its header and ciphertext.
  *
- * Rejects anything that is not a v1 bitplan envelope. Every rejection is a
- * CliError, because the only way a user meets one is by pointing the CLI at
- * something that is not a bitplan draft.
+ * Rejects anything that is not a v1 bitplan envelope.
  */
 export function parseEnvelope(bytes: Uint8Array): ParsedEnvelope {
 	const prefix = MAGIC.length + 1 + 4
@@ -243,24 +208,14 @@ function assertHeader(value: unknown): EnvelopeHeader {
 			`Unsupported bitplan header version ${String(h.v)}; this CLI understands 1.`,
 		)
 	}
-	if (h.alg !== 'aes-256-gcm') {
-		throw new CliError(
-			`Unsupported bitplan cipher "${String(h.alg)}"; this CLI understands aes-256-gcm.`,
-		)
-	}
-	if (typeof h.iv !== 'string' || fromBase64(h.iv).length !== IV_BYTES) {
-		throw new CliError(
-			`Malformed bitplan envelope: iv must be ${IV_BYTES} base64-encoded bytes.`,
-		)
-	}
 	const key = h.key
 	if (typeof key !== 'object' || key === null) {
-		throw new CliError('Malformed bitplan envelope: header has no key wrap.')
+		throw new CliError('Malformed bitplan envelope: header has no key.')
 	}
 	const k = key as Record<string, unknown>
 	if (k.mode !== 'brc2-self') {
 		throw new CliError(
-			`Unsupported bitplan key wrap mode "${String(k.mode)}"; this CLI understands brc2-self.`,
+			`Unsupported bitplan key mode "${String(k.mode)}"; this CLI understands brc2-self.`,
 		)
 	}
 	if (
@@ -276,104 +231,75 @@ function assertHeader(value: unknown): EnvelopeHeader {
 	if (typeof k.keyID !== 'string' || k.keyID.length === 0) {
 		throw new CliError('Malformed bitplan envelope: key.keyID is missing.')
 	}
-	if (typeof k.ciphertext !== 'string' || k.ciphertext.length === 0) {
-		throw new CliError('Malformed bitplan envelope: key.ciphertext is missing.')
-	}
 
 	return {
 		v: 1,
-		alg: 'aes-256-gcm',
-		iv: h.iv,
 		key: {
 			mode: 'brc2-self',
 			protocolID: [k.protocolID[0], k.protocolID[1]],
 			keyID: k.keyID,
-			ciphertext: k.ciphertext,
 		},
 	}
 }
 
+function assertProtocolLevel(level: number): 0 | 1 | 2 {
+	if (level !== 0 && level !== 1 && level !== 2) {
+		throw new CliError(
+			`Malformed bitplan envelope: key.protocolID security level ${level} is not 0, 1 or 2.`,
+		)
+	}
+	return level
+}
+
+function assertPlaintext(value: unknown): DraftPlaintext {
+	if (
+		typeof value !== 'object' ||
+		value === null ||
+		typeof (value as DraftPlaintext).html !== 'string'
+	) {
+		throw new CliError(
+			'Decrypted this draft but its plaintext has no html document.',
+		)
+	}
+	return value as DraftPlaintext
+}
+
 /**
- * Unwrap the content key through the wallet and decrypt the body.
+ * Decrypt the body through the wallet.
  *
  * The header's own protocolID / keyID are used, not this CLI's constants, so
- * an envelope written by a future version with a different protocol still
- * decrypts as long as the wallet holds the key.
+ * an envelope written under a different protocol still opens if the wallet
+ * holds the key.
  */
 export async function openEnvelope(
 	wallet: WalletInterface,
 	bytes: Uint8Array,
 ): Promise<{ header: EnvelopeHeader; plaintext: DraftPlaintext }> {
 	const { header, ciphertext } = parseEnvelope(bytes)
+	const level = assertProtocolLevel(header.key.protocolID[0])
 
-	const level = header.key.protocolID[0]
-	if (level !== 0 && level !== 1 && level !== 2) {
-		throw new CliError(
-			`Malformed bitplan envelope: key.protocolID security level ${level} is not 0, 1 or 2.`,
-		)
-	}
-
-	let unwrapped: Awaited<ReturnType<typeof wallet.decrypt>>
+	let decrypted: Awaited<ReturnType<typeof wallet.decrypt>>
 	try {
-		unwrapped = await wallet.decrypt({
+		decrypted = await wallet.decrypt({
 			protocolID: [level, header.key.protocolID[1]],
 			keyID: header.key.keyID,
 			counterparty: 'self',
-			ciphertext: Array.from(fromBase64(header.key.ciphertext)),
+			ciphertext: Array.from(ciphertext),
 		})
 	} catch (error) {
 		throw new CliError(
-			`The wallet refused to unwrap this draft's content key (protocol ${header.key.protocolID[1]}, keyID ${header.key.keyID}): ${error instanceof Error ? error.message : String(error)}`,
-		)
-	}
-	const contentKey = Uint8Array.from(unwrapped.plaintext)
-	if (contentKey.length !== CONTENT_KEY_BYTES) {
-		throw new CliError(
-			`Wallet returned a ${contentKey.length}-byte content key; expected ${CONTENT_KEY_BYTES}.`,
+			`The wallet refused to decrypt this draft (protocol ${header.key.protocolID[1]}, keyID ${header.key.keyID}): ${error instanceof Error ? error.message : String(error)}`,
 		)
 	}
 
-	const cryptoKey = await webcrypto.subtle.importKey(
-		'raw',
-		contentKey,
-		{ name: 'AES-GCM' },
-		false,
-		['decrypt'],
-	)
-	let body: Uint8Array
+	let parsed: unknown
 	try {
-		body = new Uint8Array(
-			await webcrypto.subtle.decrypt(
-				{ name: 'AES-GCM', iv: fromBase64(header.iv) },
-				cryptoKey,
-				ciphertext,
-			),
-		)
-	} catch {
-		throw new CliError(
-			'Could not decrypt this draft: the ciphertext failed its authentication tag. The content or the key wrap has been altered.',
-		)
-	} finally {
-		contentKey.fill(0)
-	}
-
-	let plaintext: unknown
-	try {
-		plaintext = JSON.parse(new TextDecoder().decode(body))
+		parsed = JSON.parse(new TextDecoder().decode(Uint8Array.from(decrypted.plaintext)))
 	} catch {
 		throw new CliError(
 			'Decrypted this draft but its plaintext is not valid JSON.',
 		)
 	}
-	if (
-		typeof plaintext !== 'object' ||
-		plaintext === null ||
-		typeof (plaintext as DraftPlaintext).html !== 'string'
-	) {
-		throw new CliError(
-			'Decrypted this draft but its plaintext has no html document.',
-		)
-	}
 
-	return { header, plaintext: plaintext as DraftPlaintext }
+	return { header, plaintext: assertPlaintext(parsed) }
 }

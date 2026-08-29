@@ -1,15 +1,12 @@
 /**
  * The bitplan on-chain envelope.
  *
- * Binary layout (see packages/cli/ENVELOPE.md — that file is the public spec):
+ * Binary layout (see packages/cli/ENVELOPE.md):
  *
- *   'BPLN' (4 bytes ASCII) | version byte 0x01 | uint32-LE header length |
- *   UTF-8 JSON header | ciphertext
+ *   'BPLN' | 0x01 | uint32-LE header length | UTF-8 JSON header | ciphertext
  *
- * The ciphertext is AES-256-GCM (WebCrypto, 128-bit tag appended) over a
- * UTF-8 JSON plaintext. The content key is 32 random bytes, never persisted:
- * it only survives as the wrapped copy in the header, encrypted by the user's
- * wallet under BRC-2 self-encryption.
+ * The ciphertext is the BRC-2 output of `wallet.encrypt` over the UTF-8 JSON
+ * plaintext.
  */
 
 // TODO: extract shared @bitplan/envelope package (tracked in TODO.md)
@@ -18,11 +15,6 @@
 export const MAGIC = Uint8Array.from([0x42, 0x50, 0x4c, 0x4e]);
 export const ENVELOPE_VERSION = 0x01;
 
-/** Byte length of the AES-GCM initialization vector. */
-export const IV_BYTES = 12;
-/** Byte length of the AES-256 content key. */
-export const CONTENT_KEY_BYTES = 32;
-
 /** Largest header we will parse; a real header is a few hundred bytes. */
 const MAX_HEADER_BYTES = 64 * 1024;
 
@@ -30,20 +22,15 @@ export class EnvelopeError extends Error {
   override readonly name = "EnvelopeError";
 }
 
-export interface EnvelopeKeyWrap {
-  /** base64 of the wallet.encrypt output over the raw content key. */
-  ciphertext: string;
+export interface EnvelopeKey {
   keyID: string;
-  /** Only mode defined in v1: wrapped by the author's own wallet. */
+  /** BRC-2 self-encryption through the author's wallet. */
   mode: "brc2-self";
   protocolID: [number, string];
 }
 
 export interface EnvelopeHeader {
-  alg: "aes-256-gcm";
-  /** base64, 12 bytes. */
-  iv: string;
-  key: EnvelopeKeyWrap;
+  key: EnvelopeKey;
   v: 1;
 }
 
@@ -74,15 +61,15 @@ export interface ParsedEnvelope {
 }
 
 /**
- * Minimal wallet surface used to unwrap the content key.
+ * Minimal wallet surface used to decrypt the body.
  * Satisfied by `@bsv/sdk` WalletClient and by the in-test XOR mock.
  */
 export interface EnvelopeWallet {
   decrypt: (args: {
-    protocolID: [number, string];
-    keyID: string;
-    counterparty: "self";
     ciphertext: number[];
+    counterparty: "self";
+    keyID: string;
+    protocolID: [number, string];
   }) => Promise<{ plaintext: number[] }>;
 }
 
@@ -211,26 +198,14 @@ function assertHeader(value: unknown): EnvelopeHeader {
       `Unsupported bitplan header version ${String(h.v)}; this viewer understands 1.`
     );
   }
-  if (h.alg !== "aes-256-gcm") {
-    throw new EnvelopeError(
-      `Unsupported bitplan cipher "${String(h.alg)}"; this viewer understands aes-256-gcm.`
-    );
-  }
-  if (typeof h.iv !== "string" || fromBase64(h.iv).length !== IV_BYTES) {
-    throw new EnvelopeError(
-      `Malformed bitplan envelope: iv must be ${IV_BYTES} base64-encoded bytes.`
-    );
-  }
   const { key } = h;
   if (typeof key !== "object" || key === null) {
-    throw new EnvelopeError(
-      "Malformed bitplan envelope: header has no key wrap."
-    );
+    throw new EnvelopeError("Malformed bitplan envelope: header has no key.");
   }
   const k = key as Record<string, unknown>;
   if (k.mode !== "brc2-self") {
     throw new EnvelopeError(
-      `Unsupported bitplan key wrap mode "${String(k.mode)}"; this viewer understands brc2-self.`
+      `Unsupported bitplan key mode "${String(k.mode)}"; this viewer understands brc2-self.`
     );
   }
   if (
@@ -248,17 +223,9 @@ function assertHeader(value: unknown): EnvelopeHeader {
       "Malformed bitplan envelope: key.keyID is missing."
     );
   }
-  if (typeof k.ciphertext !== "string" || k.ciphertext.length === 0) {
-    throw new EnvelopeError(
-      "Malformed bitplan envelope: key.ciphertext is missing."
-    );
-  }
 
   return {
-    alg: "aes-256-gcm",
-    iv: h.iv,
     key: {
-      ciphertext: k.ciphertext,
       keyID: k.keyID,
       mode: "brc2-self",
       protocolID: [k.protocolID[0], k.protocolID[1]],
@@ -267,75 +234,62 @@ function assertHeader(value: unknown): EnvelopeHeader {
   };
 }
 
-/**
- * Unwrap the content key through the wallet and decrypt the body.
- *
- * The header's own protocolID / keyID are used, not this viewer's constants, so
- * an envelope written by a future version with a different protocol still
- * decrypts as long as the wallet holds the key.
- */
-export async function openEnvelope(
-  wallet: EnvelopeWallet,
-  bytes: Uint8Array
-): Promise<{ header: EnvelopeHeader; plaintext: DraftPlaintext }> {
-  const { header, ciphertext } = parseEnvelope(bytes);
-
-  const [level] = header.key.protocolID;
+function assertProtocolLevel(level: number): 0 | 1 | 2 {
   if (level !== 0 && level !== 1 && level !== 2) {
     throw new EnvelopeError(
       `Malformed bitplan envelope: key.protocolID security level ${level} is not 0, 1 or 2.`
     );
   }
+  return level;
+}
 
-  let unwrapped: Awaited<ReturnType<EnvelopeWallet["decrypt"]>>;
+function assertPlaintext(value: unknown): DraftPlaintext {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    typeof (value as DraftPlaintext).html !== "string"
+  ) {
+    throw new EnvelopeError(
+      "Decrypted this draft but its plaintext has no html document."
+    );
+  }
+  return value as DraftPlaintext;
+}
+
+/**
+ * Decrypt the body through the wallet.
+ *
+ * The header's own protocolID / keyID are used, not this viewer's constants, so
+ * an envelope written under a different protocol still decrypts as long as the
+ * wallet holds the key.
+ */
+export async function openEnvelope(
+  wallet: EnvelopeWallet,
+  bytes: Uint8Array
+): Promise<{ header: EnvelopeHeader; plaintext: DraftPlaintext }> {
+  const { ciphertext, header } = parseEnvelope(bytes);
+  const level = assertProtocolLevel(header.key.protocolID[0]);
+
+  let decrypted: Awaited<ReturnType<EnvelopeWallet["decrypt"]>>;
   try {
-    unwrapped = await wallet.decrypt({
-      ciphertext: Array.from(fromBase64(header.key.ciphertext)),
+    decrypted = await wallet.decrypt({
+      ciphertext: Array.from(ciphertext),
       counterparty: "self",
       keyID: header.key.keyID,
       protocolID: [level, header.key.protocolID[1]],
     });
   } catch (error) {
     throw new EnvelopeError(
-      `The wallet refused to unwrap this draft's content key (protocol ${header.key.protocolID[1]}, keyID ${header.key.keyID}): ${error instanceof Error ? error.message : String(error)}`,
+      `The wallet refused to decrypt this draft (protocol ${header.key.protocolID[1]}, keyID ${header.key.keyID}): ${error instanceof Error ? error.message : String(error)}`,
       { cause: error }
     );
   }
-  const contentKey = Uint8Array.from(unwrapped.plaintext);
-  if (contentKey.length !== CONTENT_KEY_BYTES) {
-    throw new EnvelopeError(
-      `Wallet returned a ${contentKey.length}-byte content key; expected ${CONTENT_KEY_BYTES}.`
-    );
-  }
 
-  const cryptoKey = await globalThis.crypto.subtle.importKey(
-    "raw",
-    new Uint8Array(contentKey),
-    { name: "AES-GCM" },
-    false,
-    ["decrypt"]
-  );
-  let body: Uint8Array;
+  let parsed: unknown;
   try {
-    body = new Uint8Array(
-      await globalThis.crypto.subtle.decrypt(
-        { iv: new Uint8Array(fromBase64(header.iv)), name: "AES-GCM" },
-        cryptoKey,
-        new Uint8Array(ciphertext)
-      )
+    parsed = JSON.parse(
+      new TextDecoder().decode(Uint8Array.from(decrypted.plaintext))
     );
-  } catch (error) {
-    throw new EnvelopeError(
-      "Could not decrypt this draft: the ciphertext failed its authentication tag. The content or the key wrap has been altered.",
-      { cause: error }
-    );
-  } finally {
-    contentKey.fill(0);
-  }
-
-  let plaintext: unknown;
-  try {
-    plaintext = JSON.parse(new TextDecoder().decode(body));
   } catch (error) {
     throw new EnvelopeError(
       "Decrypted this draft but its plaintext is not valid JSON.",
@@ -344,15 +298,6 @@ export async function openEnvelope(
       }
     );
   }
-  if (
-    typeof plaintext !== "object" ||
-    plaintext === null ||
-    typeof (plaintext as DraftPlaintext).html !== "string"
-  ) {
-    throw new EnvelopeError(
-      "Decrypted this draft but its plaintext has no html document."
-    );
-  }
 
-  return { header, plaintext: plaintext as DraftPlaintext };
+  return { header, plaintext: assertPlaintext(parsed) };
 }

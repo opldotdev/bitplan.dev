@@ -1,18 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import { BITPLAN_PROTOCOL } from '../src/constants.js'
 import {
-	CONTENT_KEY_BYTES,
 	type DraftPlaintext,
 	ENVELOPE_VERSION,
 	frameEnvelope,
-	fromBase64,
-	IV_BYTES,
 	MAGIC,
 	newKeyId,
 	openEnvelope,
 	parseEnvelope,
 	sealEnvelope,
-	toBase64,
 } from '../src/envelope.js'
 import { CliError } from '../src/errors.js'
 import { createMockWallet, xorPad } from './mockWallet.js'
@@ -35,6 +31,17 @@ const PLAINTEXT: DraftPlaintext = {
 	html: '<!doctype html><title>Migration plan</title><p>hello</p>',
 }
 
+function validHeader() {
+	return {
+		v: 1 as const,
+		key: {
+			mode: 'brc2-self' as const,
+			protocolID: [2, 'bitplan'] as [number, string],
+			keyID: 'key-1',
+		},
+	}
+}
+
 describe('envelope round trip', () => {
 	test('seals and opens through the wallet', async () => {
 		const { wallet, calls } = createMockWallet()
@@ -49,31 +56,19 @@ describe('envelope round trip', () => {
 		expect(calls.decrypt).toHaveLength(1)
 	})
 
-	test('wraps the content key through the wallet, not around it', async () => {
+	test('encrypts the document through the wallet, not a homemade content key', async () => {
 		const { wallet, calls } = createMockWallet()
 		const envelope = await sealEnvelope(wallet, PLAINTEXT, 'key-1')
-		const { header } = parseEnvelope(envelope)
+		const { ciphertext } = parseEnvelope(envelope)
+		const body = Array.from(new TextEncoder().encode(JSON.stringify(PLAINTEXT)))
 
-		// The wrap is the mock's XOR of the real key, so unwrapping the header
-		// must reproduce a 32-byte key that differs from the stored bytes.
-		const stored = fromBase64(header.key.ciphertext)
-		expect(stored).toHaveLength(CONTENT_KEY_BYTES)
-
-		const unwrapped = Uint8Array.from(xorPad(Array.from(stored)))
-		expect(unwrapped).toHaveLength(CONTENT_KEY_BYTES)
-		expect(Array.from(unwrapped)).not.toEqual(Array.from(stored))
+		expect(Array.from(ciphertext)).toEqual(xorPad(body))
+		expect(ciphertext.length).toBe(body.length)
 
 		const wrapCall = calls.encrypt[0]
 		expect(wrapCall?.counterparty).toBe('self')
 		expect(wrapCall?.protocolID).toEqual(BITPLAN_PROTOCOL)
 		expect(wrapCall?.keyID).toBe('key-1')
-	})
-
-	test('the same document sealed twice produces different ciphertext', async () => {
-		const { wallet } = createMockWallet()
-		const a = await sealEnvelope(wallet, PLAINTEXT, 'key-1')
-		const b = await sealEnvelope(wallet, PLAINTEXT, 'key-1')
-		expect(Array.from(a)).not.toEqual(Array.from(b))
 	})
 
 	test('reuses the keyID given, so every version of a draft shares one', async () => {
@@ -97,39 +92,30 @@ describe('envelope round trip', () => {
 
 		const { header, ciphertext } = parseEnvelope(envelope)
 		expect(header.v).toBe(1)
-		expect(header.alg).toBe('aes-256-gcm')
-		expect(fromBase64(header.iv)).toHaveLength(IV_BYTES)
 		expect(header.key.mode).toBe('brc2-self')
 		expect(header.key.protocolID).toEqual([2, 'bitplan'])
-		// AES-GCM appends a 16-byte tag.
-		expect(ciphertext.length).toBeGreaterThan(16)
+		expect(header.key.keyID).toBe('key-1')
+		expect(ciphertext.length).toBeGreaterThan(0)
 	})
 
-	test('a tampered ciphertext fails its authentication tag', async () => {
+	test('a tampered ciphertext does not round-trip as the document', async () => {
 		const { wallet } = createMockWallet()
 		const envelope = await sealEnvelope(wallet, PLAINTEXT, 'key-1')
 		const last = envelope.length - 1
 		envelope[last] = (envelope[last] ?? 0) ^ 0xff
 
 		await expect(openEnvelope(wallet, envelope)).rejects.toThrow(
-			/failed its authentication tag/,
+			/not valid JSON|no html document/,
 		)
 	})
-})
 
-function validHeader() {
-	return {
-		v: 1 as const,
-		alg: 'aes-256-gcm' as const,
-		iv: toBase64(new Uint8Array(IV_BYTES)),
-		key: {
-			mode: 'brc2-self' as const,
-			protocolID: [2, 'bitplan'] as [number, string],
-			keyID: 'key-1',
-			ciphertext: toBase64(new Uint8Array(CONTENT_KEY_BYTES)),
-		},
-	}
-}
+	test('reads the protocolID out of the header, not the CLI constants', async () => {
+		const { wallet, calls } = createMockWallet()
+		const envelope = await sealEnvelope(wallet, PLAINTEXT, 'key-1')
+		await openEnvelope(wallet, envelope)
+		expect(calls.decrypt[0]?.protocolID).toEqual([2, 'bitplan'])
+	})
+})
 
 describe('envelope header parsing', () => {
 	test('rejects bad magic', () => {
@@ -173,28 +159,13 @@ describe('envelope header parsing', () => {
 		expect(() => parseEnvelope(out)).toThrow(/not valid JSON/)
 	})
 
-	test('rejects an unsupported cipher', () => {
-		const header = { ...validHeader(), alg: 'aes-128-cbc' }
-		const envelope = frameEnvelope(
-			header as unknown as ReturnType<typeof validHeader>,
-			new Uint8Array([1, 2, 3]),
-		)
-		expect(() => parseEnvelope(envelope)).toThrow(/Unsupported bitplan cipher/)
-	})
-
-	test('rejects a wrong-length iv', () => {
-		const header = { ...validHeader(), iv: toBase64(new Uint8Array(8)) }
-		const envelope = frameEnvelope(header, new Uint8Array([1, 2, 3]))
-		expect(() => parseEnvelope(envelope)).toThrow(/iv must be 12/)
-	})
-
-	test('rejects an unknown key wrap mode', () => {
+	test('rejects an unknown key mode', () => {
 		const header = validHeader()
 		const envelope = frameEnvelope(
 			{ ...header, key: { ...header.key, mode: 'plaintext' } } as never,
 			new Uint8Array([1, 2, 3]),
 		)
-		expect(() => parseEnvelope(envelope)).toThrow(/key wrap mode/)
+		expect(() => parseEnvelope(envelope)).toThrow(/key mode/)
 	})
 
 	test('rejects a header with no keyID', () => {
@@ -204,12 +175,5 @@ describe('envelope header parsing', () => {
 			new Uint8Array([1, 2, 3]),
 		)
 		expect(() => parseEnvelope(envelope)).toThrow(/keyID is missing/)
-	})
-
-	test('reads the protocolID out of the header, not the CLI constants', async () => {
-		const { wallet, calls } = createMockWallet()
-		const envelope = await sealEnvelope(wallet, PLAINTEXT, 'key-1')
-		await openEnvelope(wallet, envelope)
-		expect(calls.decrypt[0]?.protocolID).toEqual([2, 'bitplan'])
 	})
 })

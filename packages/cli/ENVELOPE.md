@@ -57,7 +57,7 @@ All multi-byte integers are little-endian.
 | version     | 1 byte  | `0x01`                                              |
 | header size | 4 bytes | uint32-LE byte length of the header JSON            |
 | header      | varies  | UTF-8 JSON, exactly `header size` bytes             |
-| ciphertext  | rest    | AES-256-GCM output, authentication tag appended     |
+| ciphertext  | rest    | BRC-2 output of `wallet.encrypt`                    |
 
 A reader must reject anything whose magic is not `BPLN`, whose version byte it
 does not implement, whose header size overruns the buffer, or that carries no
@@ -65,16 +65,16 @@ ciphertext.
 
 ## Header
 
+The header is cleartext. It names the BRC-2 protocol and keyID a reader must
+pass to `wallet.decrypt`. It is not a second cipher.
+
 ```json
 {
   "v": 1,
-  "alg": "aes-256-gcm",
-  "iv": "<base64, 12 bytes>",
   "key": {
     "mode": "brc2-self",
     "protocolID": [2, "bitplan"],
-    "keyID": "<uuid string>",
-    "ciphertext": "<base64 of the wallet.encrypt output>"
+    "keyID": "<uuid string>"
   }
 }
 ```
@@ -82,48 +82,29 @@ ciphertext.
 | Field            | Meaning                                                             |
 | ---------------- | ------------------------------------------------------------------- |
 | `v`              | Header version. `1`.                                                 |
-| `alg`            | Content cipher. `aes-256-gcm`.                                       |
-| `iv`             | 12-byte AES-GCM initialization vector, base64. Fresh per version.    |
-| `key.mode`       | How the content key is wrapped. `brc2-self` is the only v1 mode.     |
+| `key.mode`       | How the body is encrypted. `brc2-self` is the only v1 mode.          |
 | `key.protocolID` | BRC-2 protocol: `[securityLevel, name]`. bitplan uses `[2, "bitplan"]`. |
 | `key.keyID`      | BRC-2 key id. Minted per draft, **reused for every version**.        |
-| `key.ciphertext` | The wrapped content key, base64 of the wallet's `encrypt` output.    |
 
-The header is cleartext on purpose. It carries no secret: `keyID` is a label
-the wallet derives against, not a key, and it is what lets a client recover a
-draft's wrapping parameters from the chain alone when local state is gone.
-
-A reader must use the **header's** `protocolID` and `keyID` when unwrapping,
-not its own constants, so that an envelope written under a different protocol
-still opens if the wallet holds the key.
-
-## Content key
-
-- 32 random bytes from a CSPRNG (`crypto.getRandomValues`).
-- Fresh for **every version**. Never derived from the document, never reused
-  across versions, never written to disk.
-- Used once for AES-256-GCM, then wrapped:
-
-  ```
-  wallet.encrypt({
-    protocolID: [2, "bitplan"],
-    keyID:      <the draft's keyID>,
-    counterparty: "self",
-    plaintext:  <the 32 key bytes>
-  })
-  ```
-
-- Unwrapping reverses it with `wallet.decrypt` and the header's
-  `protocolID` / `keyID`.
-
-The publishing client holds no keys of its own. Every key operation is a
-BRC-100 call into the user's wallet.
+`keyID` is a derivation label, not a secret. A reader must use the header's
+`protocolID` and `keyID` when decrypting, not its own constants.
 
 ## Ciphertext
 
-AES-256-GCM over the UTF-8 JSON plaintext below, with the WebCrypto default
-128-bit authentication tag appended to the ciphertext. No additional
-authenticated data.
+The body is the UTF-8 JSON plaintext, encrypted with the BRC-100 wallet:
+
+```
+wallet.encrypt({
+  protocolID:   header.key.protocolID,
+  keyID:        header.key.keyID,
+  counterparty: "self",
+  plaintext:    <UTF-8 JSON bytes>
+})
+```
+
+Decrypt with `wallet.decrypt` and the same parameters. The wallet implements
+BRC-2 (Type-42 derived keys, AES-256-GCM). The publishing client does not
+choose an IV, a content key, or a second AES pass.
 
 ## Plaintext
 

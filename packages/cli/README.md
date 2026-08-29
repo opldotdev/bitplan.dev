@@ -91,9 +91,9 @@ bitplan fetch <origin|url>
 
 ## How it works
 
-- **Encryption.** A fresh 32-byte AES-256-GCM key per version, wrapped by your
-  wallet under BRC-2 self-encryption. The wrapped key travels in the envelope
-  header; the raw key is never written anywhere. See
+- **Encryption.** The document is BRC-2 encrypted by your wallet
+  (`wallet.encrypt`, counterparty `self`). The envelope header only names the
+  protocol and keyID so a reader can call `wallet.decrypt`. See
   [ENVELOPE.md](./ENVELOPE.md) for the byte layout.
 - **Versioning.** The first publish inscribes a 1-satoshi output. Later
   publishes spend that satoshi back to you carrying a new envelope. Only the

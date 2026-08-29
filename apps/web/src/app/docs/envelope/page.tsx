@@ -11,7 +11,7 @@ import {
 
 export const metadata: Metadata = {
   description:
-    "On-chain format for a bitplan draft: BPLN envelope, MAP fields, and AES-256-GCM ciphertext.",
+    "On-chain format for a bitplan draft: BPLN envelope, MAP fields, and BRC-2 ciphertext.",
   title: "Envelope",
 };
 
@@ -27,7 +27,7 @@ const LAYOUT = [
   {
     field: "ciphertext",
     size: "rest",
-    value: "AES-256-GCM, authentication tag appended",
+    value: "BRC-2 ciphertext from wallet.encrypt",
   },
 ] as const;
 
@@ -37,9 +37,9 @@ export default function EnvelopePage() {
       <h1>Envelope</h1>
       <p>
         This is the on-chain format bitplan publishes. Anything that can read a
-        1Sat Ordinal and talk to a BRC-100 wallet can implement it. v1 is
-        encrypted only. A conforming implementation must not add a cleartext
-        path.
+        1Sat Ordinal and talk to a BRC-100 wallet can implement it. The body is
+        BRC-2, the encryption the wallet already implements. There is no
+        cleartext path.
       </p>
       <section id="where-it-lives">
         <h2>Where it lives</h2>
@@ -94,13 +94,13 @@ export default function EnvelopePage() {
         </div>
       </section>
       <section id="content-key">
-        <h2>Content key</h2>
+        <h2>BRC-2</h2>
         <p>
-          32 random bytes, fresh for every version, wrapped with{" "}
-          <code>wallet.encrypt</code> under BRC-2{" "}
-          <code>counterparty: &quot;self&quot;</code>. The wrapped key rides in
-          the header. The raw key is never written to disk. Unwrap with the
-          header&apos;s protocolID and keyID, not client constants.
+          The header names the protocol and keyID. The rest is{" "}
+          <code>wallet.encrypt</code> of the UTF-8 JSON document, with{" "}
+          <code>counterparty: &quot;self&quot;</code>. Decrypt with the
+          header&apos;s protocolID and keyID, not client constants. The CLI does
+          not pick an IV or a second AES key.
         </p>
       </section>
     </>

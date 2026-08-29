@@ -6,7 +6,7 @@ import type { WalletInterface } from '@bsv/sdk'
  * encrypt/decrypt are a real involution — XOR against a fixed non-zero pad —
  * rather than the identity, so a test that round-trips an envelope actually
  * proves the wrap and unwrap ran and transformed bytes. An identity mock would
- * pass even if `sealEnvelope` forgot to wrap the content key at all.
+ * pass even if `sealEnvelope` forgot to call wallet.encrypt at all.
  */
 const PAD = Uint8Array.from(
 	Array.from({ length: 32 }, (_, i) => ((i * 37 + 11) % 251) + 1),
