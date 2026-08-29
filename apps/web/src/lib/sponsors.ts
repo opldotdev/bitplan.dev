@@ -2,6 +2,7 @@ export const SPONSOR_APP = "bitplan";
 export const SPONSOR_CONTENT_TYPE = "image/webp";
 export const SPONSOR_PAYMENT_ADDRESS = "14iPT5Yqcz3qUHxRo7vqNoxmvxr4P6J9Ah";
 export const SPONSOR_SUBTYPE = "bitplanSponsorSlot";
+export const SPONSOR_TEST_SLOT_ID = "silver-1";
 
 export type SponsorTierId = "diamond" | "gold" | "platinum" | "silver";
 
@@ -95,6 +96,10 @@ export const SPONSOR_SLOT_IDS = SPONSOR_TIERS.flatMap((tier) => tier.slotIds);
 
 export function sponsorImageUrl(slotId: string): string {
   return `/api/sponsors/${encodeURIComponent(slotId)}/image`;
+}
+
+export function sponsorPriceSats(slotId: string, tier: SponsorTier): number {
+  return slotId === SPONSOR_TEST_SLOT_ID ? 1_000_000 : tier.priceSats;
 }
 
 export function sponsorSubtype(slotId: string): string {

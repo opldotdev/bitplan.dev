@@ -30,7 +30,8 @@ describe("SponsorSlot", () => {
     );
 
     expect(markup).not.toContain('disabled=""');
-    expect(markup).toContain("Sponsor · 3 BSV");
+    expect(markup).toContain("Test slot · 0.01 BSV");
+    expect(markup).toContain("cursor-pointer");
   });
 
   test("renders an on-chain sponsor as a sponsored link", () => {

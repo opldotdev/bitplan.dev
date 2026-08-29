@@ -4,6 +4,7 @@ import {
   SPONSOR_SLOT_IDS,
   SPONSOR_TIERS,
   sponsorImageUrl,
+  sponsorPriceSats,
   sponsorSubtype,
 } from "./sponsors";
 
@@ -21,5 +22,15 @@ describe("sponsor slots", () => {
   test("uses slot-specific MAP discovery tags and local images", () => {
     expect(sponsorSubtype("gold-1")).toBe("bitplanSponsorSlot:gold-1");
     expect(sponsorImageUrl("gold-1")).toBe("/api/sponsors/gold-1/image");
+  });
+
+  test("keeps one cheap test slot without changing its tier", () => {
+    const silver = SPONSOR_TIERS.find(({ id }) => id === "silver");
+    expect(silver).toBeDefined();
+    if (!silver) {
+      return;
+    }
+    expect(sponsorPriceSats("silver-1", silver)).toBe(1_000_000);
+    expect(sponsorPriceSats("silver-2", silver)).toBe(silver.priceSats);
   });
 });

@@ -48,7 +48,8 @@ Prices are fixed in satoshis so old payments remain verifiable:
 | Diamond | 4 | 30 BSV |
 | Platinum | 6 | 15 BSV |
 | Gold | 8 | 6 BSV |
-| Silver | 12 | 3 BSV |
+| Silver test (`silver-1`) | 1 | 0.01 BSV |
+| Silver | 11 | 3 BSV |
 
 ## Deployment
 

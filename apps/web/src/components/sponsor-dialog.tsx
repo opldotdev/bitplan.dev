@@ -27,7 +27,12 @@ import {
   loadSponsorImage,
   type SponsorCrop,
 } from "@/lib/sponsor-image";
-import type { SponsorSlotState, SponsorTier } from "@/lib/sponsors";
+import {
+  SPONSOR_TEST_SLOT_ID,
+  type SponsorSlotState,
+  type SponsorTier,
+  sponsorPriceSats,
+} from "@/lib/sponsors";
 import { connectBrowserWalletClient } from "@/lib/wallet";
 
 const DEFAULT_CROP: SponsorCrop = { x: 50, y: 50, zoom: 1 };
@@ -216,8 +221,10 @@ export function SponsorDialog({
     (pendingCheckout || (acknowledged && image && name.trim() && url.trim())) &&
       !busy
   );
-  const priceBsv = tier.priceSats / 100_000_000;
-  const triggerLabel = `Sponsor · ${priceBsv} BSV`;
+  const priceBsv = sponsorPriceSats(slot.slotId, tier) / 100_000_000;
+  const triggerLabel = `${
+    slot.slotId === SPONSOR_TEST_SLOT_ID ? "Test slot" : "Sponsor"
+  } · ${priceBsv} BSV`;
   let submitLabel = `Pay ${priceBsv} BSV and publish`;
   if (busy) {
     submitLabel = "Working…";
@@ -228,7 +235,10 @@ export function SponsorDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button className="size-full border-dashed" variant="outline">
+        <Button
+          className="size-full cursor-pointer hover:border-foreground/50"
+          variant="outline"
+        >
           {triggerLabel}
         </Button>
       </DialogTrigger>

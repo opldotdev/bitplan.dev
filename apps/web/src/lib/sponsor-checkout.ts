@@ -7,6 +7,7 @@ import {
   SPONSOR_CONTENT_TYPE,
   SPONSOR_PAYMENT_ADDRESS,
   type SponsorTier,
+  sponsorPriceSats,
   sponsorSubtype,
 } from "@/lib/sponsors";
 
@@ -66,7 +67,7 @@ export async function createSponsorCheckout({
       {
         lockingScript: new P2PKH().lock(SPONSOR_PAYMENT_ADDRESS).toHex(),
         outputDescription: `BitPlan sponsor payment for ${slotId}`,
-        satoshis: tier.priceSats,
+        satoshis: sponsorPriceSats(slotId, tier),
       },
     ],
   });

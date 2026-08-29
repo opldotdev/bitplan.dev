@@ -5,6 +5,7 @@ import { createSponsorCheckout } from "./sponsor-checkout";
 import {
   SPONSOR_PAYMENT_ADDRESS,
   SPONSOR_TIERS,
+  sponsorPriceSats,
   sponsorSubtype,
 } from "./sponsors";
 
@@ -44,7 +45,7 @@ describe("createSponsorCheckout", () => {
     });
     expect(request?.outputs?.map(({ satoshis }) => satoshis)).toEqual([
       1,
-      tier.priceSats,
+      sponsorPriceSats("silver-1", tier),
     ]);
 
     const imageOutput = request?.outputs?.[0];

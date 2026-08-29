@@ -10,6 +10,7 @@ import {
   SPONSOR_TIERS,
   type SponsorTier,
   type SponsorTierId,
+  sponsorPriceSats,
   sponsorSubtype,
 } from "@/lib/sponsors";
 
@@ -165,7 +166,7 @@ export function validateSponsorReceipt(
   );
   if (
     paymentOutputs.length !== 1 ||
-    paymentOutputs[0]?.satoshis !== tier.priceSats
+    paymentOutputs[0]?.satoshis !== sponsorPriceSats(slotId, tier)
   ) {
     return fail("Transaction does not contain the exact sponsor payment.");
   }

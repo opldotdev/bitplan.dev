@@ -16,6 +16,7 @@ import {
   SPONSOR_CONTENT_TYPE,
   SPONSOR_PAYMENT_ADDRESS,
   SPONSOR_TIERS,
+  sponsorPriceSats,
   sponsorSubtype,
 } from "./sponsors";
 
@@ -67,7 +68,7 @@ function receiptBeef({
   });
   transaction.addOutput({
     lockingScript: new P2PKH().lock(SPONSOR_PAYMENT_ADDRESS),
-    satoshis: payment ?? tier.priceSats,
+    satoshis: payment ?? sponsorPriceSats(slotId, tier),
   });
   return Uint8Array.from(transaction.toAtomicBEEF());
 }
@@ -95,7 +96,10 @@ describe("validateSponsorReceipt", () => {
 
   test("rejects metadata for a different fixed slot", () => {
     expect(() =>
-      validateSponsorReceipt(receiptBeef({ slotId: "silver-2" }), "silver-1")
+      validateSponsorReceipt(
+        receiptBeef({ payment: 1_000_000, slotId: "silver-2" }),
+        "silver-1"
+      )
     ).toThrow("metadata does not match");
   });
 });
