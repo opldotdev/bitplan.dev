@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   "/docs/cli-setup",
   "/docs/commands",
   "/docs/envelope",
+  "/docs/api",
   "/sponsors",
   "/about",
   "/privacy",

@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 
 import { GET as getApiCatalog } from "@/app/.well-known/api-catalog/route";
 
-import { apiIndex, OPENAPI_SPEC } from "./openapi";
+import {
+  apiCliPackage,
+  apiIndex,
+  apiVersionPolicy,
+  OPENAPI_SPEC,
+} from "./openapi";
 
 describe("OpenAPI", () => {
   test("versions the read API at /api/v1 with JSON schemas", () => {
@@ -25,11 +30,33 @@ describe("OpenAPI", () => {
     expect(OPENAPI_SPEC.externalDocs.url).toContain(
       "npmjs.com/package/bitplan"
     );
+    expect(OPENAPI_SPEC.paths["/api/v1/cli"].get.operationId).toBe(
+      "getCliPackage"
+    );
+    expect(OPENAPI_SPEC.paths["/api/v1/version"].get.operationId).toBe(
+      "getVersionPolicy"
+    );
+    expect(
+      OPENAPI_SPEC.paths["/openapi.json"].get.responses["200"].content[
+        "application/json"
+      ].schema
+    ).toEqual({ $ref: "#/components/schemas/OpenApiDocument" });
   });
 
-  test("index names the npm CLI", () => {
+  test("index names the npm CLI and version policy", () => {
     expect(apiIndex().cli).toBe("https://www.npmjs.com/package/bitplan");
     expect(apiIndex().version).toBe("1.0.0");
+    expect(apiIndex().versionPolicy).toBe("https://bitplan.dev/docs/api");
+  });
+
+  test("CLI package and version policy are typed JSON", () => {
+    expect(apiCliPackage()).toMatchObject({
+      install: "npx bitplan",
+      name: "bitplan",
+      registry: "npm",
+    });
+    expect(apiVersionPolicy().sunset).toContain("90 days");
+    expect(apiVersionPolicy().docs).toBe("https://bitplan.dev/docs/api");
   });
 
   test("RFC 9727 catalog points at OpenAPI", async () => {

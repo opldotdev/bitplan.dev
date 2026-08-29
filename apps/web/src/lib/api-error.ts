@@ -6,6 +6,16 @@ export const API_RATE_LIMIT_HEADERS = {
   "RateLimit-Policy": "120;w=60",
 } as const;
 
+export function jsonApiOk(body: unknown): Response {
+  return Response.json(body, {
+    headers: {
+      ...API_RATE_LIMIT_HEADERS,
+      "cache-control": "public, max-age=3600",
+      "content-type": "application/json; charset=utf-8",
+    },
+  });
+}
+
 export function jsonApiError(
   status: number,
   error: string,

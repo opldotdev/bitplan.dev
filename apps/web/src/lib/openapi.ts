@@ -43,8 +43,55 @@ const API_INDEX_SCHEMA = {
     llms: { format: "uri", type: "string" },
     openapi: { format: "uri", type: "string" },
     version: { type: "string" },
+    versionPolicy: { format: "uri", type: "string" },
   },
-  required: ["version", "openapi", "envelope", "cli", "docs"],
+  required: ["version", "openapi", "envelope", "cli", "docs", "versionPolicy"],
+  type: "object",
+} as const;
+
+const CLI_PACKAGE_SCHEMA = {
+  additionalProperties: false,
+  properties: {
+    docs: { format: "uri", type: "string" },
+    install: { type: "string" },
+    name: { type: "string" },
+    package: { format: "uri", type: "string" },
+    registry: { type: "string" },
+  },
+  required: ["name", "registry", "package", "install", "docs"],
+  type: "object",
+} as const;
+
+const VERSION_POLICY_SCHEMA = {
+  additionalProperties: false,
+  properties: {
+    breaking: { type: "string" },
+    deprecation: { type: "string" },
+    docs: { format: "uri", type: "string" },
+    sunset: { type: "string" },
+    version: { type: "string" },
+  },
+  required: ["version", "breaking", "deprecation", "sunset", "docs"],
+  type: "object",
+} as const;
+
+const OPENAPI_DOCUMENT_SCHEMA = {
+  additionalProperties: true,
+  properties: {
+    info: { type: "object" },
+    openapi: { type: "string" },
+    paths: { type: "object" },
+  },
+  required: ["openapi", "info", "paths"],
+  type: "object",
+} as const;
+
+const API_CATALOG_SCHEMA = {
+  additionalProperties: false,
+  properties: {
+    linkset: { items: { type: "object" }, type: "array" },
+  },
+  required: ["linkset"],
   type: "object",
 } as const;
 
@@ -92,9 +139,13 @@ const ENVELOPE_GET = {
 export const OPENAPI_SPEC = {
   components: {
     schemas: {
+      ApiCatalog: API_CATALOG_SCHEMA,
       ApiIndex: API_INDEX_SCHEMA,
+      CliPackage: CLI_PACKAGE_SCHEMA,
       Error: ERROR_SCHEMA,
+      OpenApiDocument: OPENAPI_DOCUMENT_SCHEMA,
       Problem: PROBLEM_SCHEMA,
+      VersionPolicy: VERSION_POLICY_SCHEMA,
     },
   },
   externalDocs: {
@@ -103,12 +154,32 @@ export const OPENAPI_SPEC = {
   },
   info: {
     description:
-      "Public read surface for BitPlan. This is API v1 at /api/v1. Breaking changes increment the URL path to /api/v2. Deprecated operations will send a Deprecation header (RFC 9745) and a Sunset header at least 90 days out. Responses include RateLimit and RateLimit-Policy (120 requests per 60-second window). Unknown /api/v1 and /ordfs paths return application/problem+json. Publishing and decrypting happen in the user's BRC-100 wallet via the npm package bitplan, not this HTTP API.",
+      "Public read surface for BitPlan. This is API v1 at /api/v1. Breaking changes increment the URL path to /api/v2. Deprecated operations send a Deprecation header (RFC 9745) and a Sunset header at least 90 days out. The policy page is /docs/api. Nothing is deprecated today. Responses include RateLimit and RateLimit-Policy (120 requests per 60-second window). Unknown /api/v1 and /ordfs paths return application/problem+json. Publishing and decrypting happen in the user's BRC-100 wallet via the npm package bitplan, not this HTTP API.",
     title: "BitPlan",
     version: "1.0.0",
   },
   openapi: "3.1.0",
   paths: {
+    "/.well-known/api-catalog": {
+      get: {
+        description: "RFC 9727 API catalog pointing at /openapi.json.",
+        operationId: "getApiCatalog",
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ApiCatalog" },
+              },
+              "application/linkset+json": {
+                schema: { $ref: "#/components/schemas/ApiCatalog" },
+              },
+            },
+            description: "Linkset catalog",
+          },
+        },
+        summary: "API catalog",
+      },
+    },
     "/api/v1": {
       get: {
         description:
@@ -127,8 +198,44 @@ export const OPENAPI_SPEC = {
         summary: "API v1 index",
       },
     },
+    "/api/v1/cli": {
+      get: {
+        description:
+          "npm package bitplan: install with npx bitplan or bunx bitplan.",
+        operationId: "getCliPackage",
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/CliPackage" },
+              },
+            },
+            description: "CLI package coordinates",
+          },
+        },
+        summary: "npm CLI bitplan",
+      },
+    },
     "/api/v1/content/{pointer}": {
       get: { ...ENVELOPE_GET, operationId: "getEnvelopeV1" },
+    },
+    "/api/v1/version": {
+      get: {
+        description:
+          "Versioning and deprecation policy for the public read API.",
+        operationId: "getVersionPolicy",
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/VersionPolicy" },
+              },
+            },
+            description: "Version and deprecation policy",
+          },
+        },
+        summary: "API version policy",
+      },
     },
     "/llms.txt": {
       get: {
@@ -154,7 +261,7 @@ export const OPENAPI_SPEC = {
           "200": {
             content: {
               "application/json": {
-                schema: { type: "object" },
+                schema: { $ref: "#/components/schemas/OpenApiDocument" },
               },
             },
             description: "OpenAPI document",
@@ -165,19 +272,6 @@ export const OPENAPI_SPEC = {
     },
     "/ordfs/content/{pointer}": {
       get: ENVELOPE_GET,
-    },
-    "/sitemap.xml": {
-      get: {
-        description: "Indexable public URLs.",
-        operationId: "getSitemap",
-        responses: {
-          "200": {
-            content: { "application/xml": { schema: { type: "string" } } },
-            description: "XML sitemap",
-          },
-        },
-        summary: "Sitemap",
-      },
     },
   },
   servers: [
@@ -193,6 +287,30 @@ export function apiIndex() {
     envelope: `${SITE_URL}/api/v1/content/{pointer}`,
     llms: `${SITE_URL}/llms.txt`,
     openapi: `${SITE_URL}/openapi.json`,
+    version: "1.0.0",
+    versionPolicy: `${SITE_URL}/docs/api`,
+  };
+}
+
+export function apiCliPackage() {
+  return {
+    docs: `${SITE_URL}/docs/cli-setup`,
+    install: "npx bitplan",
+    name: "bitplan",
+    package: "https://www.npmjs.com/package/bitplan",
+    registry: "npm",
+  };
+}
+
+export function apiVersionPolicy() {
+  return {
+    breaking:
+      "Breaking changes increment the URL path from /api/v1 to /api/v2.",
+    deprecation:
+      "Deprecated operations send a Deprecation header (RFC 9745). Nothing is deprecated today.",
+    docs: `${SITE_URL}/docs/api`,
+    sunset:
+      "Removed operations send a Sunset header at least 90 days before the removal date.",
     version: "1.0.0",
   };
 }

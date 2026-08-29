@@ -7,6 +7,7 @@ describe("agent pages", () => {
     expect(markdownForPath("/")).toContain("npx bitplan");
     expect(markdownForPath("/docs")).toContain("Docs");
     expect(markdownForPath("/docs/")).toContain("Docs");
+    expect(markdownForPath("/docs/api")).toContain("Sunset");
   });
 
   test("unknown paths have no markdown page", () => {

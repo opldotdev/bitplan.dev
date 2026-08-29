@@ -42,6 +42,15 @@ The CLI packages a self-contained HTML document and asks your BRC-100 wallet to 
 - CLI setup: ${SITE_URL}/docs/cli-setup
 - Commands: ${SITE_URL}/docs/commands
 - Envelope: ${SITE_URL}/docs/envelope
+- API: ${SITE_URL}/docs/api
+`,
+  "/docs/api": `# BitPlan API
+
+Public read surface is API v1 at ${SITE_URL}/api/v1. OpenAPI: ${SITE_URL}/openapi.json. CLI: https://www.npmjs.com/package/bitplan
+
+Breaking changes increment the path to /api/v2. Deprecated operations send a Deprecation header (RFC 9745) and a Sunset header at least 90 days before removal. Nothing is deprecated today.
+
+Docs: ${SITE_URL}/docs/api
 `,
   "/docs/cli-setup": `# CLI setup · BitPlan
 
@@ -119,6 +128,7 @@ Do not use BitPlan as a general file host, a server-side notes app, or a substit
 - How it works: ${SITE_URL}/docs/how-it-works
 - Envelope: ${SITE_URL}/docs/envelope
 - CLI setup: ${SITE_URL}/docs/cli-setup
+- API versioning: ${SITE_URL}/docs/api
 - OpenAPI: ${SITE_URL}/openapi.json
 - Source: ${GITHUB_URL}
 
@@ -128,7 +138,7 @@ Read a published envelope (API v1):
 
     GET ${SITE_URL}/api/v1/content/<origin>:-1
 
-The same bytes are at \`GET ${SITE_URL}/ordfs/content/<origin>:-1\`. Unknown \`/api/v1\` paths return JSON. OpenAPI: ${SITE_URL}/openapi.json. The CLI is the npm package bitplan: https://www.npmjs.com/package/bitplan
+The same bytes are at \`GET ${SITE_URL}/ordfs/content/<origin>:-1\`. Unknown \`/api/v1\` paths return JSON. CLI package: \`GET ${SITE_URL}/api/v1/cli\`. Version policy: \`GET ${SITE_URL}/api/v1/version\`. OpenAPI: ${SITE_URL}/openapi.json. The CLI is the npm package bitplan: https://www.npmjs.com/package/bitplan
 
 Publishing and decrypting go through the user's wallet via \`npx bitplan\`. Drafts at /d/<origin> are ciphertext and are not indexed.
 `;

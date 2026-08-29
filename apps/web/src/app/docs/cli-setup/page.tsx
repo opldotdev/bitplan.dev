@@ -14,8 +14,9 @@ export default function CliSetupPage() {
     <>
       <h1>BitPlan CLI</h1>
       <p>
-        The official CLI is the npm package{" "}
-        <a href="https://www.npmjs.com/package/bitplan">bitplan</a>. Run{" "}
+        The official CLI is published on the npm registry as{" "}
+        <a href="https://www.npmjs.com/package/bitplan">bitplan</a>. Machine
+        readers can GET <a href="/api/v1/cli">/api/v1/cli</a>. Run{" "}
         <code>npx bitplan</code> or <code>bunx bitplan</code>. It talks to a
         BRC-100 wallet on this machine. The wallet owns every identity key and
         handles BRC-2 wrapping, unwrapping, signing, and funding. Shared

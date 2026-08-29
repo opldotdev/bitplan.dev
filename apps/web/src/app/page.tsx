@@ -30,14 +30,17 @@ export default function Home() {
           </p>
         </div>
 
-        <section className="space-y-2">
+        <section className="space-y-3">
           <h2 className="font-medium text-lg tracking-tight">
             Publish with the BitPlan CLI
           </h2>
+          <h3 className="font-medium text-sm">npm package bitplan</h3>
           <p className="text-muted-foreground">
-            The CLI is the npm package bitplan. Run npx bitplan auth, then npx
-            bitplan upload ./plan.html. bunx bitplan is the same binary.
+            The CLI is published on the npm registry as bitplan. Run npx bitplan
+            auth, then npx bitplan upload ./plan.html. bunx bitplan is the same
+            binary.
           </p>
+          <h3 className="font-medium text-sm">Auth</h3>
           <CommandCopy command="npx bitplan auth" />
           <p className="text-muted-foreground text-sm">
             Needs a BRC-100 wallet on this machine, unlocked.
@@ -48,10 +51,12 @@ export default function Home() {
           <h2 className="font-medium text-lg tracking-tight">
             Open a BitPlan draft
           </h2>
+          <h3 className="font-medium text-sm">Docs and OpenAPI</h3>
           <p className="text-muted-foreground">
-            Docs start at /docs. The OpenAPI read surface is /openapi.json. The
-            npm package is at npmjs.com/package/bitplan.
+            BitPlan docs start at /docs. The OpenAPI read surface is
+            /openapi.json. API versioning and Sunset policy are at /docs/api.
           </p>
+          <h3 className="font-medium text-sm">Viewer</h3>
           <div className="flex flex-wrap gap-2">
             <Button asChild>
               <Link href="/docs">Get started</Link>

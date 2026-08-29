@@ -26,7 +26,8 @@ export default function DocsIntroPage() {
       <p>
         Start with <Link href="/docs/cli-setup">CLI setup</Link>, then{" "}
         <Link href="/docs/commands">commands</Link>. The OpenAPI read surface is
-        at <a href="/openapi.json">/openapi.json</a>.
+        at <a href="/openapi.json">/openapi.json</a>. Versioning and Sunset
+        policy: <Link href="/docs/api">BitPlan API</Link>.
       </p>
       <div className="not-typeset mt-5">
         <CommandCopy command="npx bitplan" />
