@@ -34,7 +34,11 @@ import {
   seqToVersion,
   versionToSeq,
 } from "@/lib/version";
-import { connectBrowserWallet } from "@/lib/wallet";
+import {
+  connectBrowserWallet,
+  getConnectedWallet,
+  reconnectAuthenticatedWallet,
+} from "@/lib/wallet";
 
 type WalletIssue = "no-wallet" | "unwrap-refused";
 
@@ -117,6 +121,10 @@ async function reopenDraft(
   }
 }
 
+async function walletForDecrypt(): Promise<EnvelopeWallet | null> {
+  return getConnectedWallet() ?? (await reconnectAuthenticatedWallet());
+}
+
 function VersionPill({
   version,
   current,
@@ -185,17 +193,26 @@ export function DraftViewer() {
       setNotFoundOrigin(null);
       setWalletIssue(null);
 
-      const reopened =
-        decryptedRef.current && walletRef.current
-          ? await reopenDraft(walletRef.current, result.draft.content.bytes)
-          : null;
-      if (!cancelled) {
-        setPlaintext(reopened?.plaintext ?? null);
-        if (reopened?.issue) {
-          setWalletIssue(reopened.issue);
-        }
-        setResolving(false);
+      const wallet = walletRef.current ?? (await walletForDecrypt());
+      if (cancelled) {
+        return;
       }
+      if (!wallet) {
+        setResolving(false);
+        return;
+      }
+
+      walletRef.current = wallet;
+      const reopened = await reopenDraft(wallet, result.draft.content.bytes);
+      if (cancelled) {
+        return;
+      }
+      if (reopened.plaintext) {
+        decryptedRef.current = true;
+      }
+      setPlaintext(reopened.plaintext);
+      setWalletIssue(reopened.issue);
+      setResolving(false);
     }
 
     load();
@@ -247,7 +264,7 @@ export function DraftViewer() {
     [loaded, router]
   );
 
-  if (resolving && !loaded) {
+  if (resolving && !plaintext) {
     return <DraftResolving />;
   }
 
@@ -402,7 +419,7 @@ function DecryptedView({
     <div className="flex min-h-dvh flex-col">
       <header className="flex shrink-0 items-center gap-3 border-border border-b px-4 py-2">
         <Wordmark />
-        <nav aria-label="Draft versions" className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1">
           {versions.map((version) => (
             <VersionPill
               current={version === currentVersion}
@@ -411,7 +428,7 @@ function DecryptedView({
               version={version}
             />
           ))}
-        </nav>
+        </div>
         {title ? (
           <p className="min-w-0 flex-1 truncate text-muted-foreground text-sm">
             {title}

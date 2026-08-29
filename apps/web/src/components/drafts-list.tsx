@@ -3,9 +3,27 @@
 import { FileLock2, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemFooter,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { DraftCoin, DraftsWallet } from "@/lib/drafts";
 import { listWalletDrafts } from "@/lib/drafts";
 import type { DraftMeta } from "@/lib/envelope";
@@ -13,7 +31,11 @@ import { openEnvelope } from "@/lib/envelope";
 import { truncateMiddle } from "@/lib/format";
 import { fetchOrdfsContent } from "@/lib/ordfs";
 import { seqToVersion } from "@/lib/version";
-import { connectBrowserWallet, getConnectedWallet } from "@/lib/wallet";
+import {
+  connectBrowserWallet,
+  getConnectedWallet,
+  reconnectAuthenticatedWallet,
+} from "@/lib/wallet";
 
 interface DraftRow extends DraftCoin {
   latestVersion: number | null;
@@ -21,16 +43,12 @@ interface DraftRow extends DraftCoin {
 }
 
 type ListState =
+  | { phase: "checking" }
   | { phase: "idle" }
   | { phase: "connecting" }
   | { phase: "no-wallet" }
   | { phase: "loaded"; rows: DraftRow[] };
 
-/**
- * Decrypt metadata best-effort: the first unwrap raises the wallet's
- * permission prompt; later ones ride the same grant. A draft whose key this
- * wallet cannot unwrap still lists — by origin, untitled.
- */
 async function toRow(wallet: DraftsWallet, coin: DraftCoin): Promise<DraftRow> {
   try {
     const content = await fetchOrdfsContent(coin.origin, -1);
@@ -45,7 +63,6 @@ async function toRow(wallet: DraftsWallet, coin: DraftCoin): Promise<DraftRow> {
   }
 }
 
-/** Postplan groups the dashboard by auto-linked repo; mirror that. */
 function repoLabel(meta: DraftMeta | null): string {
   if (meta?.repoOrg && meta.repoName) {
     return `${meta.repoOrg}/${meta.repoName}`;
@@ -86,7 +103,7 @@ async function loadRows(wallet: DraftsWallet): Promise<DraftRow[]> {
 }
 
 export function DraftsList() {
-  const [state, setState] = useState<ListState>({ phase: "idle" });
+  const [state, setState] = useState<ListState>({ phase: "checking" });
 
   const connect = useCallback(async () => {
     setState({ phase: "connecting" });
@@ -98,40 +115,77 @@ export function DraftsList() {
     }
   }, []);
 
-  // A wallet connected earlier in this tab (e.g. on the viewer) lists
-  // without a fresh click; a cold visit stays idle until the user connects.
   useEffect(() => {
-    const wallet = getConnectedWallet();
-    if (wallet) {
-      loadRows(wallet)
-        .then((rows) => setState({ phase: "loaded", rows }))
-        .catch(() => setState({ phase: "idle" }));
+    let cancelled = false;
+    async function boot() {
+      const wallet =
+        getConnectedWallet() ?? (await reconnectAuthenticatedWallet());
+      if (cancelled) {
+        return;
+      }
+      if (!wallet) {
+        setState({ phase: "idle" });
+        return;
+      }
+      try {
+        const rows = await loadRows(wallet);
+        if (!cancelled) {
+          setState({ phase: "loaded", rows });
+        }
+      } catch {
+        if (!cancelled) {
+          setState({ phase: "idle" });
+        }
+      }
     }
+    boot();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  if (state.phase === "checking") {
+    return <DraftsSkeleton />;
+  }
   if (state.phase === "loaded") {
     return state.rows.length === 0 ? (
-      <EmptyState />
+      <EmptyDrafts />
     ) : (
       <Groups rows={state.rows} />
     );
   }
-  return <ConnectCard onConnect={connect} state={state.phase} />;
+  return <ConnectEmpty onConnect={connect} state={state.phase} />;
 }
 
-function EmptyState() {
+function DraftsSkeleton() {
   return (
-    <Card>
-      <CardContent className="space-y-2 py-8 text-center">
-        <p>No drafts in this wallet yet.</p>
-        <p className="text-muted-foreground text-sm">
+    <div className="space-y-3">
+      <Skeleton className="h-4 w-32" />
+      <Skeleton className="h-16 w-full" />
+      <Skeleton className="h-16 w-full" />
+    </div>
+  );
+}
+
+function EmptyDrafts() {
+  return (
+    <Empty className="border border-dashed">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <FileLock2 />
+        </EmptyMedia>
+        <EmptyTitle>No drafts in this wallet yet</EmptyTitle>
+        <EmptyDescription>
           Publish one with{" "}
-          <code className="font-mono">npx bitplan upload ./plan.html</code>
-          {" or "}
-          <code className="font-mono">bunx bitplan upload ./plan.html</code>
-        </p>
-      </CardContent>
-    </Card>
+          <code className="font-mono">npx bitplan upload ./plan.html</code>.
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button asChild variant="outline">
+          <Link href="/docs/cli-setup">CLI setup</Link>
+        </Button>
+      </EmptyContent>
+    </Empty>
   );
 }
 
@@ -140,59 +194,54 @@ function Groups({ rows }: { rows: DraftRow[] }) {
     <div className="space-y-8">
       {groupRows(rows).map(([label, group]) => (
         <section key={label}>
-          <h2 className="mb-3 font-semibold">{label}</h2>
-          <ul className="space-y-3">
+          <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+            {label}
+          </h2>
+          <ItemGroup>
             {group.map((row) => (
-              <DraftRowCard key={row.origin} row={row} />
+              <DraftItem key={row.origin} row={row} />
             ))}
-          </ul>
+          </ItemGroup>
         </section>
       ))}
     </div>
   );
 }
 
-function DraftRowCard({ row }: { row: DraftRow }) {
-  const subtitle = [
-    truncateMiddle(row.origin),
-    row.latestVersion ? `v${row.latestVersion}` : null,
-    row.meta?.createdAt
-      ? new Date(row.meta.createdAt).toLocaleDateString()
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
+function DraftItem({ row }: { row: DraftRow }) {
   return (
-    <li>
-      <Link className="block no-underline" href={`/d/${row.origin}`}>
-        <Card className="transition-colors hover:border-muted-foreground/40">
-          <CardContent className="flex items-center gap-4 py-4">
-            <FileLock2
-              aria-hidden
-              className="size-5 shrink-0 text-muted-foreground"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">
-                {row.meta?.title ?? "Encrypted draft"}
-              </p>
-              {row.meta?.description && (
-                <p className="truncate text-muted-foreground text-sm">
-                  {row.meta.description}
-                </p>
-              )}
-              <p className="truncate font-mono text-muted-foreground text-xs">
-                {subtitle}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+    <Item asChild variant="outline">
+      <Link className="no-underline" href={`/d/${row.origin}`}>
+        <ItemMedia variant="icon">
+          <FileLock2 />
+        </ItemMedia>
+        <ItemContent className="min-w-0">
+          <ItemTitle>{row.meta?.title ?? "Encrypted draft"}</ItemTitle>
+          <ItemDescription>
+            {row.meta?.description ?? truncateMiddle(row.origin)}
+          </ItemDescription>
+        </ItemContent>
+        {row.latestVersion ? (
+          <ItemActions>
+            <Badge variant="secondary">v{row.latestVersion}</Badge>
+          </ItemActions>
+        ) : null}
+        <ItemFooter>
+          <span className="truncate font-mono text-muted-foreground text-xs">
+            {truncateMiddle(row.origin)}
+          </span>
+          {row.meta?.createdAt ? (
+            <span className="shrink-0 text-muted-foreground text-xs">
+              {new Date(row.meta.createdAt).toLocaleDateString()}
+            </span>
+          ) : null}
+        </ItemFooter>
       </Link>
-    </li>
+    </Item>
   );
 }
 
-function ConnectCard({
+function ConnectEmpty({
   onConnect,
   state,
 }: {
@@ -200,28 +249,30 @@ function ConnectCard({
   state: "idle" | "connecting" | "no-wallet";
 }) {
   return (
-    <Card>
-      <CardContent className="space-y-4 py-8 text-center">
-        <Wallet aria-hidden className="mx-auto size-6 text-muted-foreground" />
-        <p className="text-muted-foreground text-sm">
-          Connect the wallet that published these drafts. The list comes from
-          the wallet.
-        </p>
+    <Empty className="border border-dashed">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Wallet />
+        </EmptyMedia>
+        <EmptyTitle>Connect a wallet</EmptyTitle>
+        <EmptyDescription>
+          The list comes from the BRC-100 wallet on this machine.
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
         <Button
-          className="w-full"
           disabled={state === "connecting"}
           onClick={onConnect}
           type="button"
         >
           {state === "connecting" ? "Connecting…" : "Connect wallet"}
         </Button>
-        {state === "no-wallet" && (
+        {state === "no-wallet" ? (
           <p className="text-muted-foreground text-sm">
-            No BRC-100 wallet answered on this machine. Start BSV Desktop (or
-            another BRC-100 wallet) and try again.
+            No wallet answered. Start BSV Desktop and try again.
           </p>
-        )}
-      </CardContent>
-    </Card>
+        ) : null}
+      </EmptyContent>
+    </Empty>
   );
 }

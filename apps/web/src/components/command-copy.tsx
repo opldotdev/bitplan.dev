@@ -3,6 +3,8 @@
 import { Check, Copy } from "lucide-react";
 import { useCallback, useState } from "react";
 
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -13,6 +15,7 @@ export function CommandCopy({ command }: { command: string }) {
     try {
       await navigator.clipboard.writeText(command);
       setCopied(true);
+      toast.success("Copied");
       window.setTimeout(() => {
         setCopied(false);
       }, 2000);

@@ -16,3 +16,30 @@ export function truncateMiddle(value: string, head = 10, tail = 8): string {
   }
   return `${value.slice(0, head)}…${value.slice(-tail)}`;
 }
+
+/** Share-card / OG copy. Public metadata only; never plaintext. */
+export function draftShareDescription(input: {
+  origin: string | null;
+  found: boolean;
+  byteLength?: number | null;
+  version?: number | null;
+}): string {
+  if (!input.origin) {
+    return "Encrypted draft.";
+  }
+  const origin = truncateMiddle(input.origin);
+  if (!input.found) {
+    return `No draft at ${origin}.`;
+  }
+  const extras: string[] = [];
+  if (typeof input.byteLength === "number" && input.byteLength > 0) {
+    extras.push(formatByteSize(input.byteLength));
+  }
+  if (typeof input.version === "number" && input.version > 0) {
+    extras.push(`v${input.version}`);
+  }
+  if (extras.length === 0) {
+    return `Encrypted draft ${origin}.`;
+  }
+  return `Encrypted draft ${origin}. ${extras.join(", ")}.`;
+}

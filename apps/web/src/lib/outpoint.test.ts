@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { ordfsGatewayContentUrl } from "./ordfs";
 import {
   isOutpoint,
   normalizeOrigin,
@@ -35,6 +36,12 @@ describe("outpoint normalization", () => {
     expect(isOutpoint("abc_0")).toBe(false);
     expect(isOutpoint(`${TXID}-0`)).toBe(false);
     expect(() => toOrdinalOutpoint("nope")).toThrow(NOT_OUTPOINT);
+  });
+
+  test("ordfs gateway URL is absolute so OG generation can HEAD it", () => {
+    expect(ordfsGatewayContentUrl(`${TXID}_0`, -1)).toBe(
+      `https://ordfs.network/content/${TXID}_0:-1`
+    );
   });
 
   test("normalizeOrigin decodes a viewer path segment", () => {

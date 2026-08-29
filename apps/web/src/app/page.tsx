@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { CliCommands } from "@/components/cli-commands";
+import { CommandCopy } from "@/components/command-copy";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -17,35 +18,21 @@ export default function Home() {
           </p>
         </div>
 
-        <section className="space-y-4">
-          <h2 className="font-semibold text-lg tracking-tight">CLI</h2>
-          <CliCommands />
-          <p className="text-muted-foreground text-sm">
-            Needs a BRC-100 wallet on this machine, unlocked.{" "}
-            <Link
-              className="text-primary underline-offset-4 hover:underline"
-              href="/cli"
-            >
-              CLI setup
-            </Link>
-          </p>
-        </section>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href="/docs">Get started</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/drafts">My drafts</Link>
+          </Button>
+        </div>
 
-        <p className="text-sm">
-          <Link
-            className="text-primary underline-offset-4 hover:underline"
-            href="/drafts"
-          >
-            My drafts
-          </Link>
-          <span className="text-muted-foreground"> · </span>
-          <Link
-            className="text-primary underline-offset-4 hover:underline"
-            href="/cli"
-          >
-            CLI setup
-          </Link>
-        </p>
+        <div className="space-y-2">
+          <CommandCopy command="npx bitplan" />
+          <p className="text-muted-foreground text-sm">
+            Needs a BRC-100 wallet on this machine, unlocked.
+          </p>
+        </div>
 
         <p className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
           <a
@@ -54,18 +41,18 @@ export default function Home() {
           >
             CLI on npm
           </a>
-          <a
+          <Link
             className="text-primary underline-offset-4 hover:underline"
-            href="https://github.com/opldotdev/bitplan.dev/blob/master/packages/cli/ENVELOPE.md"
+            href="/docs/envelope"
           >
             Envelope spec
-          </a>
-          <a
+          </Link>
+          <Link
             className="text-primary underline-offset-4 hover:underline"
-            href="https://k57tkc9tukz5.postplan.dev"
+            href="/docs/how-it-works"
           >
-            How it compares to postplan
-          </a>
+            How it works
+          </Link>
         </p>
       </div>
     </main>
