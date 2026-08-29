@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   description:
-    "Monthly BSV sponsorships paid from a BRC-100 wallet. Logo and name on this page, a link to your site, and a mention in major release notes.",
+    "One-time BSV sponsorships paid from a BRC-100 wallet. Logo and name on this page, a link to your site, and a mention in major release notes.",
   title: "Sponsors",
 };
 
@@ -20,8 +20,7 @@ function SponsorSection({ tier }: { tier: SponsorTier }) {
             {tier.name}
           </h2>
           <p className="font-mono font-semibold text-foreground text-xs">
-            ${tier.monthlyPriceUsd}
-            <span className="text-muted-foreground">/mo</span>
+            ${tier.priceUsd}
           </p>
         </div>
         <Separator />
@@ -33,7 +32,7 @@ function SponsorSection({ tier }: { tier: SponsorTier }) {
               slotClassName={tier.slotClassName}
               slotId={slotId}
               tierName={tier.name}
-              usd={tier.monthlyPriceUsd}
+              usd={tier.priceUsd}
             />
           </li>
         ))}
@@ -53,8 +52,8 @@ export default function SponsorsPage() {
           </p>
           <h1 className="font-medium text-4xl">Sponsor BitPlan</h1>
           <p className="max-w-xl text-balance text-muted-foreground">
-            Keep encrypted plan documents on Bitcoin. Each tier is a monthly BSV
-            payment from your BRC-100 wallet. Your name and logo go on this
+            Keep encrypted plan documents on Bitcoin. Each tier is a one-time
+            BSV payment from your BRC-100 wallet. Your name and logo go on this
             page, with a link to your site, and you get a mention in major
             release notes.
           </p>

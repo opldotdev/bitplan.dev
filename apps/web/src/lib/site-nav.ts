@@ -9,20 +9,17 @@ export interface DocsNavItem {
   label: string;
 }
 
-export const DOCS_NAV: { items: DocsNavItem[]; label: string }[] = [
-  {
-    items: [
-      { href: "/docs", label: "Introduction" },
-      { href: "/docs/how-it-works", label: "How it works" },
-      { href: "/docs/cli-setup", label: "CLI setup" },
-    ],
-    label: "Get started",
-  },
-  {
-    items: [
-      { href: "/docs/commands", label: "Commands" },
-      { href: "/docs/envelope", label: "Envelope" },
-    ],
-    label: "Reference",
-  },
+export const DOCS_NAV: DocsNavItem[] = [
+  { href: "/docs", label: "Introduction" },
+  { href: "/docs/how-it-works", label: "How it works" },
+  { href: "/docs/cli-setup", label: "CLI setup" },
+  { href: "/docs/commands", label: "Commands" },
+  { href: "/docs/envelope", label: "Envelope" },
 ];
+
+export function isActivePath(pathname: string | null, href: string): boolean {
+  if (pathname === null) {
+    return false;
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}

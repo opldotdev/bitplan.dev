@@ -6,9 +6,8 @@ export interface AuthOptions {
 }
 
 /**
- * postplan `auth login` pastes an API key. bitplan has no keys: connecting
- * to the wallet is the credential. `--wallet-url` is remembered in
- * ~/.bitplan/config.json the same way postplan remembers a key.
+ * Connects to a BRC-100 wallet. `--wallet-url` is remembered in
+ * ~/.bitplan/config.json.
  */
 export async function authCommand(options: AuthOptions): Promise<void> {
 	const { url, version } = await connectWallet(options.walletUrl)

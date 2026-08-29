@@ -25,9 +25,9 @@ const COMMANDS = [
 
 export function CliCommands() {
   return (
-    <ol className="space-y-4">
+    <ol className="flex flex-col gap-4">
       {COMMANDS.map((item) => (
-        <li className="space-y-1.5" key={item.cmd}>
+        <li className="flex flex-col gap-1.5" key={item.cmd}>
           <CommandCopy command={item.cmd} />
           <p className="text-muted-foreground text-sm">{item.hint}</p>
         </li>

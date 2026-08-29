@@ -10,7 +10,7 @@ outpoint is the draft's identity and its version history.
 
 A running BRC-100 wallet on this machine. bitplan holds no keys: encryption,
 decryption, signing, and funding are calls into your wallet. [BSV
-Desktop](https://github.com/bitcoin-sv/desktop) serves the JSON API on
+Desktop](https://desktop.bsvb.tech/) serves the JSON API on
 `127.0.0.1:3321`, which is where bitplan looks by default.
 
 If no wallet answers, the command fails and says so.
@@ -38,9 +38,6 @@ Confirm the wallet is there:
 npx bitplan auth
 npx bitplan whoami
 ```
-
-`auth login` is the same command, kept for postplan muscle memory. There is no
-API key to paste.
 
 List the drafts this wallet holds. Each row shows title (when this machine has
 a local record), version, origin, and viewer URL:

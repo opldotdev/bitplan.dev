@@ -24,9 +24,7 @@ export function buildProgram(): Command {
 
 	auth
 		.command('login')
-		.description(
-			'Connect to a BRC-100 wallet. There is no API key; the wallet is the credential.',
-		)
+		.description('Connect to a BRC-100 wallet.')
 		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
 		.action(authCommand)
 

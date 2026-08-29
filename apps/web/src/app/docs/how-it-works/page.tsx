@@ -47,32 +47,28 @@ const BEATS = [
 
 export default function HowItWorksPage() {
   return (
-    <div className="space-y-8">
-      <div className="space-y-3">
-        <h1 className="font-heading font-semibold text-3xl tracking-tight">
-          How it works
-        </h1>
-        <p className="text-muted-foreground">
-          BitPlan puts an HTML plan on Bitcoin as a 1Sat Ordinal, encrypted to
-          your wallet. This site is the viewer. It stores nothing.
-        </p>
+    <>
+      <h1>How it works</h1>
+      <p>
+        BitPlan puts an HTML plan on Bitcoin as a 1Sat Ordinal, encrypted to
+        your wallet. This site is the viewer. It stores nothing.
+      </p>
+      <div className="not-typeset mt-6">
+        <ItemGroup>
+          {BEATS.map((beat) => (
+            <Item key={beat.title} variant="outline">
+              <ItemMedia variant="icon">
+                <beat.icon />
+              </ItemMedia>
+              <ItemContent>
+                <ItemTitle>{beat.title}</ItemTitle>
+                <ItemDescription>{beat.description}</ItemDescription>
+              </ItemContent>
+            </Item>
+          ))}
+        </ItemGroup>
       </div>
-
-      <ItemGroup>
-        {BEATS.map((beat) => (
-          <Item key={beat.title} variant="outline">
-            <ItemMedia variant="icon">
-              <beat.icon />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>{beat.title}</ItemTitle>
-              <ItemDescription>{beat.description}</ItemDescription>
-            </ItemContent>
-          </Item>
-        ))}
-      </ItemGroup>
-
-      <div className="flex flex-wrap gap-2">
+      <div className="not-typeset mt-6 flex flex-wrap gap-2">
         <Button asChild>
           <Link href="/docs/cli-setup">CLI setup</Link>
         </Button>
@@ -80,6 +76,6 @@ export default function HowItWorksPage() {
           <Link href="/drafts">My drafts</Link>
         </Button>
       </div>
-    </div>
+    </>
   );
 }

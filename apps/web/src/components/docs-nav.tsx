@@ -3,39 +3,50 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import {
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
+import { buttonVariants } from "@/components/ui/button";
 import { DOCS_NAV } from "@/lib/site-nav";
+import { cn } from "@/lib/utils";
 
-export function DocsNav({ onNavigate }: { onNavigate?: () => void }) {
+interface DocsNavProps {
+  className?: string;
+  layout?: "rail" | "wrap";
+}
+
+export function DocsNav({ className, layout = "rail" }: DocsNavProps) {
   const pathname = usePathname();
+  const isWrap = layout === "wrap";
 
   return (
-    <>
-      {DOCS_NAV.map((group) => (
-        <SidebarGroup key={group.label}>
-          <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {group.items.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={pathname === item.href}>
-                    <Link href={item.href} onClick={onNavigate}>
-                      {item.label}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      ))}
-    </>
+    <nav
+      aria-label="Docs"
+      className={cn(isWrap ? null : "sticky top-8", className)}
+    >
+      {isWrap ? null : (
+        <p className="mb-3 px-2 font-medium text-foreground text-sm">Docs</p>
+      )}
+      <ul
+        className={cn(isWrap ? "flex flex-wrap gap-1" : "flex flex-col gap-1")}
+      >
+        {DOCS_NAV.map((item) => {
+          const isActive = pathname === item.href;
+
+          return (
+            <li key={item.href}>
+              <Link
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  buttonVariants({ size: "sm", variant: "ghost" }),
+                  isWrap ? null : "w-full justify-start",
+                  isActive && "bg-muted text-foreground"
+                )}
+                href={item.href}
+              >
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
