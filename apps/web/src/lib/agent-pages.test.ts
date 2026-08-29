@@ -17,6 +17,7 @@ describe("agent pages", () => {
     expect(LLMS_TXT).toContain("When to use this");
     expect(LLMS_TXT).toContain("npx bitplan");
     expect(LLMS_TXT).toContain("https://www.npmjs.com/package/bitplan");
+    expect(LLMS_TXT).toContain("/api/v1/content/");
   });
 
   test("not-found markdown points at docs, sitemap, and llms.txt", () => {

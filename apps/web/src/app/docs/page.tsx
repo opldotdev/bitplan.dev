@@ -16,11 +16,17 @@ export default function DocsIntroPage() {
     <>
       <h1>BitPlan</h1>
       <p>
-        The CLI packages a self-contained HTML document and asks your BRC-100
-        wallet to publish it as an encrypted 1Sat Ordinal. Upload it again to
-        reinscribe the same satoshi. One origin outpoint identifies the draft
-        and its version history. This site is the viewer. It stores no drafts
-        server-side.
+        The BitPlan CLI packages a self-contained HTML document and asks your
+        BRC-100 wallet to publish it as an encrypted 1Sat Ordinal. The package
+        on npm is <code>bitplan</code>. Upload it again to reinscribe the same
+        satoshi. One origin outpoint identifies the draft and its version
+        history. This site is the viewer. It stores no drafts server-side.
+      </p>
+      <h2>BitPlan CLI setup</h2>
+      <p>
+        Start with <Link href="/docs/cli-setup">CLI setup</Link>, then{" "}
+        <Link href="/docs/commands">commands</Link>. The OpenAPI read surface is
+        at <a href="/openapi.json">/openapi.json</a>.
       </p>
       <div className="not-typeset mt-5">
         <CommandCopy command="npx bitplan" />

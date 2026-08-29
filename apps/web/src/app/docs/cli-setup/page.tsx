@@ -14,10 +14,13 @@ export default function CliSetupPage() {
     <>
       <h1>BitPlan CLI</h1>
       <p>
-        bitplan talks to a BRC-100 wallet on this machine. The wallet owns every
-        identity key and handles BRC-2 wrapping, unwrapping, signing, and
-        funding. Shared payloads use the standard SDK symmetric cipher; the CLI
-        holds no identity private keys.
+        The official CLI is the npm package{" "}
+        <a href="https://www.npmjs.com/package/bitplan">bitplan</a>. Run{" "}
+        <code>npx bitplan</code> or <code>bunx bitplan</code>. It talks to a
+        BRC-100 wallet on this machine. The wallet owns every identity key and
+        handles BRC-2 wrapping, unwrapping, signing, and funding. Shared
+        payloads use the standard SDK symmetric cipher; the CLI holds no
+        identity private keys.
       </p>
       <section id="start-the-wallet">
         <h2>Start the wallet</h2>

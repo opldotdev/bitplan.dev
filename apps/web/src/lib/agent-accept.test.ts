@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { isDocumentPath, prefers, wantsMarkdownNotFound } from "./agent-accept";
+import {
+  isApiPath,
+  isDocumentPath,
+  prefers,
+  wantsJsonNotFound,
+  wantsMarkdownNotFound,
+} from "./agent-accept";
 
 describe("agent accept", () => {
   test("browsers prefer HTML over markdown", () => {
@@ -28,5 +34,21 @@ describe("agent accept", () => {
     expect(isDocumentPath("/")).toBe(true);
     expect(isDocumentPath("/icon.png")).toBe(false);
     expect(isDocumentPath("/llms.txt")).toBe(false);
+  });
+
+  test("JSON Accept prefers a JSON 404", () => {
+    expect(wantsJsonNotFound("application/json")).toBe(true);
+    expect(wantsJsonNotFound("application/problem+json")).toBe(true);
+    expect(
+      wantsJsonNotFound(
+        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+      )
+    ).toBe(false);
+  });
+
+  test("API prefixes are /api and /ordfs", () => {
+    expect(isApiPath("/api/v1/orank-probe-test")).toBe(true);
+    expect(isApiPath("/ordfs/content/nope")).toBe(true);
+    expect(isApiPath("/docs")).toBe(false);
   });
 });

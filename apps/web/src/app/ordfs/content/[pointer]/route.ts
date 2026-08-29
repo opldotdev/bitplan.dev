@@ -1,3 +1,4 @@
+import { API_RATE_LIMIT_HEADERS, jsonApiError } from "@/lib/api-error";
 import { parseEnvelope } from "@/lib/envelope";
 import { toOrdinalOutpoint } from "@/lib/outpoint";
 
@@ -31,7 +32,7 @@ export function HEAD(_request: Request, context: RouteContext) {
 async function proxyContent(method: "GET" | "HEAD", context: RouteContext) {
   const pointer = parsePointer((await context.params).pointer);
   if (!pointer) {
-    return jsonError(
+    return jsonApiError(
       400,
       "invalid-pointer",
       "Pointer must be txid_vout:seq.",
@@ -47,7 +48,7 @@ async function proxyContent(method: "GET" | "HEAD", context: RouteContext) {
       signal: AbortSignal.timeout(15_000),
     });
   } catch {
-    return jsonError(
+    return jsonApiError(
       502,
       "gateway-unreachable",
       "Could not reach the 1Sat content gateway.",
@@ -55,7 +56,7 @@ async function proxyContent(method: "GET" | "HEAD", context: RouteContext) {
     );
   }
   if (upstream.status === 404) {
-    return jsonError(
+    return jsonApiError(
       404,
       "not-found",
       "No BitPlan inscription at that pointer.",
@@ -63,7 +64,7 @@ async function proxyContent(method: "GET" | "HEAD", context: RouteContext) {
     );
   }
   if (!upstream.ok) {
-    return jsonError(
+    return jsonApiError(
       upstream.status,
       "gateway-error",
       `1Sat returned ${upstream.status}.`,
@@ -73,7 +74,7 @@ async function proxyContent(method: "GET" | "HEAD", context: RouteContext) {
   if (
     mediaType(upstream.headers.get("content-type")) !== BITPLAN_CONTENT_TYPE
   ) {
-    return jsonError(
+    return jsonApiError(
       502,
       "not-bitplan",
       "That inscription is not a BitPlan envelope.",
@@ -83,7 +84,7 @@ async function proxyContent(method: "GET" | "HEAD", context: RouteContext) {
 
   const claimedLength = parseLength(upstream.headers.get("content-length"));
   if (claimedLength !== null && claimedLength > MAX_ENVELOPE_BYTES) {
-    return jsonError(
+    return jsonApiError(
       502,
       "too-large",
       "Envelope is larger than the viewer will fetch.",
@@ -101,7 +102,7 @@ async function proxyContent(method: "GET" | "HEAD", context: RouteContext) {
 
   const bytes = await readLimited(upstream.body, MAX_ENVELOPE_BYTES);
   if (!bytes) {
-    return jsonError(
+    return jsonApiError(
       502,
       "too-large",
       "Envelope is larger than the viewer will fetch.",
@@ -111,7 +112,7 @@ async function proxyContent(method: "GET" | "HEAD", context: RouteContext) {
   try {
     parseEnvelope(bytes);
   } catch {
-    return jsonError(
+    return jsonApiError(
       502,
       "invalid-envelope",
       "Bytes at that pointer are not a BitPlan envelope.",
@@ -146,21 +147,6 @@ function parsePointer(value: string): string | null {
   }
 }
 
-function jsonError(
-  status: number,
-  error: string,
-  message: string,
-  hint: string
-): Response {
-  return Response.json(
-    { error, hint, message },
-    {
-      headers: { "content-type": "application/json; charset=utf-8" },
-      status,
-    }
-  );
-}
-
 function ordfsGateway(): string {
   const configured = process.env.NEXT_PUBLIC_ORDFS_GATEWAY_URL?.trim();
   if (!configured) {
@@ -190,7 +176,10 @@ function parseLength(value: string | null): number | null {
 }
 
 function responseHeaders(upstream: Headers): Headers {
-  const headers = new Headers(SAFE_RESPONSE_HEADERS);
+  const headers = new Headers({
+    ...SAFE_RESPONSE_HEADERS,
+    ...API_RATE_LIMIT_HEADERS,
+  });
   for (const name of ["x-ord-seq", "x-origin", "x-outpoint"]) {
     const value = upstream.get(name);
     if (value) {

@@ -2,11 +2,14 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import {
+  isApiPath,
   isDocumentPath,
   prefers,
+  wantsJsonNotFound,
   wantsMarkdownNotFound,
 } from "@/lib/agent-accept";
 import { markdownForPath, markdownNotFound } from "@/lib/agent-pages";
+import { jsonNotFound } from "@/lib/api-error";
 
 export function proxy(request: NextRequest) {
   const accept = request.headers.get("accept") ?? "";
@@ -22,6 +25,10 @@ export function proxy(request: NextRequest) {
       return markdownResponse(markdown, 200);
     }
     return markdownResponse(markdownNotFound(), 404);
+  }
+
+  if (wantsJsonNotFound(accept) && markdownForPath(path) === null) {
+    return jsonNotFound(path);
   }
 
   if (
@@ -43,7 +50,8 @@ export const config = {
 
 function shouldSkip(path: string): boolean {
   return (
-    path.startsWith("/ordfs") ||
+    isApiPath(path) ||
+    path.startsWith("/.well-known/") ||
     path.startsWith("/d/") ||
     path.includes("opengraph-image") ||
     path.includes("twitter-image")

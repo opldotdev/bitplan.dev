@@ -87,7 +87,7 @@ ${SITE_URL}/privacy
 `,
   "/sponsors": `# Sponsor BitPlan
 
-Help keep encrypted plan documents on Bitcoin. Planned tiers include a name, logo, site link, and a mention in major release notes.
+Choose one of 30 fixed placements, crop a WebP, and pay with Yours Wallet or another BRC-100 wallet. The image, backlink, placement, and payment are published together on Bitcoin. The first valid transaction received for a slot wins.
 
 Page: ${SITE_URL}/sponsors
 `,
@@ -124,9 +124,11 @@ Do not use BitPlan as a general file host, a server-side notes app, or a substit
 
 ## HTTP
 
-Read a published envelope:
+Read a published envelope (API v1):
 
-    GET ${SITE_URL}/ordfs/content/<origin>:-1
+    GET ${SITE_URL}/api/v1/content/<origin>:-1
+
+The same bytes are at \`GET ${SITE_URL}/ordfs/content/<origin>:-1\`. Unknown \`/api/v1\` paths return JSON. OpenAPI: ${SITE_URL}/openapi.json. The CLI is the npm package bitplan: https://www.npmjs.com/package/bitplan
 
 Publishing and decrypting go through the user's wallet via \`npx bitplan\`. Drafts at /d/<origin> are ciphertext and are not indexed.
 `;

@@ -21,31 +21,46 @@ export default function Home() {
             Plan documents on Bitcoin.
           </h1>
           <p className="text-muted-foreground">
-            Publish an encrypted HTML file as a 1Sat Ordinal. Your BRC-100
-            wallet protects the identity keys and publishes each version. This
-            site asks it to open private drafts or unlock shared drafts. It
-            stores no drafts server-side. The CLI is the npm package bitplan:
-            run npx bitplan auth, then npx bitplan upload ./plan.html. Upload
-            the same file again to reinscribe the same satoshi. One origin
-            outpoint is the draft and its version history.
+            BitPlan publishes an encrypted HTML file as a 1Sat Ordinal. Your
+            BRC-100 wallet protects the identity keys and publishes each
+            version. This site asks it to open private drafts or unlock shared
+            drafts. It stores no drafts server-side. Upload the same file again
+            to reinscribe the same satoshi. One origin outpoint is the draft and
+            its version history.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button asChild>
-            <Link href="/docs">Get started</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/drafts">My drafts</Link>
-          </Button>
-        </div>
-
-        <div className="space-y-2">
+        <section className="space-y-2">
+          <h2 className="font-medium text-lg tracking-tight">
+            Publish with the BitPlan CLI
+          </h2>
+          <p className="text-muted-foreground">
+            The CLI is the npm package bitplan. Run npx bitplan auth, then npx
+            bitplan upload ./plan.html. bunx bitplan is the same binary.
+          </p>
           <CommandCopy command="npx bitplan auth" />
           <p className="text-muted-foreground text-sm">
             Needs a BRC-100 wallet on this machine, unlocked.
           </p>
-        </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-medium text-lg tracking-tight">
+            Open a BitPlan draft
+          </h2>
+          <p className="text-muted-foreground">
+            Docs start at /docs. The OpenAPI read surface is /openapi.json. The
+            npm package is at npmjs.com/package/bitplan.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link href="/docs">Get started</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/drafts">My drafts</Link>
+            </Button>
+          </div>
+        </section>
 
         <p className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
           <a

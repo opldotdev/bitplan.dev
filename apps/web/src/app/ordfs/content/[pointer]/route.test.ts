@@ -35,6 +35,7 @@ describe("OrdFS content route", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ error: "invalid-pointer" });
+    expect(response.headers.get("ratelimit-policy")).toBe("120;w=60");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

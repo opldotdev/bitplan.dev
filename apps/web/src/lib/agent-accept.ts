@@ -29,6 +29,19 @@ export function isDocumentPath(path: string): boolean {
   return base === "" || !base.includes(".");
 }
 
+export function isApiPath(path: string): boolean {
+  return (
+    path === "/api" || path.startsWith("/api/") || path.startsWith("/ordfs")
+  );
+}
+
+export function wantsJsonNotFound(accept: string): boolean {
+  return (
+    prefers(accept, "application/json", "text/html") ||
+    prefers(accept, "application/problem+json", "text/html")
+  );
+}
+
 export function wantsMarkdownNotFound(accept: string): boolean {
   if (prefers(accept, "text/html", "text/markdown")) {
     return false;

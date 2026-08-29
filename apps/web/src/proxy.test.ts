@@ -42,4 +42,13 @@ describe("proxy", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("Docs");
   });
+
+  test("JSON Accept on an unknown path is problem+json 404", async () => {
+    const response = proxy(request("/orank-probe-test", "application/json"));
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain(
+      "application/problem+json"
+    );
+    expect(await response.json()).toMatchObject({ code: "not-found" });
+  });
 });
