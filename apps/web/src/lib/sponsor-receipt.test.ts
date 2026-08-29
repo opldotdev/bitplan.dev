@@ -16,7 +16,7 @@ import {
   SPONSOR_CONTENT_TYPE,
   SPONSOR_PAYMENT_ADDRESS,
   SPONSOR_TIERS,
-  sponsorPriceSats,
+  sponsorPriceUsd,
   sponsorSubtype,
 } from "./sponsors";
 
@@ -35,9 +35,11 @@ function webp(width: number, height: number): Uint8Array {
 
 function receiptBeef({
   payment,
+  quotedPrice,
   slotId = "silver-1",
 }: {
   payment?: number;
+  quotedPrice?: number;
   slotId?: string;
 } = {}): Uint8Array {
   const tier = SPONSOR_TIERS.find(({ id }) => id === "silver");
@@ -45,6 +47,8 @@ function receiptBeef({
     throw new Error("Missing silver tier.");
   }
   const owner = PrivateKey.fromRandom().toPublicKey().toAddress();
+  const priceSats =
+    quotedPrice ?? (slotId === "silver-1" ? 1_250_000 : 250_000_000);
   const transaction = new Transaction();
   transaction.addOutput({
     lockingScript: buildInscriptionScript(
@@ -57,7 +61,9 @@ function receiptBeef({
         subType: sponsorSubtype(slotId),
         subTypeData: JSON.stringify({
           href: "https://example.com/",
-          schema: 1,
+          priceSats,
+          priceUsd: sponsorPriceUsd(slotId, tier),
+          schema: 2,
           slot: slotId,
           tier: tier.id,
         }),
@@ -68,7 +74,7 @@ function receiptBeef({
   });
   transaction.addOutput({
     lockingScript: new P2PKH().lock(SPONSOR_PAYMENT_ADDRESS),
-    satoshis: payment ?? sponsorPriceSats(slotId, tier),
+    satoshis: payment ?? priceSats,
   });
   return Uint8Array.from(transaction.toAtomicBEEF());
 }
@@ -82,6 +88,8 @@ describe("validateSponsorReceipt", () => {
       imageHeight: 128,
       imageWidth: 384,
       name: "Acme",
+      priceSats: 1_250_000,
+      priceUsd: 0.25,
       slotId: "silver-1",
       tierId: "silver",
     });
@@ -96,10 +104,7 @@ describe("validateSponsorReceipt", () => {
 
   test("rejects metadata for a different fixed slot", () => {
     expect(() =>
-      validateSponsorReceipt(
-        receiptBeef({ payment: 1_000_000, slotId: "silver-2" }),
-        "silver-1"
-      )
+      validateSponsorReceipt(receiptBeef({ slotId: "silver-2" }), "silver-1")
     ).toThrow("metadata does not match");
   });
 });
@@ -136,6 +141,27 @@ describe("finalizeSponsorReceipt", () => {
       })
     ).rejects.toBeInstanceOf(SponsorSlotClaimedError);
     expect(relay).not.toHaveBeenCalled();
+  });
+
+  test("rejects a stale BSV quote before claiming the slot", async () => {
+    const claim = mock(() => Promise.resolve("etag"));
+
+    await expect(
+      finalizeSponsorReceipt("silver-1", receiptBeef(), {
+        claim,
+        quote: () =>
+          Promise.resolve({
+            bsvUsd: 12.5,
+            priceSats: 2_000_000,
+            priceUsd: 0.25,
+            slotId: "silver-1",
+          }),
+        read: () => Promise.resolve(null),
+        relay: () => Promise.resolve(),
+        release: () => Promise.resolve(),
+      })
+    ).rejects.toThrow("BSV quote changed");
+    expect(claim).not.toHaveBeenCalled();
   });
 
   test("keeps the winning receipt when relay needs a retry", async () => {

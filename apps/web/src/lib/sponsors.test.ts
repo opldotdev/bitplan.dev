@@ -4,7 +4,7 @@ import {
   SPONSOR_SLOT_IDS,
   SPONSOR_TIERS,
   sponsorImageUrl,
-  sponsorPriceSats,
+  sponsorPriceUsd,
   sponsorSubtype,
 } from "./sponsors";
 
@@ -14,8 +14,7 @@ describe("sponsor slots", () => {
     expect(new Set(SPONSOR_SLOT_IDS).size).toBe(30);
     for (const tier of SPONSOR_TIERS) {
       expect(tier.imageWidth).toBeGreaterThan(tier.imageHeight);
-      expect(Number.isSafeInteger(tier.priceSats)).toBe(true);
-      expect(tier.priceSats).toBeGreaterThan(0);
+      expect(tier.priceUsd).toBeGreaterThan(0);
     }
   });
 
@@ -30,7 +29,7 @@ describe("sponsor slots", () => {
     if (!silver) {
       return;
     }
-    expect(sponsorPriceSats("silver-1", silver)).toBe(1_000_000);
-    expect(sponsorPriceSats("silver-2", silver)).toBe(silver.priceSats);
+    expect(sponsorPriceUsd("silver-1", silver)).toBe(0.25);
+    expect(sponsorPriceUsd("silver-2", silver)).toBe(silver.priceUsd);
   });
 });

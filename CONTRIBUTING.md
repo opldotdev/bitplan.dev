@@ -59,4 +59,5 @@ and the cross-runtime compatibility tests in the same pull request.
 
 ## Security reports
 
-Do not open a public issue for a vulnerability. Follow [SECURITY.md](SECURITY.md).
+Use GitHub private vulnerability reporting for security issues. Do not include
+real private keys, wallet databases, decrypted plans, or live credentials.

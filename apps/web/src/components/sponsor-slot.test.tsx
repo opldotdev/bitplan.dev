@@ -13,7 +13,6 @@ const tier = {
   imageHeight: 128,
   imageWidth: 384,
   name: "Silver",
-  priceSats: 300_000_000,
   priceUsd: 50,
   slotClassName: "aspect-[384/128]",
   slotIds: ["silver-1"],
@@ -30,7 +29,7 @@ describe("SponsorSlot", () => {
     );
 
     expect(markup).not.toContain('disabled=""');
-    expect(markup).toContain("Test slot · 0.01 BSV");
+    expect(markup).toContain("Test slot · $0.25");
     expect(markup).toContain("cursor-pointer");
   });
 

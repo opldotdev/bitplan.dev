@@ -12,7 +12,7 @@ import {
 export const metadata: Metadata = {
   description:
     "On-chain format for a bitplan draft: BPLN envelope, MAP fields, and BRC-2 ciphertext.",
-  title: "Envelope",
+  title: "Envelopes",
 };
 
 const LAYOUT = [
@@ -34,7 +34,7 @@ const LAYOUT = [
 export default function EnvelopePage() {
   return (
     <>
-      <h1>Envelope</h1>
+      <h1>Envelopes</h1>
       <p>
         This is the on-chain format bitplan publishes. Anything that can read a
         1Sat Ordinal and talk to a BRC-100 wallet can implement it. The body is
@@ -94,25 +94,19 @@ export default function EnvelopePage() {
         </div>
       </section>
       <section id="content-key">
-        <h2>BRC-2</h2>
+        <h2>Private</h2>
         <p>
           The header names the fixed <code>[2, &quot;bitplan&quot;]</code>
-          protocol and keyID. Private v1 contains one{" "}
-          <code>wallet.encrypt</code> result with{" "}
-          <code>counterparty: &quot;self&quot;</code>. Shared v2 contains one
-          document encrypted by the SDK&apos;s AES-GCM <code>SymmetricKey</code>
-          , then uses the wallet to wrap only that key for each reader. The CLI
-          never receives an identity private key or implements its own cipher.
+          protocol and keyID. The wallet encrypts and decrypts the plan with{" "}
+          <code>counterparty: &quot;self&quot;</code>.
         </p>
       </section>
       <section id="sharing">
-        <h2>Shared readers</h2>
+        <h2>Shared</h2>
         <p>
-          A v2 header records the payload length, publisher identity key, and a
-          wrapped-key range for each reader. A recipient asks its wallet to
-          unwrap its range with the publisher as counterparty, then decrypts the
-          one payload locally. Identity keys and the access list are public; the
-          document and its key remain encrypted.
+          The SDK encrypts the plan once. The wallet wraps its key for each
+          reader. A reader asks their wallet to unwrap the key, then decrypts
+          the plan locally. Identity keys are public; the plan stays encrypted.
         </p>
       </section>
     </>

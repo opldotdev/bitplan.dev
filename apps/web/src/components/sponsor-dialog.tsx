@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, useCallback, useEffect, useState } from "react";
+import Cropper, { type Area, type Point } from "react-easy-crop";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -20,24 +21,35 @@ import { Slider } from "@/components/ui/slider";
 import {
   createSponsorCheckout,
   type SponsorCheckout,
+  sponsorWalletErrorMessage,
 } from "@/lib/sponsor-checkout";
 import {
-  drawSponsorImage,
   exportSponsorWebp,
+  type LoadedSponsorImage,
   loadSponsorImage,
-  type SponsorCrop,
+  type SourceCrop,
 } from "@/lib/sponsor-image";
 import {
   SPONSOR_TEST_SLOT_ID,
+  type SponsorQuote,
   type SponsorSlotState,
   type SponsorTier,
-  sponsorPriceSats,
+  sponsorPriceUsd,
 } from "@/lib/sponsors";
 import { connectBrowserWalletClient } from "@/lib/wallet";
 
-const DEFAULT_CROP: SponsorCrop = { x: 50, y: 50, zoom: 1 };
+const DEFAULT_CROP: Point = { x: 0, y: 0 };
+const TRAILING_DECIMAL_PATTERN = /\.$/;
+const TRAILING_ZERO_PATTERN = /0+$/;
 
 class DiscardSponsorCheckoutError extends Error {}
+
+function checkoutAfterError(
+  error: unknown,
+  checkout: SponsorCheckout | undefined
+): SponsorCheckout | undefined {
+  return error instanceof DiscardSponsorCheckoutError ? undefined : checkout;
+}
 
 function validatedSponsorUrl(value: string): string {
   const url = new URL(value);
@@ -47,17 +59,40 @@ function validatedSponsorUrl(value: string): string {
   return url.toString();
 }
 
-async function ensureSlotAvailable(slotId: string): Promise<void> {
+function isSponsorQuote(value: unknown): value is SponsorQuote {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "priceSats" in value &&
+      typeof value.priceSats === "number" &&
+      "priceUsd" in value &&
+      typeof value.priceUsd === "number" &&
+      "bsvUsd" in value &&
+      typeof value.bsvUsd === "number" &&
+      "slotId" in value &&
+      typeof value.slotId === "string"
+  );
+}
+
+async function getSponsorQuote(slotId: string): Promise<SponsorQuote> {
   const response = await fetch(`/api/sponsors/${slotId}`, {
     cache: "no-store",
-    method: "HEAD",
   });
-  if (response.status === 200) {
+  if (response.status === 409) {
     throw new Error("This slot was just sold. Choose another slot.");
   }
-  if (response.status !== 404) {
+  const result: unknown = await response.json().catch(() => undefined);
+  if (!(response.ok && isSponsorQuote(result))) {
     throw new Error("Sponsor checkout is temporarily unavailable.");
   }
+  return result;
+}
+
+function formatBsv(satoshis: number): string {
+  return (satoshis / 100_000_000)
+    .toFixed(8)
+    .replace(TRAILING_ZERO_PATTERN, "")
+    .replace(TRAILING_DECIMAL_PATTERN, "");
 }
 
 async function finalizeCheckout(
@@ -73,6 +108,11 @@ async function finalizeCheckout(
   if (response.status === 409) {
     throw new DiscardSponsorCheckoutError(
       "This slot was claimed first. Your transaction was not sent."
+    );
+  }
+  if (response.status === 400) {
+    throw new DiscardSponsorCheckoutError(
+      "The transaction needs a fresh price. Try again."
     );
   }
   if (response.status === 422) {
@@ -95,6 +135,47 @@ async function finalizeCheckout(
   );
 }
 
+async function prepareCheckout({
+  area,
+  image,
+  name,
+  onStatus,
+  slotId,
+  tier,
+  url,
+}: {
+  area: SourceCrop;
+  image: LoadedSponsorImage;
+  name: string;
+  onStatus: (message: string) => void;
+  slotId: string;
+  tier: SponsorTier;
+  url: string;
+}): Promise<SponsorCheckout> {
+  onStatus("Preparing image…");
+  const sponsorUrl = validatedSponsorUrl(url);
+  const webp = await exportSponsorWebp(image.element, tier, area);
+  onStatus("Getting the current BSV quote…");
+  const quote = await getSponsorQuote(slotId);
+  onStatus(
+    `Approve ${formatBsv(quote.priceSats)} BSV ($${quote.priceUsd}) in your wallet…`
+  );
+  try {
+    const wallet = await connectBrowserWalletClient();
+    return await createSponsorCheckout({
+      image: new Uint8Array(await webp.arrayBuffer()),
+      name: name.trim(),
+      quote,
+      slotId,
+      tier,
+      url: sponsorUrl,
+      wallet,
+    });
+  } catch (error) {
+    throw new Error(sponsorWalletErrorMessage(error), { cause: error });
+  }
+}
+
 export function SponsorDialog({
   slot,
   tier,
@@ -103,83 +184,93 @@ export function SponsorDialog({
   tier: SponsorTier;
 }) {
   const router = useRouter();
-  const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const [crop, setCrop] = useState(DEFAULT_CROP);
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [croppedArea, setCroppedArea] = useState<SourceCrop>();
+  const [image, setImage] = useState<LoadedSponsorImage | null>(null);
   const [name, setName] = useState("");
   const [pendingCheckout, setPendingCheckout] = useState<SponsorCheckout>();
   const [status, setStatus] = useState<string>();
   const [url, setUrl] = useState("");
+  const [zoom, setZoom] = useState(1);
 
-  useEffect(() => {
-    if (canvas && image) {
-      drawSponsorImage(canvas, image, tier, crop);
-    }
-  }, [canvas, crop, image, tier]);
+  useEffect(
+    () => () => {
+      if (image) {
+        URL.revokeObjectURL(image.url);
+      }
+    },
+    [image]
+  );
 
   const selectImage = useCallback(async (file: File | undefined) => {
     setImage(null);
     setCrop(DEFAULT_CROP);
+    setCroppedArea(undefined);
     setStatus(undefined);
+    setZoom(1);
     if (!file) {
       return;
     }
     try {
       setImage(await loadSponsorImage(file));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Invalid image.");
+      toast.error(error instanceof Error ? error.message : "Invalid image.");
     }
   }, []);
 
+  const completeCrop = useCallback(
+    (_area: Area, areaPixels: Area) => setCroppedArea(areaPixels),
+    []
+  );
+
   const publishSponsor = useCallback(async () => {
-    if (!(pendingCheckout || (canvas && image && acknowledged))) {
+    const selectedArea = croppedArea;
+    const selectedImage = image;
+    if (!(pendingCheckout || (selectedArea && selectedImage))) {
       return;
     }
     setBusy(true);
     try {
       let checkout = pendingCheckout;
       if (!checkout) {
-        setStatus("Preparing image…");
-        const sponsorUrl = validatedSponsorUrl(url);
-        const webp = await exportSponsorWebp(canvas as HTMLCanvasElement);
-        await ensureSlotAvailable(slot.slotId);
-
-        setStatus("Approve the transaction in your wallet…");
-        const wallet = await connectBrowserWalletClient();
-        checkout = await createSponsorCheckout({
-          image: new Uint8Array(await webp.arrayBuffer()),
-          name: name.trim(),
+        if (!(selectedArea && selectedImage)) {
+          return;
+        }
+        checkout = await prepareCheckout({
+          area: selectedArea,
+          image: selectedImage,
+          name,
+          onStatus: setStatus,
           slotId: slot.slotId,
           tier,
-          url: sponsorUrl,
-          wallet,
+          url,
         });
         setPendingCheckout(checkout);
       }
 
       setStatus("Finalizing your slot…");
       if (!(await finalizeCheckout(slot.slotId, checkout))) {
-        setStatus(
+        setStatus(undefined);
+        toast.warning(
           "Your slot is secured, but ARC has not confirmed the transaction. Retry finalization without another wallet payment."
         );
         return;
       }
       setPendingCheckout(undefined);
-      setStatus("Published. Your sponsor is live.");
+      setStatus(undefined);
+      toast.success("Published. Your sponsor is live.");
       router.refresh();
     } catch (error) {
-      if (error instanceof DiscardSponsorCheckoutError) {
-        setPendingCheckout(undefined);
-      }
+      setPendingCheckout((checkout) => checkoutAfterError(error, checkout));
       const message = error instanceof Error ? error.message : "Unknown error.";
-      setStatus(message);
+      setStatus(undefined);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
   }, [
-    acknowledged,
+    croppedArea,
     image,
     name,
     pendingCheckout,
@@ -201,31 +292,19 @@ export function SponsorDialog({
     },
     [selectImage]
   );
-  const changeZoom = useCallback(([zoom]: number[]) => {
-    setCrop((current) => ({ ...current, zoom: zoom ?? 1 }));
+  const changeZoom = useCallback(([value]: number[]) => {
+    setZoom(value ?? 1);
   }, []);
-  const changeX = useCallback(([x]: number[]) => {
-    setCrop((current) => ({ ...current, x: x ?? 50 }));
-  }, []);
-  const changeY = useCallback(([y]: number[]) => {
-    setCrop((current) => ({ ...current, y: y ?? 50 }));
-  }, []);
-  const changeAcknowledged = useCallback(
-    (checked: boolean | "indeterminate") => {
-      setAcknowledged(checked === true);
-    },
-    []
-  );
 
   const canSubmit = Boolean(
-    (pendingCheckout || (acknowledged && image && name.trim() && url.trim())) &&
+    (pendingCheckout || (croppedArea && image && name.trim() && url.trim())) &&
       !busy
   );
-  const priceBsv = sponsorPriceSats(slot.slotId, tier) / 100_000_000;
+  const priceUsd = sponsorPriceUsd(slot.slotId, tier);
   const triggerLabel = `${
     slot.slotId === SPONSOR_TEST_SLOT_ID ? "Test slot" : "Sponsor"
-  } · ${priceBsv} BSV`;
-  let submitLabel = `Pay ${priceBsv} BSV and publish`;
+  } · $${priceUsd}`;
+  let submitLabel = `Pay $${priceUsd} and publish`;
   if (busy) {
     submitLabel = "Working…";
   } else if (pendingCheckout) {
@@ -292,66 +371,44 @@ export function SponsorDialog({
 
           {image ? (
             <div className="grid gap-4">
-              <canvas
-                aria-label="Sponsor image crop preview"
-                className="h-auto w-full rounded-lg border bg-muted"
-                ref={setCanvas}
-              />
+              <div
+                className="relative w-full touch-none overflow-hidden rounded-lg border bg-black"
+                style={{
+                  aspectRatio: `${tier.imageWidth} / ${tier.imageHeight}`,
+                }}
+              >
+                <Cropper
+                  aspect={tier.imageWidth / tier.imageHeight}
+                  crop={crop}
+                  image={image.url}
+                  onCropChange={setCrop}
+                  onCropComplete={completeCrop}
+                  onZoomChange={setZoom}
+                  roundCropAreaPixels
+                  zoom={zoom}
+                />
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Drag to reposition. Scroll or pinch to zoom.
+              </p>
               <div className="grid gap-2">
-                <Label>Zoom</Label>
+                <Label htmlFor={`${slot.slotId}-zoom`}>Zoom</Label>
                 <Slider
                   aria-label="Crop zoom"
+                  id={`${slot.slotId}-zoom`}
                   max={3}
                   min={1}
                   onValueChange={changeZoom}
                   step={0.05}
-                  value={[crop.zoom]}
+                  value={[zoom]}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Horizontal</Label>
-                  <Slider
-                    aria-label="Horizontal crop position"
-                    max={100}
-                    min={0}
-                    onValueChange={changeX}
-                    value={[crop.x]}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Vertical</Label>
-                  <Slider
-                    aria-label="Vertical crop position"
-                    max={100}
-                    min={0}
-                    onValueChange={changeY}
-                    value={[crop.y]}
-                  />
-                </div>
               </div>
             </div>
           ) : null}
 
-          <div className="flex items-start gap-3">
-            <Checkbox
-              checked={acknowledged}
-              id={`${slot.slotId}-rights`}
-              onCheckedChange={changeAcknowledged}
-            />
-            <Label
-              className="items-start leading-snug"
-              htmlFor={`${slot.slotId}-rights`}
-            >
-              I own or have permission to publish this image and link
-              permanently on Bitcoin.
-            </Label>
-          </div>
-          {status ? (
-            <p className="text-muted-foreground text-sm" role="status">
-              {status}
-            </p>
-          ) : null}
+          <p className="min-h-5 text-muted-foreground text-sm" role="status">
+            {status}
+          </p>
         </div>
 
         <DialogFooter>

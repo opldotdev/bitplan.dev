@@ -1,4 +1,4 @@
-# The BitPlan envelope
+# Envelopes
 
 This is the encrypted on-chain format BitPlan publishes. Anything that can
 read a 1Sat Ordinal and talk to a BRC-100 wallet can implement it. There is no
@@ -32,7 +32,7 @@ The version byte is `0x01` for a private envelope and `0x02` for a shared
 envelope. Readers reject unknown versions, bad magic, invalid headers, buffer
 overruns, headers larger than 64 KiB, and empty ciphertext.
 
-## Version 1: wallet only
+## Private
 
 Private drafts retain the compact original format:
 
@@ -60,7 +60,7 @@ wallet.encrypt({
 
 The same wallet decrypts it with `counterparty: "self"`.
 
-## Version 2: named readers
+## Shared
 
 Shared drafts encrypt the document once with the SDK's `SymmetricKey`. The
 wallet then encrypts only that 32-byte document key for each reader. The first
@@ -135,8 +135,8 @@ The private body or shared payload decrypts to this UTF-8 JSON:
 
 ## Privacy and permanence
 
-In v1, only the envelope parameters and ciphertext are public. In v2, the
-publisher and recipient identity public keys are also public so a reader can
+With private plans, only the envelope parameters and ciphertext are public.
+Shared plans also publish the reader identity keys so each reader can
 locate its slot. This reveals the access graph, and size and inscription cost
 grow only by one small wrapped key and header entry per reader. BitPlan caps a
 shared version at 128 additional readers.

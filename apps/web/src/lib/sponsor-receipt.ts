@@ -10,14 +10,21 @@ import {
   SPONSOR_TIERS,
   type SponsorTier,
   type SponsorTierId,
-  sponsorPriceSats,
+  sponsorPriceUsd,
   sponsorSubtype,
 } from "@/lib/sponsors";
 
 export const MAX_SPONSOR_BEEF_BYTES = 1024 * 1024;
 const MAX_SPONSOR_WEBP_BYTES = 200 * 1024;
 const MAP_KEYS = ["app", "name", "subType", "subTypeData", "type"];
-const SUBTYPE_DATA_KEYS = ["href", "schema", "slot", "tier"];
+const SUBTYPE_DATA_KEYS = [
+  "href",
+  "priceSats",
+  "priceUsd",
+  "schema",
+  "slot",
+  "tier",
+];
 
 export interface SponsorReceipt {
   href: string;
@@ -25,6 +32,8 @@ export interface SponsorReceipt {
   imageOutpoint: string;
   imageWidth: number;
   name: string;
+  priceSats: number;
+  priceUsd: number;
   slotId: string;
   tierId: SponsorTierId;
   txid: string;
@@ -164,12 +173,6 @@ export function validateSponsorReceipt(
   const paymentOutputs = transaction.outputs.filter(
     (candidate) => candidate.lockingScript.toHex() === paymentScript
   );
-  if (
-    paymentOutputs.length !== 1 ||
-    paymentOutputs[0]?.satoshis !== sponsorPriceSats(slotId, tier)
-  ) {
-    return fail("Transaction does not contain the exact sponsor payment.");
-  }
 
   const sponsorOutputs = transaction.outputs.flatMap((candidate, vout) => {
     const map = decodeSponsorMap(candidate.lockingScript);
@@ -201,11 +204,22 @@ export function validateSponsorReceipt(
   const subTypeData = parseSubtypeData(map.data.subTypeData);
   if (
     !hasExactKeys(subTypeData, SUBTYPE_DATA_KEYS) ||
-    subTypeData.schema !== 1 ||
+    subTypeData.schema !== 2 ||
     subTypeData.slot !== slotId ||
-    subTypeData.tier !== tier.id
+    subTypeData.tier !== tier.id ||
+    subTypeData.priceUsd !== sponsorPriceUsd(slotId, tier) ||
+    !Number.isSafeInteger(subTypeData.priceSats) ||
+    (subTypeData.priceSats as number) <= 0
   ) {
     return fail("Sponsor subTypeData does not match this slot.");
+  }
+  const priceSats = subTypeData.priceSats as number;
+  const priceUsd = subTypeData.priceUsd as number;
+  if (
+    paymentOutputs.length !== 1 ||
+    paymentOutputs[0]?.satoshis !== priceSats
+  ) {
+    return fail("Transaction does not contain the exact sponsor payment.");
   }
   const href = readHttpsUrl(subTypeData.href);
 
@@ -235,6 +249,8 @@ export function validateSponsorReceipt(
     imageOutpoint: `${txid}_${imageVout}`,
     imageWidth: tier.imageWidth,
     name,
+    priceSats,
+    priceUsd,
     slotId,
     tierId: tier.id,
     txid,

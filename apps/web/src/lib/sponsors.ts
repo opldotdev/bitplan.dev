@@ -12,10 +12,16 @@ export interface SponsorTier {
   imageHeight: number;
   imageWidth: number;
   name: string;
-  priceSats: number;
   priceUsd: number;
   slotClassName: string;
   slotIds: readonly string[];
+}
+
+export interface SponsorQuote {
+  bsvUsd: number;
+  priceSats: number;
+  priceUsd: number;
+  slotId: string;
 }
 
 export interface Sponsor {
@@ -52,7 +58,6 @@ export const SPONSOR_TIERS: readonly SponsorTier[] = [
     imageHeight: 256,
     imageWidth: 828,
     name: "Diamond",
-    priceSats: 3_000_000_000,
     priceUsd: 500,
     slotClassName: "aspect-[828/256]",
     slots: 4,
@@ -63,7 +68,6 @@ export const SPONSOR_TIERS: readonly SponsorTier[] = [
     imageHeight: 192,
     imageWidth: 640,
     name: "Platinum",
-    priceSats: 1_500_000_000,
     priceUsd: 250,
     slotClassName: "aspect-[640/192]",
     slots: 6,
@@ -74,7 +78,6 @@ export const SPONSOR_TIERS: readonly SponsorTier[] = [
     imageHeight: 192,
     imageWidth: 512,
     name: "Gold",
-    priceSats: 600_000_000,
     priceUsd: 100,
     slotClassName: "aspect-[512/192]",
     slots: 8,
@@ -85,7 +88,6 @@ export const SPONSOR_TIERS: readonly SponsorTier[] = [
     imageHeight: 128,
     imageWidth: 384,
     name: "Silver",
-    priceSats: 300_000_000,
     priceUsd: 50,
     slotClassName: "aspect-[384/128]",
     slots: 12,
@@ -98,8 +100,8 @@ export function sponsorImageUrl(slotId: string): string {
   return `/api/sponsors/${encodeURIComponent(slotId)}/image`;
 }
 
-export function sponsorPriceSats(slotId: string, tier: SponsorTier): number {
-  return slotId === SPONSOR_TEST_SLOT_ID ? 1_000_000 : tier.priceSats;
+export function sponsorPriceUsd(slotId: string, tier: SponsorTier): number {
+  return slotId === SPONSOR_TEST_SLOT_ID ? 0.25 : tier.priceUsd;
 }
 
 export function sponsorSubtype(slotId: string): string {

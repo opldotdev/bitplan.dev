@@ -57,7 +57,7 @@ Set `NEXT_PUBLIC_SITE_URL` to the public origin and
 `NEXT_PUBLIC_ORDFS_GATEWAY_URL` to the OrdFS gateway when they differ from the
 defaults in `.env.example`. Sponsorship checkout also needs a private Vercel
 Blob store connected to the project. Vercel supplies the server-only
-`BLOB_READ_WRITE_TOKEN`; see [SPONSORS.md](../../SPONSORS.md).
+`BLOB_READ_WRITE_TOKEN`.
 
 For self-hosting, build as above and run `bun run start`. The application needs
 outbound HTTPS access to the configured OrdFS gateway.

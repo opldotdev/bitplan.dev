@@ -1,7 +1,11 @@
 import { OneSatServices } from "@1sat/client";
 import { Transaction } from "@bsv/sdk";
-
 import {
+  quoteSponsorSlot,
+  sponsorPaymentMatchesQuote,
+} from "@/lib/sponsor-quote";
+import {
+  InvalidSponsorReceiptError,
   type SponsorReceipt,
   validateSponsorReceipt,
 } from "@/lib/sponsor-receipt";
@@ -19,9 +23,47 @@ export interface SponsorFinalization extends SponsorReceipt {
 
 interface FinalizeDependencies {
   claim: (slotId: string, beef: Uint8Array) => Promise<string>;
+  quote?: typeof quoteSponsorSlot;
   read: (slotId: string) => Promise<StoredSponsorReceipt | null>;
   relay: (beef: Uint8Array) => Promise<void>;
   release: (slotId: string, etag: string) => Promise<void>;
+}
+
+async function claimReceipt(
+  slotId: string,
+  beef: Uint8Array,
+  receipt: SponsorReceipt,
+  dependencies: FinalizeDependencies
+): Promise<string> {
+  const existing = await dependencies.read(slotId);
+  if (existing) {
+    if (!sameBytes(existing.beef, beef)) {
+      throw new SponsorSlotClaimedError(slotId);
+    }
+    return existing.etag;
+  }
+
+  if (dependencies.quote) {
+    const current = await dependencies.quote(slotId);
+    if (!sponsorPaymentMatchesQuote(receipt.priceSats, current.priceSats)) {
+      throw new InvalidSponsorReceiptError(
+        "The BSV quote changed. Refresh the quote and try again."
+      );
+    }
+  }
+
+  try {
+    return await dependencies.claim(slotId, beef);
+  } catch (error) {
+    if (!(error instanceof SponsorSlotClaimedError)) {
+      throw error;
+    }
+    const stored = await dependencies.read(slotId);
+    if (!(stored && sameBytes(stored.beef, beef))) {
+      throw error;
+    }
+    return stored.etag;
+  }
 }
 
 export class TerminalSponsorRelayError extends Error {
@@ -67,25 +109,14 @@ export async function finalizeSponsorReceipt(
   beef: Uint8Array,
   dependencies: FinalizeDependencies = {
     claim: claimSponsorSlot,
+    quote: quoteSponsorSlot,
     read: readStoredSponsorReceipt,
     relay: relaySponsorBeef,
     release: releaseSponsorSlot,
   }
 ): Promise<SponsorFinalization> {
   const receipt = validateSponsorReceipt(beef, slotId);
-  let etag: string;
-  try {
-    etag = await dependencies.claim(slotId, beef);
-  } catch (error) {
-    if (!(error instanceof SponsorSlotClaimedError)) {
-      throw error;
-    }
-    const stored = await dependencies.read(slotId);
-    if (!(stored && sameBytes(stored.beef, beef))) {
-      throw error;
-    }
-    ({ etag } = stored);
-  }
+  const etag = await claimReceipt(slotId, beef, receipt, dependencies);
 
   let relayed = true;
   try {

@@ -72,9 +72,9 @@ CLI commands: upload, list, fetch, whoami, version, auth.
 
 Docs: ${SITE_URL}/docs/commands
 `,
-  "/docs/envelope": `# Envelope · BitPlan
+  "/docs/envelope": `# Envelopes · BitPlan
 
-On-chain format for a bitplan draft: BPLN magic, JSON header, BRC-2 ciphertext. Private envelopes are v1. Shared envelopes are v2.
+On-chain format for a BitPlan draft: BPLN magic, JSON header, and BRC-2 ciphertext. Envelopes can be private or shared.
 
 Docs: ${SITE_URL}/docs/envelope
 `,

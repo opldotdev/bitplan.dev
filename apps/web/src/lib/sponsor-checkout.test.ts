@@ -1,11 +1,13 @@
 import { describe, expect, mock, test } from "bun:test";
 import { P2PKH, type WalletInterface } from "@bsv/sdk";
 
-import { createSponsorCheckout } from "./sponsor-checkout";
+import {
+  createSponsorCheckout,
+  sponsorWalletErrorMessage,
+} from "./sponsor-checkout";
 import {
   SPONSOR_PAYMENT_ADDRESS,
   SPONSOR_TIERS,
-  sponsorPriceSats,
   sponsorSubtype,
 } from "./sponsors";
 
@@ -30,6 +32,12 @@ describe("createSponsorCheckout", () => {
     const result = await createSponsorCheckout({
       image: new Uint8Array([1, 2, 3]),
       name: "Acme",
+      quote: {
+        bsvUsd: 20,
+        priceSats: 1_250_000,
+        priceUsd: 0.25,
+        slotId: "silver-1",
+      },
       slotId: "silver-1",
       tier,
       url: "https://example.com/",
@@ -44,8 +52,7 @@ describe("createSponsorCheckout", () => {
       randomizeOutputs: false,
     });
     expect(request?.outputs?.map(({ satoshis }) => satoshis)).toEqual([
-      1,
-      sponsorPriceSats("silver-1", tier),
+      1, 1_250_000,
     ]);
 
     const imageOutput = request?.outputs?.[0];
@@ -56,5 +63,20 @@ describe("createSponsorCheckout", () => {
     expect(paymentOutput?.lockingScript).toBe(
       new P2PKH().lock(SPONSOR_PAYMENT_ADDRESS).toHex()
     );
+  });
+
+  test("turns a serialized wallet denial into safe copy", () => {
+    const error = new Error(
+      JSON.stringify({
+        args: { lockingScript: "deadbeef" },
+        call: "createAction",
+        message: "Permission denied.",
+      })
+    );
+    const message = sponsorWalletErrorMessage(error);
+    expect(message).toBe(
+      "The wallet declined the transaction. Nothing was published or paid."
+    );
+    expect(message).not.toContain("lockingScript");
   });
 });

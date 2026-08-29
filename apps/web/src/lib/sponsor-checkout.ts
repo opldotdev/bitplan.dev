@@ -6,19 +6,34 @@ import {
   SPONSOR_APP,
   SPONSOR_CONTENT_TYPE,
   SPONSOR_PAYMENT_ADDRESS,
+  type SponsorQuote,
   type SponsorTier,
-  sponsorPriceSats,
   sponsorSubtype,
 } from "@/lib/sponsors";
+
+const WALLET_REJECTION_PATTERN = /permission denied|user.?rejected|declined/i;
 
 export interface SponsorCheckout {
   beef: Uint8Array<ArrayBuffer>;
   txid: string;
 }
 
+export function sponsorWalletErrorMessage(error: unknown): string {
+  let message = "";
+  if (error instanceof Error) {
+    ({ message } = error);
+  } else if (typeof error === "string") {
+    message = error;
+  }
+  return WALLET_REJECTION_PATTERN.test(message)
+    ? "The wallet declined the transaction. Nothing was published or paid."
+    : "The wallet could not create the transaction. Nothing was published or paid.";
+}
+
 export async function createSponsorCheckout({
   image,
   name,
+  quote,
   slotId,
   tier,
   url,
@@ -26,11 +41,15 @@ export async function createSponsorCheckout({
 }: {
   image: Uint8Array;
   name: string;
+  quote: SponsorQuote;
   slotId: string;
   tier: SponsorTier;
   url: string;
   wallet: WalletInterface;
 }): Promise<SponsorCheckout> {
+  if (quote.slotId !== slotId) {
+    throw new Error("Sponsor quote does not match this slot.");
+  }
   const ownerAddress = await defaultPayAddress(
     createContext(wallet, { chain: "main" })
   );
@@ -44,7 +63,9 @@ export async function createSponsorCheckout({
       subType: sponsorSubtype(slotId),
       subTypeData: JSON.stringify({
         href: url,
-        schema: 1,
+        priceSats: quote.priceSats,
+        priceUsd: quote.priceUsd,
+        schema: 2,
         slot: slotId,
         tier: tier.id,
       }),
@@ -67,7 +88,7 @@ export async function createSponsorCheckout({
       {
         lockingScript: new P2PKH().lock(SPONSOR_PAYMENT_ADDRESS).toHex(),
         outputDescription: `BitPlan sponsor payment for ${slotId}`,
-        satoshis: sponsorPriceSats(slotId, tier),
+        satoshis: quote.priceSats,
       },
     ],
   });

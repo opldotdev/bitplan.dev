@@ -5,6 +5,10 @@ import {
   TerminalSponsorRelayError,
 } from "@/lib/sponsor-finalize";
 import {
+  quoteSponsorSlot,
+  SponsorQuoteUnavailableError,
+} from "@/lib/sponsor-quote";
+import {
   InvalidSponsorReceiptError,
   MAX_SPONSOR_BEEF_BYTES,
   sponsorTierForSlot,
@@ -89,6 +93,30 @@ export async function HEAD(
   }
 }
 
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ slotId: string }> }
+): Promise<NextResponse> {
+  const { slotId } = await params;
+  if (!sponsorTierForSlot(slotId)) {
+    return json({ error: "Unknown sponsor slot." }, 404);
+  }
+  try {
+    if (await isSponsorSlotClaimed(slotId)) {
+      return json({ error: "Sponsor slot is sold." }, 409);
+    }
+    return json(await quoteSponsorSlot(slotId), 200);
+  } catch (error) {
+    if (error instanceof SponsorStorageUnavailableError) {
+      return json({ error: error.message }, 503);
+    }
+    if (error instanceof SponsorQuoteUnavailableError) {
+      return json({ error: error.message }, 503);
+    }
+    return json({ error: "Could not quote this sponsor slot." }, 500);
+  }
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ slotId: string }> }
@@ -120,6 +148,9 @@ export async function POST(
       return json({ error: "Sponsor slot is sold." }, 409);
     }
     if (error instanceof SponsorStorageUnavailableError) {
+      return json({ error: error.message }, 503);
+    }
+    if (error instanceof SponsorQuoteUnavailableError) {
       return json({ error: error.message }, 503);
     }
     if (error instanceof TerminalSponsorRelayError) {

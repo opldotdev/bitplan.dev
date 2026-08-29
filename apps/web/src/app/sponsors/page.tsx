@@ -34,7 +34,7 @@ function SponsorSection({
             {tier.name}
           </h2>
           <p className="font-mono font-semibold text-foreground text-xs">
-            {tier.priceSats / 100_000_000} BSV · ~${tier.priceUsd}
+            ${tier.priceUsd}
           </p>
         </div>
         <Separator />
@@ -67,9 +67,8 @@ export default async function SponsorsPage() {
           />
           <h1 className="font-medium text-4xl">Sponsor BitPlan</h1>
           <p className="max-w-xl text-balance text-muted-foreground">
-            Choose a placement, crop your image, and publish it with Yours
-            Wallet, BSV Desktop, or another BRC-100 wallet. Each slot is sold
-            once.
+            Choose a placement and publish it with your BRC-100 wallet. Each
+            slot is sold once.
           </p>
         </header>
 
