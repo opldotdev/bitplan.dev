@@ -15,7 +15,7 @@ export function SiteHeader() {
         <Button asChild size="icon" variant="ghost">
           <a
             aria-label="GitHub"
-            href="https://github.com/b-open-io"
+            href="https://github.com/opldotdev/bitplan.dev"
             rel="noopener noreferrer"
             target="_blank"
           >

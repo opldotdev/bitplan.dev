@@ -60,13 +60,13 @@ export default function Home() {
           </a>
           <a
             className="text-primary underline-offset-4 hover:underline"
-            href="https://github.com/b-open-io"
+            href="https://github.com/opldotdev/bitplan.dev/blob/master/packages/cli/ENVELOPE.md"
           >
             Envelope spec
           </a>
           <a
             className="text-primary underline-offset-4 hover:underline"
-            href="https://postplan.dev"
+            href="https://k57tkc9tukz5.postplan.dev"
           >
             How it compares to postplan
           </a>
