@@ -149,19 +149,15 @@ export async function publishGenesis(
 }
 
 /**
- * Later publishes: spend the draft's coin back to self with a new envelope.
- *
- * `buildTransferOrdinals` + `executeTrackedAction` is the same pair the
- * `sendOrdinals` action runs internally; calling them directly skips that
- * action's debug logging, which would otherwise land on this CLI's stdout.
+ * Build the reinscription transfer: same envelope, content type, and MAP the
+ * later publish spends onto the coin.
  */
-export async function publishVersion(
+export async function buildVersionTransfer(
 	wallet: WalletInterface,
 	coin: BitplanCoin,
 	envelope: Uint8Array,
-): Promise<PublishResult> {
-	const ctx = walletContext(wallet)
-	const params = await buildTransferOrdinals(ctx, {
+) {
+	return buildTransferOrdinals(walletContext(wallet), {
 		transfers: [
 			{
 				id: coin.id,
@@ -174,6 +170,21 @@ export async function publishVersion(
 			},
 		],
 	})
+}
+
+/**
+ * Later publishes: spend the draft's coin back to self with a new envelope.
+ *
+ * `buildTransferOrdinals` + `executeTrackedAction` is the same pair the
+ * `sendOrdinals` action runs internally; calling them directly skips that
+ * action's debug logging, which would otherwise land on this CLI's stdout.
+ */
+export async function publishVersion(
+	wallet: WalletInterface,
+	coin: BitplanCoin,
+	envelope: Uint8Array,
+): Promise<PublishResult> {
+	const params = await buildVersionTransfer(wallet, coin, envelope)
 
 	if ('error' in params) {
 		throw new CliError(
