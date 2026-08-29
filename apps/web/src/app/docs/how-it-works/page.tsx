@@ -112,8 +112,8 @@ export default function HowItWorksPage() {
           The SDK gets both the document key and a fresh AES-GCM IV from the
           operating system&apos;s secure random generator. It stops with an
           error if secure randomness is unavailable. The encrypted plan also
-          commits the exact public header, so changing the access list or key
-          parameters makes decryption fail.
+          commits the exact public header. Changes made without the document key
+          fail authentication.
         </p>
         <CodeExample code={SHARED_CODE} label="See the shared key flow" />
         <h3>What this protects</h3>

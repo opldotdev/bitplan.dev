@@ -101,6 +101,8 @@ stores the hex digest as `headerSha256` inside the encrypted plaintext. Object
 keys are sorted lexicographically at every level; array order is preserved.
 Readers recompute the hash and reject a mismatch. This binds the reader list,
 publisher identity, key parameters, and body layout to the encrypted payload.
+It detects changes made without the document key; it is not a publisher
+signature.
 
 For the owner and each recipient, the publisher calls:
 

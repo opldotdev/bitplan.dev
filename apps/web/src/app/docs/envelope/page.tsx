@@ -121,9 +121,9 @@ export default function EnvelopePage() {
           AES-GCM provides confidentiality and tamper detection. The wallet will
           fail on the wrong protocol, <code>keyID</code>, counterparty, or
           ciphertext. A shared payload includes a SHA-256 commitment to its
-          canonical header, so its public access list and key parameters cannot
-          be changed unnoticed. The envelope does not prove authorship by
-          itself; the ordinal&apos;s origin and transaction chain do that.
+          canonical header. It detects changes made without the document key.
+          The envelope does not prove authorship by itself; the ordinal&apos;s
+          origin and transaction chain do that.
         </p>
       </section>
     </>
