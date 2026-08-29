@@ -39,11 +39,12 @@ npx bitplan auth
 npx bitplan whoami
 ```
 
-List the drafts this wallet holds. Each row shows title (when this machine has
-a local record), version, origin, and viewer URL:
+List the drafts this wallet holds. The table shortens origins and outpoints;
+`--verbose` prints them in full, with the raw timestamp:
 
 ```sh
 npx bitplan list
+npx bitplan list --verbose
 ```
 
 Read one back (HTML to stdout, metadata to stderr with `--meta`):
@@ -80,6 +81,7 @@ bitplan upload <file>
 
 bitplan list
   --json
+  -v, --verbose            Full origins, outpoints, and timestamps
   --limit <n>
 
 bitplan fetch <origin|url>

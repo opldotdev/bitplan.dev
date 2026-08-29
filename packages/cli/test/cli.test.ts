@@ -8,6 +8,7 @@ import { buildProgram, main } from '../src/index.js'
 import { originFromReference } from '../src/ordfs.js'
 import {
 	isOutpoint,
+	shortOutpoint,
 	toOrdinalOutpoint,
 	toWalletOutpoint,
 } from '../src/outpoint.js'
@@ -89,6 +90,13 @@ describe('cli surface', () => {
 				'--allow-finding',
 				'--wallet-url',
 			]),
+		)
+	})
+
+	test('list takes json, verbose, and limit flags', () => {
+		const list = commandNamed(program, 'list')
+		expect(flagsOf(list)).toEqual(
+			expect.arrayContaining(['--json', '--verbose', '--limit']),
 		)
 	})
 
@@ -205,6 +213,12 @@ describe('outpoint spellings', () => {
 		expect(toOrdinalOutpoint(`${'a'.repeat(64)}.3`)).toBe(`${'a'.repeat(64)}_3`)
 		expect(toWalletOutpoint(`${'a'.repeat(64)}_3`)).toBe(`${'a'.repeat(64)}.3`)
 		expect(toOrdinalOutpoint(`${'a'.repeat(64)}_3`)).toBe(`${'a'.repeat(64)}_3`)
+	})
+
+	test('shortens a 64-char txid to 1234...7890_vout', () => {
+		const txid = '5a524804ff938d69cf7cc1cb78da03633aadce2ad216d0af87bc296eb2c0d813'
+		expect(shortOutpoint(`${txid}_0`)).toBe('5a52...d813_0')
+		expect(shortOutpoint(`${txid}.12`)).toBe('5a52...d813_12')
 	})
 
 	test('rejects things that are not outpoints', () => {

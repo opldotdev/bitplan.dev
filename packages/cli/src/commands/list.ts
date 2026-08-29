@@ -1,15 +1,16 @@
 import { listBitplanCoins } from '../ordinals.js'
+import { shortOutpoint } from '../outpoint.js'
 import { type DraftRecord, readDrafts } from '../state.js'
 import { connectWallet } from '../wallet.js'
-import { viewerUrl } from './upload.js'
 
 export interface ListOptions {
 	json?: boolean
+	verbose?: boolean
 	limit?: string
 	walletUrl?: string
 }
 
-interface ListedDraft {
+export interface ListedDraft {
 	origin: string
 	outpoint: string
 	id: string
@@ -59,19 +60,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
 		return
 	}
 
-	console.log(`Drafts (${drafts.length})`)
-	console.log('')
-	for (const draft of drafts) {
-		console.log(draft.title ?? 'Untitled draft (no local record)')
-		const version = draft.version === null ? 'version ?' : `v${draft.version}`
-		const updated = draft.updatedAt ? timeAgo(draft.updatedAt) : 'unknown'
-		console.log(`  ${version} · updated ${updated}`)
-		console.log(`  origin ${draft.origin}`)
-		console.log(`  ${viewerUrl(draft.origin)}`)
-		if (draft.description) console.log(`  ${draft.description}`)
-		if (draft.file) console.log(`  ${draft.file}`)
-		console.log('')
-	}
+	console.log(formatDraftsTable(drafts, { verbose: options.verbose === true }))
 }
 
 const UNITS: ReadonlyArray<readonly [string, number]> = [
@@ -83,15 +72,54 @@ const UNITS: ReadonlyArray<readonly [string, number]> = [
 	['minute', 60],
 ]
 
-export function timeAgo(value: string | null | undefined): string {
-	if (!value) return 'unknown'
+export function timeAgo(value: string | null | undefined, now = Date.now()): string {
+	if (!value) return '-'
 	const then = new Date(value).getTime()
-	if (Number.isNaN(then)) return 'unknown'
+	if (Number.isNaN(then)) return '-'
 
-	const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000))
+	const seconds = Math.max(0, Math.floor((now - then) / 1000))
 	for (const [name, secs] of UNITS) {
 		const amount = Math.floor(seconds / secs)
 		if (amount >= 1) return `${amount} ${name}${amount === 1 ? '' : 's'} ago`
 	}
 	return 'just now'
+}
+
+export function formatDraftsTable(
+	drafts: readonly ListedDraft[],
+	options: { verbose?: boolean; now?: number } = {},
+): string {
+	const verbose = options.verbose === true
+	const now = options.now ?? Date.now()
+	const headers = verbose
+		? ['Title', 'Ver', 'Origin', 'Outpoint', 'Updated']
+		: ['Title', 'Ver', 'Origin', 'Outpoint', 'Updated']
+
+	const rows = drafts.map((draft) => {
+		const title = draft.title ?? 'Untitled (no local record)'
+		const ver = draft.version === null ? '-' : `v${draft.version}`
+		const origin = verbose ? draft.origin : shortOutpoint(draft.origin)
+		const outpoint = verbose ? draft.outpoint : shortOutpoint(draft.outpoint)
+		const updated = verbose
+			? (draft.updatedAt ?? '-')
+			: timeAgo(draft.updatedAt, now)
+		return [title, ver, origin, outpoint, updated]
+	})
+
+	return renderTable(headers, rows)
+}
+
+function renderTable(headers: string[], rows: string[][]): string {
+	const widths = headers.map((header, column) =>
+		Math.max(header.length, ...rows.map((row) => (row[column] ?? '').length)),
+	)
+	const line = (cells: string[]) =>
+		cells.map((cell, column) => padEnd(cell, widths[column] ?? 0)).join('  ')
+	const rule = widths.map((width) => '-'.repeat(width)).join('  ')
+	return [line(headers), rule, ...rows.map(line)].join('\n')
+}
+
+function padEnd(value: string, width: number): string {
+	if (value.length >= width) return value
+	return value + ' '.repeat(width - value.length)
 }

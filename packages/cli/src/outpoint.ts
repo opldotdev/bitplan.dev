@@ -48,3 +48,14 @@ export function isOutpoint(value: string): boolean {
 		return false
 	}
 }
+
+/** `abcd...wxyz_0` — first and last four of the txid, vout kept. */
+export function shortOutpoint(outpoint: string): string {
+	try {
+		const { txid, vout } = splitOutpoint(outpoint)
+		return `${txid.slice(0, 4)}...${txid.slice(-4)}_${vout}`
+	} catch {
+		if (outpoint.length <= 12) return outpoint
+		return `${outpoint.slice(0, 4)}...${outpoint.slice(-4)}`
+	}
+}

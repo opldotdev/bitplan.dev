@@ -57,6 +57,7 @@ export function buildProgram(): Command {
 		.command('list')
 		.description('List the drafts this wallet holds.')
 		.option('--json', 'Print raw JSON')
+		.option('-v, --verbose', 'Show full origins, outpoints, and timestamps')
 		.option('--limit <n>', 'Maximum drafts to return (default 100)')
 		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
 		.action(listCommand)

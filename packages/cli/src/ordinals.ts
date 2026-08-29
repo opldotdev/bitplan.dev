@@ -19,10 +19,10 @@ import { Buffer } from 'node:buffer'
 import {
 	buildTransferOrdinals,
 	createContext,
-	executeTrackedAction,
 	inscribe,
 	type OneSatContext,
 	ORDINALS_BASKET,
+	sendOrdinals,
 	type WalletInterface,
 	type WalletOutput,
 } from '@1sat/actions'
@@ -148,6 +148,18 @@ export async function publishGenesis(
 	return { txid: result.txid, outpoint, origin: outpoint }
 }
 
+function versionTransfer(coin: BitplanCoin, envelope: Uint8Array) {
+	return {
+		id: coin.id,
+		counterparty: 'self' as const,
+		map: { ...MAP_METADATA },
+		inscription: {
+			base64Content: Buffer.from(envelope).toString('base64'),
+			contentType: CONTENT_TYPE,
+		},
+	}
+}
+
 /**
  * Build the reinscription transfer: same envelope, content type, and MAP the
  * later publish spends onto the coin.
@@ -158,55 +170,19 @@ export async function buildVersionTransfer(
 	envelope: Uint8Array,
 ) {
 	return buildTransferOrdinals(walletContext(wallet), {
-		transfers: [
-			{
-				id: coin.id,
-				counterparty: 'self',
-				map: { ...MAP_METADATA },
-				inscription: {
-					base64Content: Buffer.from(envelope).toString('base64'),
-					contentType: CONTENT_TYPE,
-				},
-			},
-		],
+		transfers: [versionTransfer(coin, envelope)],
 	})
 }
 
-/**
- * Later publishes: spend the draft's coin back to self with a new envelope.
- *
- * `buildTransferOrdinals` + `executeTrackedAction` is the same pair the
- * `sendOrdinals` action runs internally; calling them directly skips that
- * action's debug logging, which would otherwise land on this CLI's stdout.
- */
+/** Later publishes: spend the draft's coin back to self with a new envelope. */
 export async function publishVersion(
 	wallet: WalletInterface,
 	coin: BitplanCoin,
 	envelope: Uint8Array,
 ): Promise<PublishResult> {
-	const params = await buildVersionTransfer(wallet, coin, envelope)
-
-	if ('error' in params) {
-		throw new CliError(
-			`The wallet could not build the update transaction: ${params.error}`,
-		)
-	}
-
-	const { sources, ...createArgs } = params
-	const result = await executeTrackedAction(
-		wallet,
-		{ ...createArgs, options: { randomizeOutputs: false } },
-		undefined,
-		params.inputBEEF as number[],
-		undefined,
-		{
-			spends: sources.flatMap((source) => {
-				const id = source.tags?.find((tag) => tag.startsWith('id:'))?.slice(3)
-				return id ? [{ basket: ORDINALS_BASKET, id }] : []
-			}),
-			permissionScheme: '1sat',
-		},
-	)
+	const result = await sendOrdinals.execute(walletContext(wallet), {
+		transfers: [versionTransfer(coin, envelope)],
+	})
 
 	if (result.error) {
 		throw new CliError(

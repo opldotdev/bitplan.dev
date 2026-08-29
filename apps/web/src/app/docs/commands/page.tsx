@@ -24,7 +24,7 @@ const FLAGS = [
   },
   {
     command: "list",
-    flags: "--json, --limit <n>",
+    flags: "--json, -v/--verbose, --limit <n>",
   },
   {
     command: "fetch <origin|url>",
