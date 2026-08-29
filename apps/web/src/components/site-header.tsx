@@ -61,8 +61,15 @@ export function SiteHeader() {
     }
   }, [router]);
 
+  const isHome = pathname === "/";
+
   return (
-    <header>
+    <header
+      className={cn(
+        isHome &&
+          "absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-background/55 to-transparent"
+      )}
+    >
       <div className="mx-auto grid h-14 w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-1 justify-self-start sm:gap-2">
           <Sheet onOpenChange={setMenuOpen} open={menuOpen}>
