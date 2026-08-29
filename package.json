@@ -23,7 +23,6 @@
 		"lint:fix:root": "biome check --write .",
 		"lint:root": "biome check .",
 		"lint:web": "bun run --cwd apps/web check",
-		"sponsor:setup": "bun packages/cli/scripts/setupSponsorSlot.ts",
 		"typecheck": "bun run --filter '*' typecheck",
 		"test": "bun test"
 	},

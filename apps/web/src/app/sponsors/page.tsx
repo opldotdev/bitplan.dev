@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 
 import { SponsorSlot } from "@/components/sponsor-slot";
 import { Separator } from "@/components/ui/separator";
+import { loadSponsorSlots } from "@/lib/sponsor-slots";
 import {
-  loadSponsorSlots,
   SPONSOR_TIERS,
   type SponsorSlotState,
   type SponsorTier,
@@ -33,7 +34,7 @@ function SponsorSection({
             {tier.name}
           </h2>
           <p className="font-mono font-semibold text-foreground text-xs">
-            ~${tier.priceUsd}
+            {tier.priceSats / 100_000_000} BSV · ~${tier.priceUsd}
           </p>
         </div>
         <Separator />
@@ -51,21 +52,24 @@ function SponsorSection({
 
 export default async function SponsorsPage() {
   const slots = await loadSponsorSlots();
-  const configured = slots.size > 0;
 
   return (
     <main className="flex-1 overflow-x-clip bg-background text-foreground">
       <div className="mx-auto w-full max-w-4xl px-4 pt-12 pb-24 sm:px-6 sm:pt-16">
         <header className="flex flex-col items-center gap-4 pb-12 text-center">
-          <p className="font-semibold text-4xl">
-            BitPlan
-            <span className="text-primary">.</span>
-          </p>
+          <Image
+            alt="BitPlan"
+            className="size-12 rounded-sm"
+            height={48}
+            priority
+            src="/icon.png"
+            width={48}
+          />
           <h1 className="font-medium text-4xl">Sponsor BitPlan</h1>
           <p className="max-w-xl text-balance text-muted-foreground">
-            {configured
-              ? "Buy a unique slot with your local BRC-100 wallet and publish one permanent, optimized image on its 1Sat Ordinal."
-              : "Permanent sponsor placements are opening soon. Checkout will use your local BRC-100 wallet, with no account or database."}
+            Choose a placement, crop your image, and publish it with Yours
+            Wallet, BSV Desktop, or another BRC-100 wallet. Each slot is sold
+            once.
           </p>
         </header>
 

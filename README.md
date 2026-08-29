@@ -85,7 +85,7 @@ HTML rendering.
 
 Third-party attribution is recorded in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-Sponsor slot setup is documented in [SPONSORS.md](SPONSORS.md).
+Sponsor checkout and operations are documented in [SPONSORS.md](SPONSORS.md).
 
 ## License
 

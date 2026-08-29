@@ -3,8 +3,8 @@ import type { WalletInterface } from "@bsv/sdk";
 import type { DraftsWallet } from "@/lib/drafts";
 
 /**
- * Browser BRC-100 client. `WalletClient("auto")` races window.CWI, the
- * localhost JSON/wire bridges, and XDM — see @bsv/sdk WalletClient.
+ * Browser BRC-100 client. `WalletClient("auto")` races the desktop bridges and
+ * the XDM transport used by extensions such as Yours Wallet.
  *
  * `reconnectAuthenticatedWallet` probes `isAuthenticated` and does not prompt.
  * `connectBrowserWallet` calls `waitForAuthentication` and must stay behind

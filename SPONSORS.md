@@ -1,39 +1,61 @@
 # Sponsorship operations
 
-Sponsor state lives on Bitcoin, not in a database. Each slot is a unique
-ordinal listed through OrdLock. Buying the listing atomically pays BitPlan and
-transfers that slot to the buyer. The buyer then reinscribes the slot with an
-optimized WebP logo and MAP metadata that tells the site where to display it.
+BitPlan has 30 fixed sponsor slots defined in source. There is no slot registry,
+pre-mint transaction, Redis instance, or application database.
 
-## Create a slot
+## Checkout
 
-With the BitPlan BRC-100 wallet running, create and list one slot:
+1. The browser crops the sponsor image and encodes a WebP no larger than
+   200 KiB.
+2. A standard BRC-100 wallet creates one signed `noSend` transaction containing
+   the 1Sat inscription, MAP placement data, and the BitPlan payment.
+3. The browser sends the Atomic BEEF to BitPlan without broadcasting it.
+4. The server validates the image, MAP fields, link, fixed slot, and exact
+   payment.
+5. Vercel Blob records the winner at `sponsors/<slot>.beef` with overwrites
+   disabled. The first valid upload wins.
+6. BitPlan submits the winning BEEF to the 1Sat relay, which forwards it to ARC.
 
-```sh
-bun sponsor:setup --slot gold-1 --yes
+A transaction that loses the Blob race is never submitted by BitPlan. Stored
+BEEF also lets the site display a sponsor immediately while OrdFS catches up.
+
+## Wallets
+
+The website uses one `@bsv/sdk` `WalletInterface` through
+`WalletClient("auto")`. It supports standard BRC-100 transports, including the
+Yours Wallet extension and BSV Desktop. It does not use the legacy
+`window.yours` provider.
+
+## On-chain format
+
+Each winning transaction has exactly one 1-satoshi `image/webp` inscription and
+one P2PKH payment to BitPlan. MAP records:
+
+```json
+{
+  "app": "bitplan",
+  "type": "ord",
+  "subType": "bitplanSponsorSlot:<slot>",
+  "name": "Sponsor name",
+  "subTypeData": "{\"schema\":1,\"slot\":\"gold-1\",\"tier\":\"gold\",\"href\":\"https://example.com/\"}"
+}
 ```
 
-The current BSV/USD rate sets the tier price. Pass `--price-sats 1234` to use an
-exact price. Each command creates the placeholder inscription already locked by
-OrdLock, so setup is one wallet action and one transaction per slot.
+Prices are fixed in satoshis so old payments remain verifiable:
 
-Add the printed origin to `NEXT_PUBLIC_SPONSOR_SLOT_ORIGINS` as a JSON object:
+| Tier | Slots | Price |
+| --- | ---: | ---: |
+| Diamond | 4 | 30 BSV |
+| Platinum | 6 | 15 BSV |
+| Gold | 8 | 6 BSV |
+| Silver | 12 | 3 BSV |
 
-```dotenv
-NEXT_PUBLIC_SPONSOR_SLOT_ORIGINS={"gold-1":"<txid>_0"}
-```
+## Deployment
 
-MAP selects the visible tier and slot. The origin allowlist is still required:
-without it, anyone could publish matching MAP fields and impersonate a sponsor.
+Connect one private Vercel Blob store to the web project. Vercel supplies
+`BLOB_READ_WRITE_TOKEN`; it is a server secret and must never use a
+`NEXT_PUBLIC_` prefix. No other sponsor-specific environment variable is
+required.
 
-## Buyer flow
-
-The website connects to the buyer's BRC-100 wallet. It crops the selected image
-to the tier canvas and encodes WebP before any wallet request. The OrdLock
-purchase is the reservation and payment in one transaction; a second wallet
-transaction reinscribes the purchased slot with the logo. If that second step
-fails, the buyer still owns the slot and can retry without paying again.
-
-Tier canvases are 828×256 (Diamond), 640×192 (Platinum), 512×192 (Gold), and
-384×128 (Silver). Logo bytes and the sponsor name, URL, tier, and slot are
-permanent. The buyer must confirm they have publication rights.
+The tests use generated transactions and a fake Blob implementation. They do
+not broadcast or spend BSV.

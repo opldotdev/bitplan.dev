@@ -32,7 +32,7 @@ export function SponsorSlot({
             alt={`${slot.sponsor.name} logo`}
             className="size-full object-cover"
             height={tier.imageHeight}
-            src={sponsorImageUrl(slot.sponsor.imageOutpoint, tier)}
+            src={sponsorImageUrl(slot.slotId)}
             unoptimized
             width={tier.imageWidth}
           />
@@ -41,7 +41,7 @@ export function SponsorSlot({
     );
   }
 
-  if (slot && (slot.status === "available" || slot.status === "reserved")) {
+  if (slot?.status === "available") {
     return (
       <div className={cn("w-full", tier.slotClassName)}>
         <SponsorDialog slot={slot} tier={tier} />

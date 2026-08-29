@@ -1,7 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { SponsorSlot } from "./sponsor-slot";
+mock.module("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => undefined }),
+}));
+
+const { SponsorSlot } = await import("./sponsor-slot");
 
 const tier = {
   gridClassName: "grid-cols-3 sm:grid-cols-6",
@@ -9,33 +13,35 @@ const tier = {
   imageHeight: 128,
   imageWidth: 384,
   name: "Silver",
+  priceSats: 300_000_000,
   priceUsd: 50,
   slotClassName: "aspect-[384/128]",
   slotIds: ["silver-1"],
 };
 
 describe("SponsorSlot", () => {
-  test("renders an opening-soon slot with no payment interaction", () => {
+  test("renders an available slot with payment interaction", () => {
     const markup = renderToStaticMarkup(
-      <SponsorSlot slotId="silver-1" tier={tier} />
+      <SponsorSlot
+        slot={{ slotId: "silver-1", status: "available" }}
+        slotId="silver-1"
+        tier={tier}
+      />
     );
 
-    expect(markup).toContain("disabled");
-    expect(markup).toContain("Opening soon");
-    expect(markup).toContain("opening soon");
+    expect(markup).not.toContain('disabled=""');
+    expect(markup).toContain("Sponsor · 3 BSV");
   });
 
   test("renders an on-chain sponsor as a sponsored link", () => {
     const markup = renderToStaticMarkup(
       <SponsorSlot
         slot={{
-          origin: `${"a".repeat(64)}_0`,
           slotId: "silver-1",
           sponsor: {
-            imageOutpoint: `${"b".repeat(64)}_0`,
             name: "Acme",
-            origin: `${"a".repeat(64)}_0`,
             slotId: "silver-1",
+            txid: "b".repeat(64),
             url: "https://example.com",
           },
           status: "sponsored",
@@ -47,6 +53,6 @@ describe("SponsorSlot", () => {
 
     expect(markup).toContain("Acme logo");
     expect(markup).toContain('rel="sponsored noopener noreferrer"');
-    expect(markup).toContain("/1sat/ordfs/image/");
+    expect(markup).toContain("/api/sponsors/silver-1/image");
   });
 });

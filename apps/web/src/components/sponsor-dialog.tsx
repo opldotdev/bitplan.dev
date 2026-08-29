@@ -1,16 +1,7 @@
 "use client";
 
-import { buyOrdinal, createContext, sendOrdinals } from "@1sat/actions";
-import { OneSatServices } from "@1sat/client";
-import { Beef, Utils, type WalletInterface } from "@bsv/sdk";
 import { useRouter } from "next/navigation";
-import {
-  type ChangeEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type ChangeEvent, useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,89 +18,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
+  createSponsorCheckout,
+  type SponsorCheckout,
+} from "@/lib/sponsor-checkout";
+import {
   drawSponsorImage,
   exportSponsorWebp,
   loadSponsorImage,
   type SponsorCrop,
 } from "@/lib/sponsor-image";
-import {
-  SPONSOR_APP,
-  SPONSOR_CONTENT_TYPE,
-  SPONSOR_SUBTYPE,
-  type SponsorSlotState,
-  type SponsorTier,
-} from "@/lib/sponsors";
+import type { SponsorSlotState, SponsorTier } from "@/lib/sponsors";
 import { connectBrowserWalletClient } from "@/lib/wallet";
 
-interface ActionResult {
-  actionId?: string;
-  error?: string;
-  tx?: number[];
-  txid?: string;
-}
-
-class SlotReservedError extends Error {}
-
 const DEFAULT_CROP: SponsorCrop = { x: 50, y: 50, zoom: 1 };
-const TRAILING_SLASH_PATTERN = /\/$/;
 
-function actionError(result: ActionResult, fallback: string): Error | null {
-  if (result.error) {
-    return new Error(result.error);
-  }
-  if (!result.txid) {
-    return new Error(fallback);
-  }
-  return null;
-}
-
-async function relayResult(
-  services: OneSatServices,
-  result: ActionResult
-): Promise<boolean> {
-  if (!result.txid) {
-    return false;
-  }
-  try {
-    const beef = result.tx
-      ? Beef.fromBinary(result.tx)
-      : await services.getBeefForTxid(result.txid);
-    await services.postBeef(beef, [result.txid]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function findOwnedSlotId(
-  wallet: WalletInterface,
-  origin: string,
-  purchase?: ActionResult
-): Promise<string> {
-  if (purchase?.actionId) {
-    return `${purchase.actionId}_0`;
-  }
-  const result = await wallet.listOutputs({
-    basket: "1sat",
-    includeTags: true,
-    limit: 100,
-    tagQueryMode: "all",
-    tags: [`origin:${origin}`],
-  });
-  const preferred = purchase?.txid
-    ? result.outputs.find((candidate) =>
-        candidate.outpoint.replace(".", "_").startsWith(`${purchase.txid}_`)
-      )
-    : undefined;
-  const output = preferred ?? result.outputs[0];
-  const id = output?.tags?.find((tag) => tag.startsWith("id:"))?.slice(3);
-  if (!id) {
-    throw new Error(
-      "This wallet does not contain the purchased slot. Connect the wallet that bought it."
-    );
-  }
-  return id;
-}
+class DiscardSponsorCheckoutError extends Error {}
 
 function validatedSponsorUrl(value: string): string {
   const url = new URL(value);
@@ -119,53 +42,52 @@ function validatedSponsorUrl(value: string): string {
   return url.toString();
 }
 
-async function acquireSponsorSlot({
-  context,
-  ownedId,
-  services,
-  slot,
-  updateStatus,
-  wallet,
-}: {
-  context: ReturnType<typeof createContext>;
-  ownedId?: string;
-  services: OneSatServices;
-  slot: SponsorSlotState & { origin: string };
-  updateStatus: (message: string) => void;
-  wallet: WalletInterface;
-}): Promise<string> {
-  if (ownedId) {
-    return ownedId;
+async function ensureSlotAvailable(slotId: string): Promise<void> {
+  const response = await fetch(`/api/sponsors/${slotId}`, {
+    cache: "no-store",
+    method: "HEAD",
+  });
+  if (response.status === 200) {
+    throw new Error("This slot was just sold. Choose another slot.");
   }
-  if (slot.listing) {
-    updateStatus(
-      `Approve ${slot.listing.priceSats.toLocaleString()} sats in your wallet…`
-    );
-    const purchase = (await buyOrdinal.execute(context, {
-      origin: slot.origin,
-      outpoint: slot.listing.outpoint,
-    })) as ActionResult;
-    const actionFailure = actionError(
-      purchase,
-      "The wallet did not return a purchase transaction."
-    );
-    if (actionFailure) {
-      throw actionFailure;
-    }
-    await relayResult(services, purchase);
-    try {
-      return await findOwnedSlotId(wallet, slot.origin, purchase);
-    } catch (cause) {
-      throw new SlotReservedError(
-        cause instanceof Error
-          ? cause.message
-          : "The purchased slot was not found.",
-        { cause }
-      );
-    }
+  if (response.status !== 404) {
+    throw new Error("Sponsor checkout is temporarily unavailable.");
   }
-  updateStatus("Finding this slot in your wallet…");
-  return findOwnedSlotId(wallet, slot.origin);
+}
+
+async function finalizeCheckout(
+  slotId: string,
+  checkout: SponsorCheckout
+): Promise<boolean> {
+  const response = await fetch(`/api/sponsors/${slotId}`, {
+    body: checkout.beef,
+    headers: { "content-type": "application/octet-stream" },
+    method: "POST",
+  });
+  const result: unknown = await response.json().catch(() => undefined);
+  if (response.status === 409) {
+    throw new DiscardSponsorCheckoutError(
+      "This slot was claimed first. Your transaction was not sent."
+    );
+  }
+  if (response.status === 422) {
+    throw new DiscardSponsorCheckoutError(
+      "The network rejected the transaction. No payment was accepted; try again."
+    );
+  }
+  if (!response.ok) {
+    const message =
+      result && typeof result === "object" && "error" in result
+        ? String(result.error)
+        : "The server could not finalize this slot.";
+    throw new Error(message);
+  }
+  return !(
+    result &&
+    typeof result === "object" &&
+    "relayed" in result &&
+    result.relayed === false
+  );
 }
 
 export function SponsorDialog({
@@ -176,22 +98,21 @@ export function SponsorDialog({
   tier: SponsorTier;
 }) {
   const router = useRouter();
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const [crop, setCrop] = useState(DEFAULT_CROP);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [name, setName] = useState("");
-  const [ownedId, setOwnedId] = useState<string>();
+  const [pendingCheckout, setPendingCheckout] = useState<SponsorCheckout>();
   const [status, setStatus] = useState<string>();
   const [url, setUrl] = useState("");
 
   useEffect(() => {
-    // biome-ignore lint/suspicious/noUnnecessaryConditions: the ref is populated after the canvas mounts.
-    if (canvasRef.current && image) {
-      drawSponsorImage(canvasRef.current, image, tier, crop);
+    if (canvas && image) {
+      drawSponsorImage(canvas, image, tier, crop);
     }
-  }, [crop, image, tier]);
+  }, [canvas, crop, image, tier]);
 
   const selectImage = useCallback(async (file: File | undefined) => {
     setImage(null);
@@ -208,87 +129,60 @@ export function SponsorDialog({
   }, []);
 
   const publishSponsor = useCallback(async () => {
-    const canvas = canvasRef.current;
-    // biome-ignore lint/suspicious/noUnnecessaryConditions: the canvas can unmount before this callback runs.
-    if (!(canvas && image && slot.origin && acknowledged)) {
+    if (!(pendingCheckout || (canvas && image && acknowledged))) {
       return;
     }
     setBusy(true);
-    setStatus("Preparing image…");
-    let ownsSlot = Boolean(ownedId);
     try {
-      const sponsorUrl = validatedSponsorUrl(url);
-      const webp = await exportSponsorWebp(canvas);
-      const wallet = await connectBrowserWalletClient();
-      const gateway = (
-        process.env.NEXT_PUBLIC_ORDFS_GATEWAY_URL ?? "https://api.1sat.app"
-      ).replace(TRAILING_SLASH_PATTERN, "");
-      const services = new OneSatServices("main", gateway);
-      const context = createContext(wallet, { services });
+      let checkout = pendingCheckout;
+      if (!checkout) {
+        setStatus("Preparing image…");
+        const sponsorUrl = validatedSponsorUrl(url);
+        const webp = await exportSponsorWebp(canvas as HTMLCanvasElement);
+        await ensureSlotAvailable(slot.slotId);
 
-      const id = await acquireSponsorSlot({
-        context,
-        ownedId,
-        services,
-        slot: { ...slot, origin: slot.origin },
-        updateStatus: setStatus,
-        wallet,
-      });
-      setOwnedId(id);
-      ownsSlot = true;
-
-      setStatus("Slot reserved. Approve publishing the permanent image…");
-      const bytes = new Uint8Array(await webp.arrayBuffer());
-      const publish = (await sendOrdinals.execute(context, {
-        transfers: [
-          {
-            counterparty: "self",
-            id,
-            inscription: {
-              base64Content: Utils.toBase64(Array.from(bytes)),
-              contentType: SPONSOR_CONTENT_TYPE,
-            },
-            map: {
-              app: SPONSOR_APP,
-              name: name.trim(),
-              subType: SPONSOR_SUBTYPE,
-              subTypeData: JSON.stringify({
-                href: sponsorUrl,
-                schema: 1,
-                slot: slot.slotId,
-                tier: tier.id,
-              }),
-              type: "ord",
-            },
-          },
-        ],
-      })) as ActionResult;
-      const publishError = actionError(
-        publish,
-        "The wallet did not return a publishing transaction."
-      );
-      if (publishError) {
-        throw publishError;
+        setStatus("Approve the transaction in your wallet…");
+        const wallet = await connectBrowserWalletClient();
+        checkout = await createSponsorCheckout({
+          image: new Uint8Array(await webp.arrayBuffer()),
+          name: name.trim(),
+          slotId: slot.slotId,
+          tier,
+          url: sponsorUrl,
+          wallet,
+        });
+        setPendingCheckout(checkout);
       }
-      const relayed = await relayResult(services, publish);
-      setStatus(
-        relayed
-          ? "Published. Your sponsor will appear after OrdFS indexes the transaction."
-          : "Published. Indexing may take a little longer because the relay was unavailable."
-      );
+
+      setStatus("Finalizing your slot…");
+      if (!(await finalizeCheckout(slot.slotId, checkout))) {
+        setStatus(
+          "Your slot is secured, but ARC has not confirmed the transaction. Retry finalization without another wallet payment."
+        );
+        return;
+      }
+      setPendingCheckout(undefined);
+      setStatus("Published. Your sponsor is live.");
       router.refresh();
     } catch (error) {
-      ownsSlot = ownsSlot || error instanceof SlotReservedError;
+      if (error instanceof DiscardSponsorCheckoutError) {
+        setPendingCheckout(undefined);
+      }
       const message = error instanceof Error ? error.message : "Unknown error.";
-      setStatus(
-        ownsSlot
-          ? `Your slot is reserved, but publishing failed: ${message} You can retry without paying again.`
-          : `Nothing was purchased: ${message}`
-      );
+      setStatus(message);
     } finally {
       setBusy(false);
     }
-  }, [acknowledged, image, name, ownedId, router, slot, tier, url]);
+  }, [
+    acknowledged,
+    image,
+    name,
+    pendingCheckout,
+    router,
+    slot.slotId,
+    tier,
+    url,
+  ]);
 
   const changeName = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setName(event.target.value);
@@ -319,16 +213,16 @@ export function SponsorDialog({
   );
 
   const canSubmit = Boolean(
-    acknowledged && image && name.trim() && url.trim() && !busy
+    (pendingCheckout || (acknowledged && image && name.trim() && url.trim())) &&
+      !busy
   );
-  const triggerLabel = slot.listing
-    ? `Sponsor · ${slot.listing.priceSats.toLocaleString()} sats`
-    : "Finish sponsor";
-  let submitLabel = "Publish sponsor";
+  const priceBsv = tier.priceSats / 100_000_000;
+  const triggerLabel = `Sponsor · ${priceBsv} BSV`;
+  let submitLabel = `Pay ${priceBsv} BSV and publish`;
   if (busy) {
     submitLabel = "Working…";
-  } else if (slot.listing && !ownedId) {
-    submitLabel = "Buy and publish";
+  } else if (pendingCheckout) {
+    submitLabel = "Retry ARC submission";
   }
 
   return (
@@ -344,9 +238,8 @@ export function SponsorDialog({
             {tier.name} sponsor · {slot.slotId}
           </DialogTitle>
           <DialogDescription>
-            {slot.listing
-              ? "Your wallet buys this unique slot first, then publishes one permanent WebP on its ordinal."
-              : "Connect the wallet that reserved this slot to finish its permanent inscription."}
+            Your wallet creates one transaction containing the permanent WebP
+            and payment. The first valid transaction received wins this slot.
           </DialogDescription>
         </DialogHeader>
 
@@ -392,7 +285,7 @@ export function SponsorDialog({
               <canvas
                 aria-label="Sponsor image crop preview"
                 className="h-auto w-full rounded-lg border bg-muted"
-                ref={canvasRef}
+                ref={setCanvas}
               />
               <div className="grid gap-2">
                 <Label>Zoom</Label>
