@@ -19,10 +19,7 @@ export default function ContactPage() {
         </p>
         <p>
           Follow{" "}
-          <a href="https://twitter.com/opldotdev">
-            Open Protocol Labs (@opldotdev)
-          </a>
-          .
+          <a href="https://x.com/opldotdev">Open Protocol Labs (@opldotdev)</a>.
         </p>
         <p>
           The CLI is{" "}
