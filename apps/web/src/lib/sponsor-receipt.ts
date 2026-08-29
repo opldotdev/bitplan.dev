@@ -4,6 +4,9 @@ import { OP, P2PKH, Script, Transaction } from "@bsv/sdk";
 import {
   SPONSOR_APP,
   SPONSOR_CONTENT_TYPE,
+  SPONSOR_LINK_MAX_BLURB_LENGTH,
+  SPONSOR_LINK_SLOT_ID,
+  SPONSOR_LINK_TIER,
   SPONSOR_PAYMENT_ADDRESS,
   SPONSOR_SLOT_IDS,
   SPONSOR_SUBTYPE,
@@ -27,6 +30,7 @@ const SUBTYPE_DATA_KEYS = [
 ];
 
 export interface SponsorReceipt {
+  blurb?: string;
   href: string;
   imageHeight: number;
   imageOutpoint: string;
@@ -51,6 +55,9 @@ function fail(message: string): never {
 }
 
 export function sponsorTierForSlot(slotId: string): SponsorTier | undefined {
+  if (slotId === SPONSOR_LINK_SLOT_ID) {
+    return SPONSOR_LINK_TIER;
+  }
   if (!SPONSOR_SLOT_IDS.includes(slotId)) {
     return;
   }
@@ -107,6 +114,26 @@ function isWebp(bytes: Uint8Array): boolean {
     ascii(bytes, 8, 4) === "WEBP" &&
     littleEndian32(bytes, 4) === bytes.length - 8
   );
+}
+
+function readLinkBlurb(
+  subTypeData: Record<string, unknown>
+): string | undefined {
+  if (!("blurb" in subTypeData)) {
+    return;
+  }
+  const value = subTypeData.blurb;
+  if (
+    typeof value !== "string" ||
+    value !== value.trim() ||
+    value.length === 0 ||
+    value.length > SPONSOR_LINK_MAX_BLURB_LENGTH
+  ) {
+    fail(
+      `Sponsor blurb must be between 1 and ${SPONSOR_LINK_MAX_BLURB_LENGTH} characters.`
+    );
+  }
+  return value;
 }
 
 function parseSubtypeData(value: string): Record<string, unknown> {
@@ -202,8 +229,13 @@ export function validateSponsorReceipt(
     return fail("Sponsor name must be between 1 and 64 characters.");
   }
   const subTypeData = parseSubtypeData(map.data.subTypeData);
+  const isLink = slotId === SPONSOR_LINK_SLOT_ID;
+  const expectedKeys =
+    isLink && "blurb" in subTypeData
+      ? [...SUBTYPE_DATA_KEYS, "blurb"]
+      : SUBTYPE_DATA_KEYS;
   if (
-    !hasExactKeys(subTypeData, SUBTYPE_DATA_KEYS) ||
+    !hasExactKeys(subTypeData, expectedKeys) ||
     subTypeData.schema !== 2 ||
     subTypeData.slot !== slotId ||
     subTypeData.tier !== tier.id ||
@@ -222,6 +254,7 @@ export function validateSponsorReceipt(
     return fail("Transaction does not contain the exact sponsor payment.");
   }
   const href = readHttpsUrl(subTypeData.href);
+  const blurb = readLinkBlurb(subTypeData);
 
   let inscription: ReturnType<typeof Inscription.decode>;
   try {
@@ -244,6 +277,7 @@ export function validateSponsorReceipt(
 
   const txid = transaction.id("hex");
   return {
+    ...(blurb === undefined ? {} : { blurb }),
     href,
     imageHeight: tier.imageHeight,
     imageOutpoint: `${txid}_${imageVout}`,

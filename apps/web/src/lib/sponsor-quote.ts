@@ -1,8 +1,5 @@
-import {
-  SPONSOR_TIERS,
-  type SponsorQuote,
-  sponsorPriceUsd,
-} from "@/lib/sponsors";
+import { sponsorTierForSlot } from "@/lib/sponsor-receipt";
+import { type SponsorQuote, sponsorPriceUsd } from "@/lib/sponsors";
 
 const EXCHANGE_RATE_URL =
   "https://api.whatsonchain.com/v1/bsv/main/exchangerate";
@@ -41,7 +38,7 @@ export async function quoteSponsorSlot(
   slotId: string,
   fetcher: typeof fetch = fetch
 ): Promise<SponsorQuote> {
-  const tier = SPONSOR_TIERS.find(({ slotIds }) => slotIds.includes(slotId));
+  const tier = sponsorTierForSlot(slotId);
   if (!tier) {
     throw new RangeError("Unknown sponsor slot.");
   }

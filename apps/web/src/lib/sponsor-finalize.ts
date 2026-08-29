@@ -1,10 +1,18 @@
 import { OneSatServices } from "@1sat/client";
 import { Transaction } from "@bsv/sdk";
+import { assertSponsorNotListed } from "@/lib/sponsor-duplicates";
+import {
+  claimSponsorLink,
+  publishSponsorLinkArtifacts,
+  readStoredSponsorLink,
+  releaseSponsorLink,
+} from "@/lib/sponsor-links";
 import {
   quoteSponsorSlot,
   sponsorPaymentMatchesQuote,
 } from "@/lib/sponsor-quote";
 import {
+  extractSponsorImage,
   InvalidSponsorReceiptError,
   type SponsorReceipt,
   validateSponsorReceipt,
@@ -16,12 +24,14 @@ import {
   SponsorSlotClaimedError,
   type StoredSponsorReceipt,
 } from "@/lib/sponsor-storage";
+import { SPONSOR_LINK_SLOT_ID } from "@/lib/sponsors";
 
 export interface SponsorFinalization extends SponsorReceipt {
   relayed: boolean;
 }
 
 interface FinalizeDependencies {
+  assertNotListed?: (receipt: SponsorReceipt) => Promise<void>;
   claim: (slotId: string, beef: Uint8Array) => Promise<string>;
   quote?: typeof quoteSponsorSlot;
   read: (slotId: string) => Promise<StoredSponsorReceipt | null>;
@@ -42,6 +52,8 @@ async function claimReceipt(
     }
     return existing.etag;
   }
+
+  await dependencies.assertNotListed?.(receipt);
 
   if (dependencies.quote) {
     const current = await dependencies.quote(slotId);
@@ -108,6 +120,7 @@ export async function finalizeSponsorReceipt(
   slotId: string,
   beef: Uint8Array,
   dependencies: FinalizeDependencies = {
+    assertNotListed: (receipt) => assertSponsorNotListed(receipt),
     claim: claimSponsorSlot,
     quote: quoteSponsorSlot,
     read: readStoredSponsorReceipt,
@@ -129,5 +142,82 @@ export async function finalizeSponsorReceipt(
     // Retain the receipt so the exact same BEEF can retry relay safely.
     relayed = false;
   }
+  return { ...receipt, relayed };
+}
+
+interface LinkFinalizeDependencies {
+  assertNotListed: (
+    receipt: SponsorReceipt,
+    excludeTxid: string
+  ) => Promise<void>;
+  claim: typeof claimSponsorLink;
+  publish: typeof publishSponsorLinkArtifacts;
+  quote?: typeof quoteSponsorSlot;
+  read: typeof readStoredSponsorLink;
+  relay: (beef: Uint8Array) => Promise<void>;
+  release: typeof releaseSponsorLink;
+}
+
+async function claimLinkReceipt(
+  beef: Uint8Array,
+  receipt: SponsorReceipt,
+  dependencies: LinkFinalizeDependencies
+): Promise<string> {
+  const existing = await dependencies.read(receipt.txid);
+  if (existing) {
+    if (!sameBytes(existing.beef, beef)) {
+      throw new SponsorSlotClaimedError(SPONSOR_LINK_SLOT_ID);
+    }
+    return existing.etag;
+  }
+
+  await dependencies.assertNotListed(receipt, receipt.txid);
+  if (dependencies.quote) {
+    const current = await dependencies.quote(SPONSOR_LINK_SLOT_ID);
+    if (!sponsorPaymentMatchesQuote(receipt.priceSats, current.priceSats)) {
+      throw new InvalidSponsorReceiptError(
+        "The BSV quote changed. Refresh the quote and try again."
+      );
+    }
+  }
+  return dependencies.claim(receipt.txid, beef);
+}
+
+/**
+ * Finalize an unlimited link sponsorship. Links never compete for a slot:
+ * each receipt is stored under its own txid, so the only claim conflicts
+ * are exact retries, which are idempotent.
+ */
+export async function finalizeSponsorLinkReceipt(
+  beef: Uint8Array,
+  dependencies: LinkFinalizeDependencies = {
+    assertNotListed: assertSponsorNotListed,
+    claim: claimSponsorLink,
+    publish: publishSponsorLinkArtifacts,
+    quote: quoteSponsorSlot,
+    read: readStoredSponsorLink,
+    relay: relaySponsorBeef,
+    release: releaseSponsorLink,
+  }
+): Promise<SponsorFinalization> {
+  const receipt = validateSponsorReceipt(beef, SPONSOR_LINK_SLOT_ID);
+  const etag = await claimLinkReceipt(beef, receipt, dependencies);
+
+  let relayed = true;
+  try {
+    await dependencies.relay(beef);
+  } catch (error) {
+    if (error instanceof TerminalSponsorRelayError) {
+      await dependencies.release(receipt.txid, etag);
+      throw error;
+    }
+    // Retain the receipt so the exact same BEEF can retry relay safely.
+    relayed = false;
+  }
+
+  await dependencies.publish(
+    receipt,
+    extractSponsorImage(beef, SPONSOR_LINK_SLOT_ID)
+  );
   return { ...receipt, relayed };
 }
