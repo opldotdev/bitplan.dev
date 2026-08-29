@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.3
+
+### Fixed
+
+- Node 25+ no longer prints `ExperimentalWarning` about `localStorage` on `npx bitplan`. The published bin is an unbundled wrapper that relaunches Node with `--no-experimental-webstorage` (or `--no-webstorage`) before `@bsv/sdk` loads. The CLI does not use Web Storage.
+
 ## 0.0.2
 
 ### Fixed

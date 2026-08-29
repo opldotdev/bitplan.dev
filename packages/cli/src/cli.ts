@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
- * Published bin. Always run main(). Do not gate on import.meta.url vs
+ * Bundled CLI entry. Always run main(). Do not gate on import.meta.url vs
  * process.argv[1]: npx and bunx both install a symlink at .bin/bitplan, so
  * those paths never match and 0.0.1 exited after loading the bundle with
  * no output.
+ *
+ * The published bin is bin/bitplan.mjs, which relaunches Node 25+ with Web
+ * Storage disabled before this file (and @bsv/sdk) load.
  */
 import { CliError } from './errors.js'
 import { main } from './index.js'

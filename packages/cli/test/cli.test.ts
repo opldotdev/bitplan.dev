@@ -129,6 +129,7 @@ describe('cli surface', () => {
 
 describe('npx and bunx bin runners', () => {
 	const cliSrc = path.join(import.meta.dir, '../src/cli.ts')
+	const wrapper = path.join(import.meta.dir, '../bin/bitplan.mjs')
 	const dist = path.join(import.meta.dir, '../dist/bitplan.js')
 
 	function run(runtime: 'bun' | 'node', file: string): string {
@@ -140,11 +141,31 @@ describe('npx and bunx bin runners', () => {
 		expect(result.exitCode).toBe(0)
 		expect(out).toMatch(/Usage: bitplan/)
 		expect(out).not.toMatch(/\(outputHelp\)/)
+		expect(out).not.toMatch(/localStorage is not available/)
+		expect(out).not.toMatch(/ExperimentalWarning/)
 		return out
 	}
 
+	test('the published bin is the unbundled wrapper', () => {
+		const pkg = JSON.parse(
+			fs.readFileSync(path.join(import.meta.dir, '../package.json'), 'utf8'),
+		) as { bin: { bitplan: string } }
+		expect(pkg.bin.bitplan).toBe('./bin/bitplan.mjs')
+		expect(fs.existsSync(wrapper)).toBe(true)
+	})
+
 	test('bun src/cli.ts prints usage', () => {
 		run('bun', cliSrc)
+	})
+
+	test('node and bun print usage through the published wrapper', () => {
+		if (!fs.existsSync(dist)) {
+			throw new Error(
+				'dist/bitplan.js missing; run bun run --filter bitplan build',
+			)
+		}
+		run('node', wrapper)
+		run('bun', wrapper)
 	})
 
 	test('node and bun print usage through a .bin-style symlink', () => {
@@ -156,7 +177,7 @@ describe('npx and bunx bin runners', () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bitplan-bin-'))
 		const link = path.join(dir, 'bitplan')
 		try {
-			fs.symlinkSync(dist, link)
+			fs.symlinkSync(wrapper, link)
 			run('node', link)
 			run('bun', link)
 		} finally {
