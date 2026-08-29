@@ -39,15 +39,16 @@ export default function Home() {
         />
         <div className="relative z-10 flex min-h-[100dvh] items-center justify-center px-6 py-16">
           <div className="mx-auto max-w-5xl text-center">
-            <h1 className="font-heading font-semibold text-[clamp(2rem,10vw,2.5rem)] leading-[1.08] tracking-tight md:text-5xl lg:text-6xl">
+            <h1 className="font-heading font-semibold text-[clamp(2rem,10vw,2.5rem)] leading-[1.08] tracking-tight md:text-6xl lg:text-7xl">
               Secure agent plans{" "}
               <span className="block">
                 <em className="italic">on Bitcoin</em>
                 <span className="text-primary">.</span>
               </span>
             </h1>
-            <p className="mx-auto mt-4 max-w-[36rem] text-balance text-foreground/75 md:text-lg">
-              Encrypted by your wallet, inscribed as a 1Sat Ordinal.
+            <p className="mx-auto mt-5 text-foreground/75 md:text-xl">
+              Encrypted by your wallet,{" "}
+              <span className="block">inscribed as a 1Sat Ordinal.</span>
             </p>
             <HomeCta />
           </div>
