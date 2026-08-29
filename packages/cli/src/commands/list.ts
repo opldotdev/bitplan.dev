@@ -1,3 +1,9 @@
+import type { WalletInterface } from '@bsv/sdk'
+import { isBitplanContentType } from '../constants.js'
+import { openEnvelope } from '../envelope.js'
+import { CliError } from '../errors.js'
+import { fetchLatest, type OrdfsContent } from '../ordfs.js'
+import type { BitplanCoin } from '../ordinals.js'
 import { listBitplanCoins } from '../ordinals.js'
 import { shortOutpoint } from '../outpoint.js'
 import { type DraftRecord, readDrafts } from '../state.js'
@@ -22,9 +28,21 @@ export interface ListedDraft {
 	file: string | null
 }
 
+interface RecoveredMetadata {
+	title: string | null
+	description: string | null
+	version: number | null
+	updatedAt: string | null
+}
+
+type FetchDraft = (
+	origin: string,
+	options?: { baseUrl?: string; seq?: number },
+) => Promise<OrdfsContent>
+
 export async function listCommand(options: ListOptions): Promise<void> {
+	const limit = parseListLimit(options.limit)
 	const { wallet } = await connectWallet(options.walletUrl)
-	const limit = options.limit ? Number.parseInt(options.limit, 10) : 100
 	const coins = await listBitplanCoins(wallet, { limit })
 
 	// The wallet is the source of truth for what exists; local state only adds
@@ -35,19 +53,48 @@ export async function listCommand(options: ListOptions): Promise<void> {
 		byOrigin.set(record.origin, { file, record })
 	}
 
-	const drafts: ListedDraft[] = coins.map((coin) => {
+	const drafts: ListedDraft[] = []
+	const recoveryErrors: Array<{ origin: string; error: unknown }> = []
+	for (const coin of coins) {
 		const local = byOrigin.get(coin.origin)
-		return {
+		let recovered: RecoveredMetadata | undefined
+		if (!local || local.record.latestOutpoint !== coin.outpoint) {
+			try {
+				recovered = await recoverDraftMetadata(wallet, coin)
+			} catch (error) {
+				recoveryErrors.push({ origin: coin.origin, error })
+			}
+		}
+		drafts.push({
 			origin: coin.origin,
 			outpoint: coin.outpoint,
 			id: coin.id,
-			title: local?.record.title ?? null,
-			description: local?.record.description ?? null,
-			version: local?.record.latestVersion ?? null,
-			updatedAt: local?.record.updatedAt ?? null,
+			title: recovered ? recovered.title : (local?.record.title ?? null),
+			description: recovered
+				? recovered.description
+				: (local?.record.description ?? null),
+			version: recovered
+				? recovered.version
+				: (local?.record.latestVersion ?? null),
+			updatedAt: recovered
+				? recovered.updatedAt
+				: (local?.record.updatedAt ?? null),
 			file: local?.file ?? null,
+		})
+	}
+
+	if (recoveryErrors.length > 0) {
+		console.error(
+			`Warning: could not recover encrypted metadata for ${recoveryErrors.length} draft${recoveryErrors.length === 1 ? '' : 's'}; the wallet-owned coins are still listed.`,
+		)
+		if (options.verbose) {
+			for (const { origin, error } of recoveryErrors) {
+				console.error(
+					`  ${origin}: ${error instanceof Error ? error.message : String(error)}`,
+				)
+			}
 		}
-	})
+	}
 
 	if (options.json) {
 		console.log(JSON.stringify(drafts, null, 2))
@@ -60,7 +107,59 @@ export async function listCommand(options: ListOptions): Promise<void> {
 		return
 	}
 
-	console.log(formatDraftsTable(drafts, { verbose: options.verbose === true }))
+	console.log(
+		options.verbose ? formatDraftsVerbose(drafts) : formatDraftsTable(drafts),
+	)
+}
+
+export function parseListLimit(value: string | undefined): number {
+	if (value === undefined) return 100
+	if (!/^[1-9]\d*$/.test(value)) {
+		throw new CliError(`--limit must be a positive integer; got "${value}".`)
+	}
+	const parsed = Number(value)
+	if (!Number.isSafeInteger(parsed)) {
+		throw new CliError(`--limit is too large; got "${value}".`)
+	}
+	return parsed
+}
+
+/** Recover encrypted metadata when drafts.json is missing or behind the wallet. */
+export async function recoverDraftMetadata(
+	wallet: WalletInterface,
+	coin: BitplanCoin,
+	load: FetchDraft = fetchLatest,
+): Promise<RecoveredMetadata> {
+	const content = await load(coin.origin)
+	if (!isBitplanContentType(content.contentType)) {
+		throw new CliError(
+			`${coin.origin} is a ${content.contentType} inscription, not a bitplan draft.`,
+		)
+	}
+	const { plaintext } = await openEnvelope(wallet, content.bytes)
+	const meta = plaintext.meta as unknown
+	if (typeof meta !== 'object' || meta === null) {
+		throw new CliError(
+			'Decrypted this draft but its plaintext has no metadata.',
+		)
+	}
+	const fields = meta as Record<string, unknown>
+	return {
+		title:
+			typeof fields.title === 'string' || fields.title === null
+				? fields.title
+				: null,
+		description:
+			typeof fields.description === 'string' || fields.description === null
+				? fields.description
+				: null,
+		version: content.sequence === null ? null : content.sequence + 1,
+		updatedAt:
+			typeof fields.createdAt === 'string' &&
+			!Number.isNaN(Date.parse(fields.createdAt))
+				? fields.createdAt
+				: null,
+	}
 }
 
 const UNITS: ReadonlyArray<readonly [string, number]> = [
@@ -72,7 +171,10 @@ const UNITS: ReadonlyArray<readonly [string, number]> = [
 	['minute', 60],
 ]
 
-export function timeAgo(value: string | null | undefined, now = Date.now()): string {
+export function timeAgo(
+	value: string | null | undefined,
+	now = Date.now(),
+): string {
 	if (!value) return '-'
 	const then = new Date(value).getTime()
 	if (Number.isNaN(then)) return '-'
@@ -87,26 +189,47 @@ export function timeAgo(value: string | null | undefined, now = Date.now()): str
 
 export function formatDraftsTable(
 	drafts: readonly ListedDraft[],
-	options: { verbose?: boolean; now?: number } = {},
+	options: { now?: number } = {},
 ): string {
-	const verbose = options.verbose === true
 	const now = options.now ?? Date.now()
-	const headers = verbose
-		? ['Title', 'Ver', 'Origin', 'Outpoint', 'Updated']
-		: ['Title', 'Ver', 'Origin', 'Outpoint', 'Updated']
+	const headers = ['Title', 'Ver', 'Origin', 'Outpoint', 'Updated']
 
 	const rows = drafts.map((draft) => {
 		const title = draft.title ?? 'Untitled (no local record)'
 		const ver = draft.version === null ? '-' : `v${draft.version}`
-		const origin = verbose ? draft.origin : shortOutpoint(draft.origin)
-		const outpoint = verbose ? draft.outpoint : shortOutpoint(draft.outpoint)
-		const updated = verbose
-			? (draft.updatedAt ?? '-')
-			: timeAgo(draft.updatedAt, now)
-		return [title, ver, origin, outpoint, updated]
+		return [
+			title,
+			ver,
+			shortOutpoint(draft.origin),
+			shortOutpoint(draft.outpoint),
+			timeAgo(draft.updatedAt, now),
+		]
 	})
 
 	return renderTable(headers, rows)
+}
+
+/** Long values belong on their own lines, not in an unbounded-width table. */
+export function formatDraftsVerbose(drafts: readonly ListedDraft[]): string {
+	return drafts
+		.map((draft, index) => {
+			const fields: ReadonlyArray<readonly [string, string]> = [
+				['Title', draft.title ?? 'Untitled'],
+				['Description', draft.description ?? '-'],
+				['Version', draft.version === null ? '-' : `v${draft.version}`],
+				['Origin', draft.origin],
+				['Outpoint', draft.outpoint],
+				['Updated', draft.updatedAt ?? '-'],
+				['File', draft.file ?? '-'],
+				['Wallet ID', draft.id],
+			]
+			const width = Math.max(...fields.map(([label]) => label.length))
+			return [
+				`Draft ${index + 1}`,
+				...fields.map(([label, value]) => `  ${label.padEnd(width)}  ${value}`),
+			].join('\n')
+		})
+		.join('\n\n')
 }
 
 function renderTable(headers: string[], rows: string[][]): string {

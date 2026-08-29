@@ -9,7 +9,8 @@
  * wallet boundary only.
  */
 
-const TXID_HEX = /^[0-9a-f]{64}$/i
+const OUTPOINT = /^([0-9a-f]{64})[._](0|[1-9]\d*)$/i
+const MAX_VOUT = 0xffff_ffff
 
 /** `txid_vout`. Accepts either spelling. */
 export function toOrdinalOutpoint(outpoint: string): string {
@@ -28,13 +29,13 @@ export function splitOutpoint(outpoint: string): {
 	vout: number
 } {
 	const trimmed = outpoint.trim()
-	const separator = trimmed.length > 64 ? trimmed[64] : undefined
-	if (separator !== '.' && separator !== '_') {
+	const match = OUTPOINT.exec(trimmed)
+	if (!match) {
 		throw new Error(`Not an outpoint: ${outpoint}`)
 	}
-	const txid = trimmed.slice(0, 64)
-	const vout = Number.parseInt(trimmed.slice(65), 10)
-	if (!TXID_HEX.test(txid) || !Number.isInteger(vout) || vout < 0) {
+	const txid = match[1]
+	const vout = Number(match[2])
+	if (!txid || !Number.isSafeInteger(vout) || vout > MAX_VOUT) {
 		throw new Error(`Not an outpoint: ${outpoint}`)
 	}
 	return { txid: txid.toLowerCase(), vout }

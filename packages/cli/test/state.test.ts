@@ -7,6 +7,7 @@ import {
 	ensureStateDir,
 	findDraftByFile,
 	findDraftByOrigin,
+	isUnsupportedDirectoryFsyncError,
 	readConfig,
 	readDrafts,
 	STATE_DIR_MODE,
@@ -44,6 +45,29 @@ function modeOf(file: string): number {
 }
 
 describe('state store', () => {
+	test('only ignores known unsupported directory fsync errors on Windows', () => {
+		for (const code of ['EISDIR', 'EINVAL', 'ENOTSUP', 'EPERM']) {
+			expect(
+				isUnsupportedDirectoryFsyncError(
+					Object.assign(new Error(code), { code }),
+					'win32',
+				),
+			).toBe(true)
+		}
+		expect(
+			isUnsupportedDirectoryFsyncError(
+				Object.assign(new Error('disk failure'), { code: 'EIO' }),
+				'win32',
+			),
+		).toBe(false)
+		expect(
+			isUnsupportedDirectoryFsyncError(
+				Object.assign(new Error('not supported'), { code: 'ENOTSUP' }),
+				'linux',
+			),
+		).toBe(false)
+	})
+
 	test('writes drafts.json 0600 inside a 0700 directory', () => {
 		const nested = path.join(dir, 'nested')
 		const file = path.join(nested, 'drafts.json')
@@ -92,9 +116,32 @@ describe('state store', () => {
 		expect(readDrafts(path.join(dir, 'nothing.json'))).toEqual({ files: {} })
 	})
 
-	test('a corrupt drafts file reads as empty, not as an error', () => {
+	test('a corrupt drafts file is surfaced instead of silently reading empty', () => {
 		fs.writeFileSync(draftsFile, 'not json{{{')
-		expect(readDrafts(draftsFile)).toEqual({ files: {} })
+		expect(() => readDrafts(draftsFile)).toThrow(/corrupt JSON/)
+	})
+
+	test('an invalid drafts structure is surfaced with the broken field', () => {
+		fs.writeFileSync(
+			draftsFile,
+			JSON.stringify({
+				files: { '/plans/one.html': { ...RECORD, origin: 'bad' } },
+			}),
+		)
+		expect(() => readDrafts(draftsFile)).toThrow(/invalid origin/)
+	})
+
+	test('a failed atomic write preserves the previous file', () => {
+		writeDrafts({ files: { '/plans/one.html': RECORD } }, draftsFile)
+		const before = fs.readFileSync(draftsFile, 'utf8')
+		const circular: { self?: unknown } = {}
+		circular.self = circular
+
+		expect(() => writeJsonFile(draftsFile, circular)).toThrow()
+		expect(fs.readFileSync(draftsFile, 'utf8')).toBe(before)
+		expect(fs.readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual(
+			[],
+		)
 	})
 
 	test('a second draft does not clobber the first', () => {

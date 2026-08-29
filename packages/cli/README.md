@@ -2,9 +2,10 @@
 
 Publish plan documents to Bitcoin as 1Sat Ordinals. Encrypted by default.
 
-The CLI encrypts a self-contained HTML document and inscribes it on BSV. Upload
-the same file again and bitplan reinscribes the same satoshi, so one origin
-outpoint is the draft's identity and its version history.
+The CLI validates a self-contained HTML document, then asks your wallet to
+encrypt and inscribe it on BSV. Upload the same file again and the wallet spends
+the current draft coin with a new inscription, so one origin outpoint identifies
+the draft and its version history.
 
 ## Requirements
 
@@ -39,8 +40,9 @@ npx bitplan auth
 npx bitplan whoami
 ```
 
-List the drafts this wallet holds. The table shortens origins and outpoints;
-`--verbose` prints them in full, with the raw timestamp:
+List the drafts this wallet holds. The default table shortens origins and
+outpoints. `--verbose` switches to one labeled detail block per draft so full
+identifiers and timestamps do not stretch the table:
 
 ```sh
 npx bitplan list
@@ -81,7 +83,7 @@ bitplan upload <file>
 
 bitplan list
   --json
-  -v, --verbose            Full origins, outpoints, and timestamps
+  -v, --verbose            One detailed block per draft
   --limit <n>
 
 bitplan fetch <origin|url>

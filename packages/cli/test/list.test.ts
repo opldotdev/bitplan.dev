@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'bun:test'
-import { formatDraftsTable, type ListedDraft, timeAgo } from '../src/commands/list.js'
+import {
+	formatDraftsTable,
+	formatDraftsVerbose,
+	type ListedDraft,
+	parseListLimit,
+	recoverDraftMetadata,
+	timeAgo,
+} from '../src/commands/list.js'
+import { type DraftPlaintext, sealEnvelope } from '../src/envelope.js'
+import type { BitplanCoin } from '../src/ordinals.js'
+import { createMockWallet } from './mockWallet.js'
 
 const ORIGIN =
 	'5a524804ff938d69cf7cc1cb78da03633aadce2ad216d0af87bc296eb2c0d813_0'
@@ -28,6 +38,66 @@ describe('timeAgo', () => {
 	})
 })
 
+describe('list options and recovery', () => {
+	test('limit is a strict positive integer', () => {
+		expect(parseListLimit(undefined)).toBe(100)
+		expect(parseListLimit('25')).toBe(25)
+		for (const invalid of [
+			'0',
+			'-1',
+			'2drafts',
+			'1.5',
+			'',
+			'9007199254740992',
+		]) {
+			expect(() => parseListLimit(invalid)).toThrow(/--limit/)
+		}
+	})
+
+	test('recovers title, description, version, and timestamp from the envelope', async () => {
+		const { wallet, calls } = createMockWallet()
+		const plaintext: DraftPlaintext = {
+			meta: {
+				title: 'Recovered plan',
+				description: 'No local state needed',
+				repoOrg: null,
+				repoName: null,
+				repoHost: null,
+				gitBranch: null,
+				gitCommitSha: null,
+				gitCommitSubject: null,
+				gitDirty: null,
+				cliVersion: '0.0.3',
+				fileSha256: 'abc',
+				createdAt: '2026-08-29T16:00:00.000Z',
+			},
+			html: '<!doctype html><title>Recovered plan</title>',
+		}
+		const bytes = await sealEnvelope(wallet, plaintext, 'recovery-key')
+		const coin = {
+			id: 'coin-1',
+			origin: ORIGIN,
+			outpoint: TIP,
+			output: {},
+		} as BitplanCoin
+		const recovered = await recoverDraftMetadata(wallet, coin, async () => ({
+			bytes,
+			contentType: 'application/x-bitplan; charset=binary',
+			origin: ORIGIN,
+			outpoint: TIP,
+			sequence: 2,
+		}))
+
+		expect(recovered).toEqual({
+			title: 'Recovered plan',
+			description: 'No local state needed',
+			version: 3,
+			updatedAt: '2026-08-29T16:00:00.000Z',
+		})
+		expect(calls.decrypt).toHaveLength(1)
+	})
+})
+
 describe('formatDraftsTable', () => {
 	test('normal mode shortens origin and outpoint and uses time ago', () => {
 		const table = formatDraftsTable([DRAFT], { now: NOW })
@@ -39,15 +109,6 @@ describe('formatDraftsTable', () => {
 		expect(table).not.toContain(ORIGIN)
 		expect(table).not.toContain(TIP)
 		expect(table).not.toContain('2026-08-29T16:00:00.000Z')
-	})
-
-	test('verbose mode prints the full origin, outpoint, and timestamp', () => {
-		const table = formatDraftsTable([DRAFT], { verbose: true, now: NOW })
-		expect(table).toContain(ORIGIN)
-		expect(table).toContain(TIP)
-		expect(table).toContain('2026-08-29T16:00:00.000Z')
-		expect(table).not.toContain('5a52...d813_0')
-		expect(table).not.toContain('2 hours ago')
 	})
 
 	test('untitled drafts and missing versions still make a row', () => {
@@ -68,5 +129,32 @@ describe('formatDraftsTable', () => {
 		expect(table).toContain('Origin')
 		expect(table).toContain('Outpoint')
 		expect(table).toContain('Updated')
+	})
+})
+
+describe('formatDraftsVerbose', () => {
+	test('prints one labeled field per line instead of a wide table', () => {
+		const output = formatDraftsVerbose([DRAFT])
+
+		expect(output).toContain('Draft 1\n')
+		expect(output).toContain(`  Origin       ${ORIGIN}`)
+		expect(output).toContain(`  Outpoint     ${TIP}`)
+		expect(output).toContain('  Updated      2026-08-29T16:00:00.000Z')
+		expect(output).toContain('  Description  phase one')
+		expect(output).toContain('  File         /tmp/plan.html')
+		expect(output).toContain('  Wallet ID    coin-1')
+		expect(output).not.toContain('5a52...d813_0')
+		expect(output).not.toContain('Title  Ver')
+	})
+
+	test('separates multiple drafts with a blank line', () => {
+		const output = formatDraftsVerbose([
+			DRAFT,
+			{ ...DRAFT, id: 'coin-2', title: null },
+		])
+
+		expect(output).toContain('Draft 1')
+		expect(output).toContain('\n\nDraft 2\n')
+		expect(output).toContain('  Title        Untitled')
 	})
 })

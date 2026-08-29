@@ -3,9 +3,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline/promises'
 import {
-	CONTENT_TYPE,
 	ENVELOPE_OVERHEAD_ESTIMATE,
 	FEE_SATS_PER_KB,
+	isBitplanContentType,
 	VIEWER_BASE_URL,
 } from '../constants.js'
 import {
@@ -27,7 +27,12 @@ import {
 } from '../ordinals.js'
 import { toOrdinalOutpoint } from '../outpoint.js'
 import { scanForSecrets } from '../secretScan.js'
-import { type DraftRecord, findDraftByFile, saveDraftRecord } from '../state.js'
+import {
+	type DraftRecord,
+	findDraftByFile,
+	findDraftByOrigin,
+	saveDraftRecord,
+} from '../state.js'
 import { CLI_VERSION } from '../version.js'
 import { connectWallet } from '../wallet.js'
 
@@ -45,12 +50,35 @@ export async function uploadCommand(
 	file: string,
 	options: UploadOptions,
 ): Promise<void> {
+	if (options.new && options.draft) {
+		throw new CliError('--new and --draft cannot be used together.')
+	}
+
 	const resolvedFile = path.resolve(file)
 	if (!fs.existsSync(resolvedFile)) {
 		throw new CliError(`File does not exist: ${resolvedFile}`)
 	}
 
 	const html = fs.readFileSync(resolvedFile, 'utf8')
+	const known = findDraftByFile(resolvedFile)
+	let explicitOrigin: string | null = null
+	if (options.draft) {
+		try {
+			explicitOrigin = toOrdinalOutpoint(options.draft)
+		} catch {
+			throw new CliError(
+				`--draft must be an outpoint in txid_vout form; got "${options.draft}".`,
+			)
+		}
+	}
+	const targetOrigin = options.new
+		? null
+		: (explicitOrigin ?? known?.origin ?? null)
+	const targetLocal = targetOrigin
+		? known?.origin === targetOrigin
+			? known
+			: findDraftByOrigin(targetOrigin)?.record
+		: undefined
 
 	const validation = validateHtml(html)
 	if (!validation.ok) {
@@ -65,7 +93,7 @@ export async function uploadCommand(
 	const git = collectGitMetadata(path.dirname(resolvedFile))
 	const meta: DraftMeta = {
 		title: validation.title,
-		description: options.description ?? null,
+		description: resolveDescription(options.description, targetLocal),
 		...git,
 		cliVersion: CLI_VERSION,
 		fileSha256: createHash('sha256').update(html, 'utf8').digest('hex'),
@@ -107,17 +135,6 @@ export async function uploadCommand(
 		)
 	}
 
-	const known = findDraftByFile(resolvedFile)
-	const targetOrigin = options.new
-		? null
-		: options.draft
-			? toOrdinalOutpoint(options.draft)
-			: (known?.origin ?? null)
-
-	if (options.new && options.draft) {
-		throw new CliError('--new and --draft cannot be used together.')
-	}
-
 	const { wallet, url } = await connectWallet(options.walletUrl)
 
 	// Resolve what we are updating before showing the confirmation, so the
@@ -127,7 +144,7 @@ export async function uploadCommand(
 	let nextVersion: number | null
 	if (targetOrigin) {
 		coin = await findCoinByOrigin(wallet, targetOrigin)
-		const local = known?.origin === targetOrigin ? known : undefined
+		const local = targetLocal
 		if (local) {
 			keyID = local.keyID
 			nextVersion =
@@ -186,6 +203,13 @@ export async function uploadCommand(
 	console.log(`Viewer:   ${viewerUrl(published.origin)}`)
 }
 
+export function resolveDescription(
+	description: string | undefined,
+	existing: DraftRecord | undefined,
+): string | null {
+	return description ?? existing?.description ?? null
+}
+
 export function viewerUrl(origin: string): string {
 	return `${VIEWER_BASE_URL}/${encodeURIComponent(origin)}`
 }
@@ -200,7 +224,7 @@ async function adoptFromChain(
 	ordfsUrl: string | undefined,
 ): Promise<{ keyID: string; sequence: number | null }> {
 	const content = await fetchLatest(origin, { baseUrl: ordfsUrl })
-	if (!content.contentType.startsWith(CONTENT_TYPE)) {
+	if (!isBitplanContentType(content.contentType)) {
 		throw new CliError(
 			`${origin} is a ${content.contentType} inscription, not a bitplan draft.`,
 		)

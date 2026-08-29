@@ -7,9 +7,12 @@
  * but convenience: origins are on chain and keyIDs are in the envelope header.
  */
 
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { CliError } from './errors.js'
+import { isOutpoint } from './outpoint.js'
 
 export const STATE_DIR_MODE = 0o700
 export const STATE_FILE_MODE = 0o600
@@ -59,25 +62,68 @@ export function ensureStateDir(dir: string = stateDir()): void {
 }
 
 export function readJsonFile<T>(file: string, fallback: T): T {
+	let raw: string
 	try {
-		return JSON.parse(fs.readFileSync(file, 'utf8')) as T
+		raw = fs.readFileSync(file, 'utf8')
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') return fallback
+		throw new CliError(
+			`Could not read local state at ${file}: ${error instanceof Error ? error.message : String(error)}`,
+		)
+	}
+
+	try {
+		return JSON.parse(raw) as T
 	} catch {
-		return fallback
+		throw new CliError(
+			`Local state at ${file} is corrupt JSON. Repair it or move it aside and try again.`,
+		)
 	}
 }
 
 export function writeJsonFile(file: string, value: unknown): void {
-	ensureStateDir(path.dirname(file))
-	fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, {
-		mode: STATE_FILE_MODE,
-	})
-	// writeFileSync only applies `mode` when it creates the file; chmod covers
-	// the rewrite case so a pre-existing world-readable file gets tightened.
-	fs.chmodSync(file, STATE_FILE_MODE)
+	const dir = path.dirname(file)
+	ensureStateDir(dir)
+	const temporary = path.join(
+		dir,
+		`.${path.basename(file)}.${process.pid}.${randomUUID()}.tmp`,
+	)
+	let descriptor: number | undefined
+	try {
+		descriptor = fs.openSync(temporary, 'wx', STATE_FILE_MODE)
+		fs.writeFileSync(descriptor, `${JSON.stringify(value, null, 2)}\n`)
+		fs.fchmodSync(descriptor, STATE_FILE_MODE)
+		fs.fsyncSync(descriptor)
+		fs.closeSync(descriptor)
+		descriptor = undefined
+		fs.renameSync(temporary, file)
+		fs.chmodSync(file, STATE_FILE_MODE)
+		fsyncDirectory(dir)
+	} catch (error) {
+		if (descriptor !== undefined) fs.closeSync(descriptor)
+		try {
+			fs.unlinkSync(temporary)
+		} catch (cleanupError) {
+			if ((cleanupError as NodeJS.ErrnoException).code !== 'ENOENT')
+				throw cleanupError
+		}
+		throw error
+	}
 }
 
 export function readConfig(file: string = configPath()): ConfigFile {
-	return readJsonFile<ConfigFile>(file, {})
+	const parsed = readJsonFile<unknown>(file, {})
+	if (!isObject(parsed)) throw invalidState(file, 'expected a JSON object')
+	if (parsed.walletUrl !== undefined && typeof parsed.walletUrl !== 'string') {
+		throw invalidState(file, 'walletUrl must be a string')
+	}
+	if (parsed.ordfsUrl !== undefined && typeof parsed.ordfsUrl !== 'string') {
+		throw invalidState(file, 'ordfsUrl must be a string')
+	}
+	return {
+		walletUrl: parsed.walletUrl as string | undefined,
+		ordfsUrl: parsed.ordfsUrl as string | undefined,
+	}
 }
 
 export function writeConfig(
@@ -88,8 +134,119 @@ export function writeConfig(
 }
 
 export function readDrafts(file: string = draftsPath()): DraftsFile {
-	const parsed = readJsonFile<Partial<DraftsFile>>(file, {})
-	return { files: parsed.files ?? {} }
+	const parsed = readJsonFile<unknown>(file, { files: {} })
+	if (!isObject(parsed)) throw invalidState(file, 'expected a JSON object')
+	if (parsed.files === undefined) return { files: {} }
+	if (!isObject(parsed.files)) {
+		throw invalidState(file, 'files must be an object keyed by local file path')
+	}
+	const files: Record<string, DraftRecord> = {}
+	for (const [filePath, value] of Object.entries(parsed.files)) {
+		files[filePath] = validateDraftRecord(value, file, filePath)
+	}
+	return { files }
+}
+
+function fsyncDirectory(dir: string): void {
+	let descriptor: number | undefined
+	try {
+		descriptor = fs.openSync(dir, 'r')
+		fs.fsyncSync(descriptor)
+	} catch (error) {
+		if (!isUnsupportedDirectoryFsyncError(error)) throw error
+	} finally {
+		if (descriptor !== undefined) fs.closeSync(descriptor)
+	}
+}
+
+export function isUnsupportedDirectoryFsyncError(
+	error: unknown,
+	platform: NodeJS.Platform = process.platform,
+): boolean {
+	if (platform !== 'win32') return false
+	const code = (error as NodeJS.ErrnoException | null)?.code
+	return (
+		code === 'EISDIR' ||
+		code === 'EINVAL' ||
+		code === 'ENOTSUP' ||
+		code === 'EPERM'
+	)
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function invalidState(file: string, reason: string): CliError {
+	return new CliError(
+		`Local state at ${file} has an invalid structure: ${reason}. Repair it or move it aside and try again.`,
+	)
+}
+
+function validateDraftRecord(
+	value: unknown,
+	file: string,
+	filePath: string,
+): DraftRecord {
+	if (!isObject(value)) {
+		throw invalidState(
+			file,
+			`record for ${JSON.stringify(filePath)} is not an object`,
+		)
+	}
+	if (typeof value.origin !== 'string' || !isOutpoint(value.origin)) {
+		throw invalidState(
+			file,
+			`record for ${JSON.stringify(filePath)} has an invalid origin`,
+		)
+	}
+	if (
+		typeof value.latestOutpoint !== 'string' ||
+		!isOutpoint(value.latestOutpoint)
+	) {
+		throw invalidState(
+			file,
+			`record for ${JSON.stringify(filePath)} has an invalid latestOutpoint`,
+		)
+	}
+	if (typeof value.keyID !== 'string' || value.keyID.length === 0) {
+		throw invalidState(
+			file,
+			`record for ${JSON.stringify(filePath)} has no keyID`,
+		)
+	}
+	if (
+		value.latestVersion !== null &&
+		(!Number.isSafeInteger(value.latestVersion) ||
+			Number(value.latestVersion) < 1)
+	) {
+		throw invalidState(
+			file,
+			`record for ${JSON.stringify(filePath)} has an invalid latestVersion`,
+		)
+	}
+	if (
+		typeof value.updatedAt !== 'string' ||
+		Number.isNaN(Date.parse(value.updatedAt))
+	) {
+		throw invalidState(
+			file,
+			`record for ${JSON.stringify(filePath)} has an invalid updatedAt`,
+		)
+	}
+	for (const field of ['title', 'description'] as const) {
+		if (
+			value[field] !== undefined &&
+			value[field] !== null &&
+			typeof value[field] !== 'string'
+		) {
+			throw invalidState(
+				file,
+				`record for ${JSON.stringify(filePath)} has a non-string ${field}`,
+			)
+		}
+	}
+	return value as unknown as DraftRecord
 }
 
 export function writeDrafts(

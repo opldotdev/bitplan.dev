@@ -3,7 +3,13 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { Command } from 'commander'
-import { estimateFeeSats, viewerUrl } from '../src/commands/upload.js'
+import { fetchCommand } from '../src/commands/fetch.js'
+import {
+	estimateFeeSats,
+	resolveDescription,
+	viewerUrl,
+} from '../src/commands/upload.js'
+import { isBitplanContentType } from '../src/constants.js'
 import { buildProgram, main } from '../src/index.js'
 import { originFromReference } from '../src/ordfs.js'
 import {
@@ -208,6 +214,44 @@ describe('viewer urls and fees', () => {
 	})
 })
 
+describe('strict CLI values', () => {
+	test('outpoints reject trailing or oversized output indexes', () => {
+		expect(() => toOrdinalOutpoint(`${'a'.repeat(64)}_1junk`)).toThrow()
+		expect(() => toOrdinalOutpoint(`${'a'.repeat(64)}_4294967296`)).toThrow()
+		expect(toOrdinalOutpoint(`${'a'.repeat(64)}.4294967295`)).toBe(
+			`${'a'.repeat(64)}_4294967295`,
+		)
+	})
+
+	test('fetch rejects a version with trailing characters before doing I/O', async () => {
+		await expect(fetchCommand(ORIGIN, { version: '2abc' })).rejects.toThrow(
+			/--version must be a positive version number/,
+		)
+	})
+
+	test('content type matching accepts parameters but not prefix lookalikes', () => {
+		expect(isBitplanContentType('application/x-bitplan')).toBe(true)
+		expect(isBitplanContentType('Application/X-Bitplan; charset=binary')).toBe(
+			true,
+		)
+		expect(isBitplanContentType('application/x-bitplanevil')).toBe(false)
+	})
+
+	test('upload preserves an existing description when the flag is omitted', () => {
+		const existing = {
+			origin: ORIGIN,
+			keyID: 'key',
+			latestOutpoint: ORIGIN,
+			latestVersion: 1,
+			updatedAt: '2026-08-29T16:00:00.000Z',
+			description: 'Keep me',
+		}
+		expect(resolveDescription(undefined, existing)).toBe('Keep me')
+		expect(resolveDescription('Replace me', existing)).toBe('Replace me')
+		expect(resolveDescription(undefined, undefined)).toBeNull()
+	})
+})
+
 describe('outpoint spellings', () => {
 	test('converts between wallet and ordinal forms', () => {
 		expect(toOrdinalOutpoint(`${'a'.repeat(64)}.3`)).toBe(`${'a'.repeat(64)}_3`)
@@ -216,7 +260,8 @@ describe('outpoint spellings', () => {
 	})
 
 	test('shortens a 64-char txid to 1234...7890_vout', () => {
-		const txid = '5a524804ff938d69cf7cc1cb78da03633aadce2ad216d0af87bc296eb2c0d813'
+		const txid =
+			'5a524804ff938d69cf7cc1cb78da03633aadce2ad216d0af87bc296eb2c0d813'
 		expect(shortOutpoint(`${txid}_0`)).toBe('5a52...d813_0')
 		expect(shortOutpoint(`${txid}.12`)).toBe('5a52...d813_12')
 	})

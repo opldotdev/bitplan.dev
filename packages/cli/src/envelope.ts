@@ -294,7 +294,9 @@ export async function openEnvelope(
 
 	let parsed: unknown
 	try {
-		parsed = JSON.parse(new TextDecoder().decode(Uint8Array.from(decrypted.plaintext)))
+		parsed = JSON.parse(
+			new TextDecoder().decode(Uint8Array.from(decrypted.plaintext)),
+		)
 	} catch {
 		throw new CliError(
 			'Decrypted this draft but its plaintext is not valid JSON.',

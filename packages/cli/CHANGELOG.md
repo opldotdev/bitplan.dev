@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.0.5
+
+### Changed
+
+- Version publishes spend the existing coin through the local createAction pipeline, with 1sat permission-module labels omitted, so BSV Desktop can sign a reinscribe.
+- Content reads default to `https://api.1sat.app` (`GET /content/<origin>:<seq>`).
+- `bitplan list --verbose` prints one labeled block per draft instead of widening the table.
+- `bitplan list` recovers title, description, and version from the on-chain envelope when local `drafts.json` is missing or behind the wallet.
+
+### Fixed
+
+- `--version` and `--limit` reject junk instead of coercing it.
+- A corrupt or invalid `drafts.json` is an error, not an empty list.
+- Content-type matching accepts parameters (`application/x-bitplan; charset=binary`) and rejects prefix lookalikes.
+
 ## 0.0.4
 
 ### Breaking Changes
@@ -9,7 +24,7 @@
 ### Changed
 
 - Version publishes go through `sendOrdinals.execute` so the new envelope lands on the same satoshi.
-- `bitplan list` prints a table (short origin/outpoint, time-ago). `--verbose` keeps full hashes and ISO timestamps. `--json` is unchanged.
+- `bitplan list` prints a compact table. `--verbose` uses one labeled block per draft so full hashes and timestamps remain readable. `--json` is unchanged.
 
 ## 0.0.3
 

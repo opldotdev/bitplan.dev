@@ -1,4 +1,4 @@
-import { CONTENT_TYPE } from '../constants.js'
+import { isBitplanContentType } from '../constants.js'
 import { openEnvelope } from '../envelope.js'
 import { CliError } from '../errors.js'
 import { fetchLatest, originFromReference } from '../ordfs.js'
@@ -25,11 +25,14 @@ export async function fetchCommand(
 
 	let seq: number | undefined
 	if (options.version !== undefined) {
-		const parsed = Number.parseInt(options.version, 10)
-		if (!Number.isInteger(parsed) || parsed < 1) {
+		if (!/^[1-9]\d*$/.test(options.version)) {
 			throw new CliError(
 				`--version must be a positive version number; got "${options.version}".`,
 			)
+		}
+		const parsed = Number(options.version)
+		if (!Number.isSafeInteger(parsed)) {
+			throw new CliError(`--version is too large; got "${options.version}".`)
 		}
 		// Version 1 is the genesis inscription, which ORDFS calls sequence 0.
 		seq = parsed - 1
@@ -40,7 +43,7 @@ export async function fetchCommand(
 		seq,
 	})
 
-	if (!content.contentType.startsWith(CONTENT_TYPE)) {
+	if (!isBitplanContentType(content.contentType)) {
 		throw new CliError(
 			`${origin} is a ${content.contentType} inscription, not a bitplan draft.`,
 		)
