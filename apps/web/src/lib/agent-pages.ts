@@ -3,7 +3,7 @@ import { GITHUB_URL, SITE_URL } from "@/lib/site";
 const PAGES: Record<string, string> = {
   "/": `# BitPlan
 
-Plan documents on Bitcoin. Encrypted by default. No servers hold your content.
+Secure agent plans on Bitcoin. Encrypted by default. No servers hold your content.
 
 Publish a self-contained HTML file with the CLI:
 
