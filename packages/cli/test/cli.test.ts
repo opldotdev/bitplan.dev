@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { beforeAll, describe, expect, test } from 'bun:test'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -175,6 +175,22 @@ describe('npx and bunx bin runners', () => {
 	const cliSrc = path.join(import.meta.dir, '../src/cli.ts')
 	const wrapper = path.join(import.meta.dir, '../bin/bitplan.mjs')
 	const dist = path.join(import.meta.dir, '../dist/bitplan.js')
+
+	// The wrapper tests exercise the real published artifact, so build it
+	// when absent (fresh clone). CI builds beforehand and skips this.
+	beforeAll(() => {
+		if (fs.existsSync(dist)) return
+		const result = Bun.spawnSync(['bun', 'run', 'build'], {
+			cwd: path.join(import.meta.dir, '..'),
+			stderr: 'pipe',
+			stdout: 'pipe',
+		})
+		if (result.exitCode !== 0) {
+			throw new Error(
+				`bun run build failed:\n${result.stdout.toString()}${result.stderr.toString()}`,
+			)
+		}
+	}, 120_000)
 
 	function run(runtime: 'bun' | 'node', file: string): string {
 		const result = Bun.spawnSync([runtime, file], {

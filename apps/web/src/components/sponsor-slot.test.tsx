@@ -1,8 +1,12 @@
 import { describe, expect, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
+// mock.module is process-global, so keep every real export intact for test
+// files that load later in the same run.
+const navigation = await import("next/navigation");
 mock.module("next/navigation", () => ({
-  useRouter: () => ({ refresh: () => undefined }),
+  ...navigation,
+  useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
 }));
 
 const { SponsorSlot } = await import("./sponsor-slot");
