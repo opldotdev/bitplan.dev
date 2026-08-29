@@ -144,9 +144,12 @@ export function markdownNotFound(): string {
 
 That URL is not a BitPlan page.
 
+Look next:
+
 - Home: ${SITE_URL}
 - Docs: ${SITE_URL}/docs
 - Sitemap: ${SITE_URL}/sitemap.xml
 - llms.txt: ${SITE_URL}/llms.txt
+- OpenAPI: ${SITE_URL}/openapi.json
 `;
 }

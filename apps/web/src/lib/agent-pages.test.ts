@@ -19,8 +19,10 @@ describe("agent pages", () => {
     expect(LLMS_TXT).toContain("https://www.npmjs.com/package/bitplan");
   });
 
-  test("not-found markdown points at docs and sitemap", () => {
+  test("not-found markdown points at docs, sitemap, and llms.txt", () => {
     expect(markdownNotFound()).toContain("/docs");
     expect(markdownNotFound()).toContain("/sitemap.xml");
+    expect(markdownNotFound()).toContain("/llms.txt");
+    expect(markdownNotFound()).toContain("/openapi.json");
   });
 });
