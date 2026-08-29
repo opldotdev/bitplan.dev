@@ -91,9 +91,9 @@ time with the id the scanner prints:
 bitplan upload plan.html --allow-finding home-path-macos-3f2a91c40b7d
 ```
 
-The scan runs on the plaintext even though the output is encrypted. The
-ciphertext is public forever, so a secret sealed today is a secret leaked the
-day the cipher breaks — and an inscription cannot be recalled.
+The scan runs on the plaintext even though the output is encrypted:
+credentials do not belong in a permanent document, encrypted or not, and an
+inscription cannot be recalled.
 
 ## State
 

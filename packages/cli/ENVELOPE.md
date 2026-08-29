@@ -152,14 +152,11 @@ authenticated data.
 
 ## What is public
 
-Everything on chain is public forever, including the ciphertext. Encryption
-protects the contents against readers **today**; it does not make an
-inscription private against a future break of AES-256-GCM or of the wallet's
-key derivation, and nothing published can be edited or deleted.
-
-That is why a conforming publisher should scan the **plaintext** for
-credentials before sealing it, and why the on-chain MAP metadata is kept to
-three fields.
+The ciphertext and the three MAP fields are public; everything else rides
+inside the encrypted payload. Nothing published can be edited or deleted,
+so a conforming publisher scans the **plaintext** for credentials before
+sealing it — defense in depth for a document that lives forever — and keeps
+the on-chain MAP metadata to three fields.
 
 ## Reserved for later versions
 
