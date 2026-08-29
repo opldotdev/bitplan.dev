@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { markdownForPath, markdownNotFound } from "@/lib/agent-pages";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const accept = request.headers.get("accept") ?? "";
   const path = request.nextUrl.pathname;
 
@@ -67,7 +67,7 @@ function markdownResponse(body: string, status: number): NextResponse {
   return new NextResponse(body, {
     headers: {
       "content-type": "text/markdown; charset=utf-8",
-      vary: "Accept",
+      vary: "Accept, Accept-Encoding",
     },
     status,
   });

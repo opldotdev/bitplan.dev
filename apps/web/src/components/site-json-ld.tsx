@@ -6,8 +6,13 @@ const GRAPH = {
     {
       "@id": `${SITE_URL}/#organization`,
       "@type": "Organization",
+      contactPoint: {
+        "@type": "ContactPoint",
+        contactType: "developer support",
+        url: `${GITHUB_URL}/issues`,
+      },
       name: "BitPlan",
-      sameAs: [GITHUB_URL],
+      sameAs: [GITHUB_URL, "https://www.npmjs.com/package/bitplan"],
       url: SITE_URL,
     },
     {
@@ -23,6 +28,7 @@ const GRAPH = {
       "@id": `${SITE_URL}/#cli`,
       "@type": "SoftwareApplication",
       applicationCategory: "DeveloperApplication",
+      downloadUrl: "https://www.npmjs.com/package/bitplan",
       name: "bitplan",
       offers: {
         "@type": "Offer",
@@ -30,7 +36,7 @@ const GRAPH = {
         priceCurrency: "USD",
       },
       operatingSystem: "macOS, Linux, Windows",
-      url: `${SITE_URL}/docs`,
+      url: "https://www.npmjs.com/package/bitplan",
     },
   ],
 };

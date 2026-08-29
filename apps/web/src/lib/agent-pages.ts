@@ -118,11 +118,17 @@ Do not use BitPlan as a general file host, a server-side notes app, or a substit
 - Docs: ${SITE_URL}/docs
 - How it works: ${SITE_URL}/docs/how-it-works
 - Envelope: ${SITE_URL}/docs/envelope
+- CLI setup: ${SITE_URL}/docs/cli-setup
+- OpenAPI: ${SITE_URL}/openapi.json
 - Source: ${GITHUB_URL}
 
-## Notes
+## HTTP
 
-There is no REST API. Publishing and decrypting go through the user's wallet. Drafts at /d/<origin> are ciphertext and are not indexed.
+Read a published envelope:
+
+    GET ${SITE_URL}/ordfs/content/<origin>:-1
+
+Publishing and decrypting go through the user's wallet via \`npx bitplan\`. Drafts at /d/<origin> are ciphertext and are not indexed.
 `;
 
 export function markdownForPath(pathname: string): string | null {

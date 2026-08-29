@@ -25,7 +25,9 @@ export default function PrivacyPage() {
         <p>
           Ordinary HTTP logs for this website are whatever the host records.
           1Sat indexes public chain data. We cannot un-publish an inscription
-          and we cannot un-decrypt a version someone already holds.
+          and we cannot un-decrypt a version someone already holds. Shared
+          envelopes name reader identity keys in the header; those keys are
+          public on the chain.
         </p>
       </div>
     </main>

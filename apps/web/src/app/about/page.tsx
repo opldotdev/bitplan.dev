@@ -24,7 +24,14 @@ export default function AboutPage() {
           history.
         </p>
         <p>
-          Start with <Link href="/docs/cli-setup">CLI setup</Link>, or read{" "}
+          The product is two pieces: the npm CLI <code>bitplan</code>, and this
+          viewer. The CLI talks to a BRC-100 wallet on 127.0.0.1:3321, encrypts
+          HTML, and inscribes it. The viewer fetches ciphertext from 1Sat and
+          asks the same kind of wallet to decrypt. Neither piece is a hosted
+          notes app.
+        </p>
+        <p>
+          Start with <Link href="/docs/cli-setup">BitPlan CLI</Link>, or read{" "}
           <Link href="/docs/how-it-works">how it works</Link>. Source is on{" "}
           <a href="https://github.com/opldotdev/bitplan.dev">GitHub</a>.
         </p>

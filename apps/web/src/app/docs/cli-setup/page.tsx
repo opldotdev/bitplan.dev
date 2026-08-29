@@ -6,13 +6,13 @@ import { CommandCopy } from "@/components/command-copy";
 export const metadata: Metadata = {
   description:
     "Connect a BRC-100 wallet, then publish with npx bitplan or bunx bitplan.",
-  title: "CLI setup",
+  title: "BitPlan CLI",
 };
 
 export default function CliSetupPage() {
   return (
     <>
-      <h1>CLI setup</h1>
+      <h1>BitPlan CLI</h1>
       <p>
         bitplan talks to a BRC-100 wallet on this machine. The wallet owns every
         identity key and handles BRC-2 wrapping, unwrapping, signing, and
