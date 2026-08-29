@@ -41,6 +41,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // The share-card routes read these at runtime via process.cwd().
+  outputFileTracingIncludes: {
+    "/**": ["./assets/og/**"],
+  },
   poweredByHeader: false,
 };
 
