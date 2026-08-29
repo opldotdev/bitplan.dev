@@ -1,14 +1,17 @@
+import { parseEnvelope } from "@/lib/envelope";
 import { toOrdinalOutpoint } from "@/lib/outpoint";
 
 /**
- * Same-origin ORDFS proxy. next.config.ts rewrites `/ordfs/:path*` to
- * `https://ordfs.network/:path*` so the browser can read `x-outpoint`,
- * `x-origin`, and `x-ord-seq` (ordfs.network CORS does not expose them).
+ * Same-origin content proxy. next.config.ts rewrites `/ordfs/:path*` to
+ * `https://api.1sat.app/:path*` so the browser can read `x-outpoint`,
+ * `x-origin`, and `x-ord-seq`.
  */
 export const ORDFS_PROXY = "/ordfs";
 
 /** Absolute gateway for server-side reads (OG images, metadata). */
-export const ORDFS_GATEWAY = "https://ordfs.network";
+export const ORDFS_GATEWAY = "https://api.1sat.app";
+
+export const BITPLAN_CONTENT_TYPE = "application/x-bitplan";
 
 export interface OrdfsContent {
   bytes: Uint8Array;
@@ -18,6 +21,22 @@ export interface OrdfsContent {
   outpoint: string | null;
   /** Position in the transfer chain, when ORDFS reports one. */
   sequence: number | null;
+}
+
+export type OrdfsContentResult =
+  | { state: "found"; content: OrdfsContent }
+  | { state: "not-found" }
+  | { state: "network-error" }
+  | { state: "server-error"; status: number }
+  | { state: "request-error"; status: number }
+  | {
+      state: "invalid-content";
+      reason: "content-type" | "envelope";
+      contentType: string;
+    };
+
+function mediaType(value: string): string {
+  return value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
 }
 
 export function ordfsContentUrl(origin: string, seq: number): string {
@@ -83,37 +102,72 @@ export async function fetchOrdfsMeta(
  * Fetch inscription bytes for an origin chain.
  *
  * `seq` -1 = latest tip, -2 = origin, N = Nth state (0-based).
- * Returns `null` on 404 or any other unsuccessful response.
+ * Distinguishes an absent inscription from connectivity, gateway, and content
+ * validation failures so callers never present an outage as a missing draft.
  */
 export async function fetchOrdfsContent(
   origin: string,
   seq: number
-): Promise<OrdfsContent | null> {
+): Promise<OrdfsContentResult> {
   const url = ordfsContentUrl(origin, seq);
 
   let response: Response;
   try {
     response = await fetch(url, { cache: "no-store" });
   } catch {
-    return null;
+    return { state: "network-error" };
   }
 
+  if (response.status === 404) {
+    return { state: "not-found" };
+  }
+  if (response.status >= 500) {
+    return { state: "server-error", status: response.status };
+  }
   if (!response.ok) {
-    return null;
+    return { state: "request-error", status: response.status };
   }
 
-  const buffer = await response.arrayBuffer();
+  const contentType =
+    response.headers.get("content-type") ?? "application/octet-stream";
+  if (mediaType(contentType) !== BITPLAN_CONTENT_TYPE) {
+    return {
+      contentType,
+      reason: "content-type",
+      state: "invalid-content",
+    };
+  }
+
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await response.arrayBuffer());
+  } catch {
+    return { state: "network-error" };
+  }
+
+  try {
+    parseEnvelope(bytes);
+  } catch {
+    return {
+      contentType,
+      reason: "envelope",
+      state: "invalid-content",
+    };
+  }
+
   const sequenceHeader = response.headers.get("x-ord-seq");
   const parsedSequence = sequenceHeader
     ? Number.parseInt(sequenceHeader, 10)
     : Number.NaN;
 
   return {
-    bytes: new Uint8Array(buffer),
-    contentType:
-      response.headers.get("content-type") ?? "application/octet-stream",
-    origin: response.headers.get("x-origin"),
-    outpoint: response.headers.get("x-outpoint"),
-    sequence: Number.isFinite(parsedSequence) ? parsedSequence : null,
+    content: {
+      bytes,
+      contentType,
+      origin: response.headers.get("x-origin"),
+      outpoint: response.headers.get("x-outpoint"),
+      sequence: Number.isFinite(parsedSequence) ? parsedSequence : null,
+    },
+    state: "found",
   };
 }

@@ -1,10 +1,11 @@
 /**
  * ORDFS reader.
  *
- * ORDFS (https://ordfs.network) resolves an origin outpoint to the current tip
- * of its transfer chain, which is exactly what reinscription-as-versioning
- * needs: `GET /content/<origin>:-1` walks forward to the newest envelope and
- * reports where it landed in `X-Outpoint` / `X-Ord-Seq`.
+ * The 1sat content gateway (https://api.1sat.app) resolves an origin outpoint
+ * to the current tip of its transfer chain, which is exactly what
+ * reinscription-as-versioning needs: `GET /content/<origin>:-1` walks forward
+ * to the newest envelope and reports where it landed in `X-Outpoint` /
+ * `X-Ord-Seq`.
  *
  * Sequence values (see the ORDFS docs):
  *   (none) raw content at that outpoint, no crawl

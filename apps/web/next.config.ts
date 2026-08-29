@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        destination: "https://ordfs.network/:path*",
+        destination: "https://api.1sat.app/:path*",
         source: "/ordfs/:path*",
       },
     ];

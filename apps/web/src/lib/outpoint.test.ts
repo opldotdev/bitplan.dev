@@ -40,7 +40,7 @@ describe("outpoint normalization", () => {
 
   test("ordfs gateway URL is absolute so OG generation can HEAD it", () => {
     expect(ordfsGatewayContentUrl(`${TXID}_0`, -1)).toBe(
-      `https://ordfs.network/content/${TXID}_0:-1`
+      `https://api.1sat.app/content/${TXID}_0:-1`
     );
   });
 

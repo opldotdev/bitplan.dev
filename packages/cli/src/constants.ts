@@ -10,6 +10,11 @@ export const ORIGINATOR = 'bitplan.dev'
  */
 export const CONTENT_TYPE = 'application/x-bitplan'
 
+/** Match the media type exactly while allowing case and standard parameters. */
+export function isBitplanContentType(contentType: string): boolean {
+	return contentType.split(';', 1)[0]?.trim().toLowerCase() === CONTENT_TYPE
+}
+
 /** Ordinals-basket tag every bitplan coin carries, from genesis onward. */
 export const TYPE_TAG = `type:${CONTENT_TYPE}`
 
@@ -32,8 +37,8 @@ export const DEFAULT_WALLET_URL = 'http://127.0.0.1:3321'
 /** Public viewer for a published draft. */
 export const VIEWER_BASE_URL = 'https://bitplan.dev/d'
 
-/** ORDFS gateway used to read published envelopes back. */
-export const DEFAULT_ORDFS_URL = 'https://ordfs.network'
+/** 1sat content gateway used to read published envelopes back. */
+export const DEFAULT_ORDFS_URL = 'https://api.1sat.app'
 
 /** Fee estimate shown before publishing, in satoshis per 1000 bytes. */
 export const FEE_SATS_PER_KB = 1

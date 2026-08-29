@@ -26,7 +26,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
 import { openEnvelope } from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
-import { fetchOrdfsContent, type OrdfsContent } from "@/lib/ordfs";
+import {
+  fetchOrdfsContent,
+  type OrdfsContent,
+  type OrdfsContentResult,
+} from "@/lib/ordfs";
 import { normalizeOrigin } from "@/lib/outpoint";
 import {
   clampVersion,
@@ -42,7 +46,7 @@ import {
 
 type WalletIssue = "no-wallet" | "unwrap-refused";
 
-interface LoadedDraft {
+export interface LoadedDraft {
   content: OrdfsContent;
   currentVersion: number;
   latestVersion: number;
@@ -65,24 +69,112 @@ export function DraftResolving() {
   );
 }
 
-type ResolveResult =
+export type ResolveResult =
+  | { state: "invalid-origin"; origin: string }
   | { state: "not-found"; origin: string }
+  | {
+      state: "unavailable";
+      origin: string;
+      reason: "network" | "server" | "request";
+      status?: number;
+    }
+  | {
+      state: "invalid-content";
+      origin: string;
+      reason: "content-type" | "envelope";
+      contentType: string;
+    }
   | { state: "found"; draft: LoadedDraft };
 
+export type ViewerState =
+  | { phase: "resolving"; requestKey: string }
+  | {
+      phase: "problem";
+      requestKey: string;
+      problem: Exclude<ResolveResult, { state: "found" }>;
+    }
+  | {
+      phase: "encrypted";
+      requestKey: string;
+      draft: LoadedDraft;
+      walletIssue: WalletIssue | null;
+    }
+  | {
+      phase: "decrypted";
+      requestKey: string;
+      draft: LoadedDraft;
+      plaintext: DraftPlaintext;
+    };
+
+/** A route may only render async state produced for that exact route/version. */
+export function isViewerStateCurrent(
+  state: ViewerState,
+  requestKey: string
+): boolean {
+  return state.requestKey === requestKey;
+}
+
+export function viewerRequestKey(
+  originParam: string,
+  requestedVersion: number | null
+): string {
+  return `${originParam}:${requestedVersion ?? "latest"}`;
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled state: ${String(value)}`);
+}
+
+function toResolveFailure(
+  result: Exclude<OrdfsContentResult, { state: "found" }>,
+  origin: string
+): Exclude<ResolveResult, { state: "found" }> {
+  switch (result.state) {
+    case "not-found":
+      return { origin, state: "not-found" };
+    case "network-error":
+      return { origin, reason: "network", state: "unavailable" };
+    case "server-error":
+      return {
+        origin,
+        reason: "server",
+        state: "unavailable",
+        status: result.status,
+      };
+    case "request-error":
+      return {
+        origin,
+        reason: "request",
+        state: "unavailable",
+        status: result.status,
+      };
+    case "invalid-content":
+      return {
+        contentType: result.contentType,
+        origin,
+        reason: result.reason,
+        state: "invalid-content",
+      };
+    default:
+      return assertNever(result);
+  }
+}
+
 /** Resolve origin + requested version to the envelope bytes to display. */
-async function resolveDraft(
+export async function resolveDraft(
   originParam: string,
   requestedVersion: number | null
 ): Promise<ResolveResult> {
   const origin = normalizeOrigin(originParam);
   if (!origin) {
-    return { origin: originParam, state: "not-found" };
+    return { origin: originParam, state: "invalid-origin" };
   }
 
-  const latest = await fetchOrdfsContent(origin, -1);
-  if (!latest) {
-    return { origin, state: "not-found" };
+  const latestResult = await fetchOrdfsContent(origin, -1);
+  if (latestResult.state !== "found") {
+    return toResolveFailure(latestResult, origin);
   }
+  const { content: latest } = latestResult;
 
   const latestVersion = seqToVersion(latest.sequence ?? 0);
   const currentVersion = clampVersion(
@@ -92,14 +184,14 @@ async function resolveDraft(
 
   let content = latest;
   if (currentVersion !== latestVersion) {
-    const pinned = await fetchOrdfsContent(
+    const pinnedResult = await fetchOrdfsContent(
       origin,
       versionToSeq(currentVersion)
     );
-    if (!pinned) {
-      return { origin, state: "not-found" };
+    if (pinnedResult.state !== "found") {
+      return toResolveFailure(pinnedResult, origin);
     }
-    content = pinned;
+    ({ content } = pinnedResult);
   }
 
   return {
@@ -158,47 +250,46 @@ export function DraftViewer() {
 
   const originParam = params.origin ?? "";
   const requestedVersion = parseVersionQuery(searchParams.get("v"));
+  const requestKey = viewerRequestKey(originParam, requestedVersion);
 
-  const [loaded, setLoaded] = useState<LoadedDraft | null>(null);
-  const [notFoundOrigin, setNotFoundOrigin] = useState<string | null>(null);
-  const [resolving, setResolving] = useState(true);
-  const [plaintext, setPlaintext] = useState<DraftPlaintext | null>(null);
-  const [walletIssue, setWalletIssue] = useState<WalletIssue | null>(null);
+  const [view, setView] = useState<ViewerState>({
+    phase: "resolving",
+    requestKey,
+  });
   const [busy, setBusy] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const walletRef = useRef<EnvelopeWallet | null>(null);
-  const decryptedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      setResolving(true);
-      setNotFoundOrigin(null);
+      setBusy(false);
+      setView({ phase: "resolving", requestKey });
 
       const result = await resolveDraft(originParam, requestedVersion);
       if (cancelled) {
         return;
       }
 
-      if (result.state === "not-found") {
-        setLoaded(null);
-        setPlaintext(null);
-        setNotFoundOrigin(result.origin);
-        setResolving(false);
+      if (result.state !== "found") {
+        setView({ phase: "problem", problem: result, requestKey });
         return;
       }
 
-      setLoaded(result.draft);
-      setNotFoundOrigin(null);
-      setWalletIssue(null);
+      setView({
+        draft: result.draft,
+        phase: "encrypted",
+        requestKey,
+        walletIssue: null,
+      });
 
       const wallet = walletRef.current ?? (await walletForDecrypt());
       if (cancelled) {
         return;
       }
       if (!wallet) {
-        setResolving(false);
         return;
       }
 
@@ -208,95 +299,101 @@ export function DraftViewer() {
         return;
       }
       if (reopened.plaintext) {
-        decryptedRef.current = true;
+        setView({
+          draft: result.draft,
+          phase: "decrypted",
+          plaintext: reopened.plaintext,
+          requestKey,
+        });
+        return;
       }
-      setPlaintext(reopened.plaintext);
-      setWalletIssue(reopened.issue);
-      setResolving(false);
+      setView({
+        draft: result.draft,
+        phase: "encrypted",
+        requestKey,
+        walletIssue: reopened.issue,
+      });
     }
 
     load();
     return () => {
       cancelled = true;
     };
-  }, [originParam, requestedVersion]);
+  }, [originParam, requestedVersion, requestKey, retryCount]);
 
   const handleConnect = useCallback(async () => {
-    if (!loaded || busy) {
+    if (view.phase !== "encrypted" || busy) {
       return;
     }
+    const { draft } = view;
     setBusy(true);
-    setWalletIssue(null);
+    setView({ ...view, walletIssue: null });
 
     try {
-      if (!walletRef.current) {
-        walletRef.current = await connectBrowserWallet();
-      }
+      walletRef.current = walletRef.current ?? (await connectBrowserWallet());
     } catch {
-      setWalletIssue("no-wallet");
+      setView((current) =>
+        current.requestKey === requestKey && current.phase === "encrypted"
+          ? { ...current, walletIssue: "no-wallet" }
+          : current
+      );
       setBusy(false);
       return;
     }
 
     try {
-      const opened = await openEnvelope(
-        walletRef.current,
-        loaded.content.bytes
+      const opened = await openEnvelope(walletRef.current, draft.content.bytes);
+      setView((current) =>
+        current.requestKey === requestKey && current.phase === "encrypted"
+          ? {
+              draft,
+              phase: "decrypted",
+              plaintext: opened.plaintext,
+              requestKey,
+            }
+          : current
       );
-      decryptedRef.current = true;
-      setPlaintext(opened.plaintext);
-      setWalletIssue(null);
     } catch {
-      setWalletIssue("unwrap-refused");
+      setView((current) =>
+        current.requestKey === requestKey && current.phase === "encrypted"
+          ? { ...current, walletIssue: "unwrap-refused" }
+          : current
+      );
     } finally {
       setBusy(false);
     }
-  }, [busy, loaded]);
+  }, [busy, requestKey, view]);
+
+  const handleRetry = useCallback(() => {
+    setRetryCount((count) => count + 1);
+  }, []);
 
   const handleVersion = useCallback(
     (version: number) => {
-      if (!loaded || version === loaded.currentVersion) {
+      if (view.phase !== "decrypted" || version === view.draft.currentVersion) {
         return;
       }
-      const query = version === loaded.latestVersion ? "" : `?v=${version}`;
-      router.replace(`/d/${loaded.origin}${query}`, { scroll: false });
+      const query = version === view.draft.latestVersion ? "" : `?v=${version}`;
+      router.replace(`/d/${view.draft.origin}${query}`, { scroll: false });
     },
-    [loaded, router]
+    [router, view]
   );
 
-  if (resolving && !plaintext) {
+  if (!isViewerStateCurrent(view, requestKey) || view.phase === "resolving") {
     return <DraftResolving />;
   }
 
-  if (notFoundOrigin !== null && !loaded) {
-    return (
-      <div className="flex min-h-dvh flex-col">
-        <ViewerHeader />
-        <main className="mx-auto flex w-full max-w-[42rem] flex-1 flex-col justify-center px-6 py-10">
-          <Card>
-            <CardHeader>
-              <CardTitle>No draft at this origin.</CardTitle>
-              <CardDescription className="break-all font-mono">
-                {notFoundOrigin}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </main>
-      </div>
-    );
+  if (view.phase === "problem") {
+    return <DraftProblemView onRetry={handleRetry} problem={view.problem} />;
   }
 
-  if (!loaded) {
-    return <DraftResolving />;
-  }
-
-  if (plaintext) {
+  if (view.phase === "decrypted") {
     return (
       <DecryptedView
-        currentVersion={loaded.currentVersion}
-        latestVersion={loaded.latestVersion}
+        currentVersion={view.draft.currentVersion}
+        latestVersion={view.draft.latestVersion}
         onVersion={handleVersion}
-        plaintext={plaintext}
+        plaintext={view.plaintext}
       />
     );
   }
@@ -304,12 +401,12 @@ export function DraftViewer() {
   return (
     <EncryptedView
       busy={busy}
-      content={loaded.content}
-      currentVersion={loaded.currentVersion}
-      latestVersion={loaded.latestVersion}
+      content={view.draft.content}
+      currentVersion={view.draft.currentVersion}
+      latestVersion={view.draft.latestVersion}
       onConnect={handleConnect}
-      origin={loaded.origin}
-      walletIssue={walletIssue}
+      origin={view.draft.origin}
+      walletIssue={view.walletIssue}
     />
   );
 }
@@ -329,6 +426,76 @@ function Wordmark() {
       BitPlan
       <span className="text-primary">.</span>
     </Link>
+  );
+}
+
+function DraftProblemView({
+  problem,
+  onRetry,
+}: {
+  problem: Exclude<ResolveResult, { state: "found" }>;
+  onRetry: () => void;
+}) {
+  let title: string;
+  let description: string;
+  let retryable = false;
+
+  switch (problem.state) {
+    case "invalid-origin":
+      title = "Invalid draft link.";
+      description = "This URL does not contain a valid draft origin.";
+      break;
+    case "not-found":
+      title = "No draft at this origin.";
+      description = "OrdFS has no inscription for this draft origin.";
+      break;
+    case "invalid-content":
+      title = "This inscription is not a BitPlan draft.";
+      description =
+        problem.reason === "content-type"
+          ? `Expected application/x-bitplan, received ${problem.contentType}.`
+          : "The inscription has the BitPlan content type but its envelope is malformed.";
+      break;
+    case "unavailable":
+      retryable = true;
+      if (problem.reason === "network") {
+        title = "Could not reach OrdFS.";
+        description =
+          "Check your connection, then try loading the draft again.";
+      } else if (problem.reason === "server") {
+        title = "OrdFS is temporarily unavailable.";
+        description = `The gateway returned status ${problem.status ?? 500}. Try again shortly.`;
+      } else {
+        title = "OrdFS rejected this request.";
+        description = `The gateway returned status ${problem.status ?? "unknown"}.`;
+      }
+      break;
+    default:
+      return assertNever(problem);
+  }
+
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <ViewerHeader />
+      <main className="mx-auto flex w-full max-w-[42rem] flex-1 flex-col justify-center px-6 py-10">
+        <Card>
+          <CardHeader>
+            <CardTitle>{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="break-all font-mono text-muted-foreground text-xs">
+              {problem.origin}
+            </p>
+            {retryable ? (
+              <Button onClick={onRetry} type="button" variant="outline">
+                Try again
+              </Button>
+            ) : null}
+          </CardContent>
+        </Card>
+      </main>
+    </div>
   );
 }
 

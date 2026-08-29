@@ -51,10 +51,11 @@ type ListState =
 
 async function toRow(wallet: DraftsWallet, coin: DraftCoin): Promise<DraftRow> {
   try {
-    const content = await fetchOrdfsContent(coin.origin, -1);
-    if (!content) {
+    const result = await fetchOrdfsContent(coin.origin, -1);
+    if (result.state !== "found") {
       return { ...coin, latestVersion: null, meta: null };
     }
+    const { content } = result;
     const latestVersion = seqToVersion(content.sequence ?? 0);
     const opened = await openEnvelope(wallet, content.bytes);
     return { ...coin, latestVersion, meta: opened.plaintext.meta };
