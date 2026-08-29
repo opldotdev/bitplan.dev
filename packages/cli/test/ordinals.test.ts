@@ -112,7 +112,7 @@ describe('buildVersionTransfer', () => {
 })
 
 describe('publishVersion', () => {
-	test('reinscribes through sendOrdinals and drops p-labels on createAction', async () => {
+	test('reinscribes through the local pipeline and does not send p-labels', async () => {
 		const { coin, output } = makeCoin()
 		const txid = 'b'.repeat(64)
 		let createActionCalls = 0
