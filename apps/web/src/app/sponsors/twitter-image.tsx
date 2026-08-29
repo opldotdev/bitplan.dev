@@ -7,6 +7,7 @@ export const size = OG_SIZE;
 export default function Image() {
   return siteOgImage({
     headline: "Sponsor BitPlan.",
+    pill: "bitplan.dev/sponsors",
     subhead: "Help keep encrypted plan documents on Bitcoin.",
   });
 }
