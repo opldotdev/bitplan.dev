@@ -69,8 +69,8 @@ export function buildProgram(): Command {
 		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
 		.option('--ordfs-url <url>', 'ORDFS gateway base URL')
 		.option(
-			'--relay',
-			'Relay wallet BEEF through 1Sat; may speed ORDFS availability',
+			'--no-relay',
+			'Do not notify 1Sat for ORDFS capture after publishing',
 		)
 		.action(uploadCommand)
 

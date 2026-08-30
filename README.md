@@ -12,7 +12,7 @@ version moves the same satoshi forward, giving the plan one permanent origin.
 
 ```sh
 npx bitplan auth
-npx bitplan upload ./plan.html --relay
+npx bitplan upload ./plan.html
 ```
 
 The command prints a private BitPlan link. Open it in a browser, connect the
@@ -53,8 +53,7 @@ Add one or more BRC-100 identity keys when publishing:
 
 ```sh
 npx bitplan upload ./plan.html \
-  --share-with <identity-key> \
-  --relay
+  --share-with <identity-key>
 ```
 
 The document is encrypted once. Its document key is wrapped separately for

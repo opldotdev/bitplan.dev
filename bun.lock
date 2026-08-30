@@ -48,7 +48,7 @@
     },
     "packages/cli": {
       "name": "bitplan",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "bin": {
         "bitplan": "./bin/bitplan.mjs",
       },

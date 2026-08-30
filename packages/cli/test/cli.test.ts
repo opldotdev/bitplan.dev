@@ -95,7 +95,7 @@ describe('cli surface', () => {
 				'--description',
 				'--share-with',
 				'--private',
-				'--relay',
+				'--no-relay',
 				'--yes',
 				'--allow-finding',
 				'--wallet-url',

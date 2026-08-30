@@ -244,7 +244,7 @@ export async function uploadCommand(
 		)
 	}
 
-	if (options.relay) {
+	if (options.relay !== false) {
 		if (published.beef) {
 			try {
 				const relay = await relayBeef(published.beef, published.txid)

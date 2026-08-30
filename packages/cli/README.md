@@ -27,17 +27,18 @@ npx bitplan upload ./plan.html
 bunx bitplan upload ./plan.html
 ```
 
-Add `--relay` when the viewer should become available as quickly as possible:
+By default, BitPlan notifies 1Sat after the wallet publishes so ORDFS can capture
+the transaction as quickly as possible. Opt out when needed:
 
 ```sh
-npx bitplan upload ./plan.html --relay
+npx bitplan upload ./plan.html --no-relay
 ```
 
-The wallet still publishes normally. Afterward, bitplan sends the
+Normally, the wallet publishes first. Afterward, bitplan sends the
 wallet-returned Atomic BEEF through 1Sat, which attempts to capture it for
 ORDFS and forwards the transaction to Arcade. This may make the viewer
 available sooner. A relay failure is only a warning because the wallet publish
-may already have succeeded.
+may already have succeeded. `--no-relay` skips only this notification.
 
 Attach an optional description (shown in `bitplan list` and the My drafts page).
 Re-running with `--description` updates it; omitting it leaves the existing one
@@ -114,7 +115,7 @@ bitplan upload <file>
   --description <text>     Set a short description
   --share-with <key>       Add a reader identity key (repeatable)
   --private                Make the new version wallet-only
-  --relay                  Relay wallet BEEF through 1Sat; may speed ORDFS availability
+  --no-relay               Skip the default 1Sat notification for ORDFS capture
   -y, --yes                Skip the confirmation prompt
   --allow-finding <id>     Waive one secret-scanner finding (repeatable)
 
@@ -143,9 +144,9 @@ encryption or publishing rather than assuming consent.
 - **Versioning.** The first publish inscribes a 1-satoshi output. Later
   publishes spend that satoshi back to you carrying a new envelope. Only the
   wallet holding the coin can publish the next one.
-- **Propagation.** With `--relay`, the CLI sends the wallet-returned Atomic
-  BEEF to 1Sat. 1Sat attempts to store it for ORDFS and forwards the leaf
-  transaction to Arcade. The wallet remains the publisher.
+- **Propagation.** By default, the CLI sends the wallet-returned Atomic BEEF to
+  1Sat. 1Sat attempts to store it for ORDFS and forwards the leaf transaction to
+  Arcade. The wallet remains the publisher. Pass `--no-relay` to opt out.
 - **Metadata.** The cleartext MAP on chain is three fields:
   `{ app: "bitplan", type: "plan", enc: "1" }`. Titles, descriptions and git
   provenance live inside the ciphertext.

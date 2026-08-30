@@ -28,7 +28,8 @@ describe("sharing instructions", () => {
     expect(instructions).toContain("npx bitplan upload ./plan.html");
     expect(instructions).toContain("--draft origin_0");
     expect(instructions.match(/--share-with/g)).toHaveLength(2);
-    expect(instructions).toContain("--relay");
+    expect(instructions).not.toContain("\n  --no-relay");
+    expect(instructions).toContain("notifies 1Sat for ORDFS capture");
     expect(instructions).toContain("Do not use --private");
     expect(instructions).toContain("BRC-100 wallet");
   });

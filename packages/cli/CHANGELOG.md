@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.10
+
+### Changed
+
+- Uploads now notify 1Sat for ORDFS capture by default after the wallet
+  publishes. Pass `--no-relay` to opt out.
+
 ## 0.0.9
 
 ### Changed

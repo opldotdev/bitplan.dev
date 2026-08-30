@@ -445,8 +445,8 @@ if (!CHILD_RUN) {
 			)
 		})
 
-		test('--relay submits wallet BEEF without changing publish success semantics', async () => {
-			await uploadCommand(htmlFile, { new: true, relay: true, yes: true })
+		test('relays wallet BEEF by default without changing publish success semantics', async () => {
+			await uploadCommand(htmlFile, { new: true, yes: true })
 
 			expect(calls.relays).toEqual([
 				{ beef: genesisBeef, txid: genesisResult.txid },
@@ -456,11 +456,17 @@ if (!CHILD_RUN) {
 			)
 
 			relayError = new Error('relay unavailable')
-			await uploadCommand(htmlFile, { new: true, relay: true, yes: true })
+			await uploadCommand(htmlFile, { new: true, yes: true })
 			expect(calls.saves).toHaveLength(2)
 			expect(console.warn).toHaveBeenCalledWith(
 				expect.stringContaining('wallet published the draft'),
 			)
+		})
+
+		test('relay: false skips the 1Sat notification', async () => {
+			await uploadCommand(htmlFile, { new: true, relay: false, yes: true })
+
+			expect(calls.relays).toEqual([])
 		})
 	})
 

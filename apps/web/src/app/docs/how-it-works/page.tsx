@@ -173,10 +173,10 @@ export default function HowItWorksPage() {
             create its next version.
           </li>
           <li>
-            <strong>Optional relay.</strong> With <code>--relay</code>, the CLI
-            sends the wallet-returned Atomic BEEF to 1Sat. 1Sat attempts to
-            capture it for OrdFS and forwards the transaction to Arcade. The
-            wallet publish remains authoritative.
+            <strong>Notify OrdFS.</strong> By default, the CLI sends the
+            wallet-returned Atomic BEEF to 1Sat. 1Sat attempts to capture it for
+            OrdFS and forwards the transaction to Arcade. The wallet publish
+            remains authoritative; <code>--no-relay</code> opts out.
           </li>
         </ol>
       </section>
