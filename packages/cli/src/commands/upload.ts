@@ -436,10 +436,16 @@ async function adoptFromChain(
 		)
 	}
 	const { header, plaintext } = await openEnvelope(wallet, content.bytes)
+	const previousPublisher = header.v === 2 ? [header.key.senderIdentityKey] : []
 	return {
 		keyID: header.key.keyID,
 		sequence: content.sequence,
-		sharedWith: sharedWithHeader(header),
+		// A transferred ordinal changes who may publish, not who may read.
+		// Keep the previous publisher as a reader; the current wallet's own key
+		// is filtered out before the next envelope is sealed.
+		sharedWith: [
+			...new Set([...sharedWithHeader(header), ...previousPublisher]),
+		],
 		description:
 			typeof plaintext.meta.description === 'string' ||
 			plaintext.meta.description === null

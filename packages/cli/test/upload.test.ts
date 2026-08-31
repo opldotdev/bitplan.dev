@@ -21,6 +21,8 @@ const VERSION_OUTPOINT = `${'b'.repeat(64)}_1`
 const GENESIS_OUTPOINT = `${'c'.repeat(64)}_0`
 const OWNER_IDENTITY_KEY =
 	'0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+const PREVIOUS_OWNER_IDENTITY_KEY =
+	'02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9'
 
 if (!CHILD_RUN) {
 	test('upload orchestration passes in an isolated module-mock process', () => {
@@ -78,6 +80,7 @@ if (!CHILD_RUN) {
 	let knownByOrigin: DraftRecord | undefined
 	let genesisError: Error | undefined
 	let identityKeyCalls = 0
+	let envelopeSenderIdentityKey = OWNER_IDENTITY_KEY
 	let relayError: Error | undefined
 	let stateSaveError: Error | undefined
 	let config: ConfigFile
@@ -144,8 +147,10 @@ if (!CHILD_RUN) {
 		}),
 		openEnvelope: async () => ({
 			header: {
+				v: 2,
 				key: {
 					keyID: 'adopted-key',
+					senderIdentityKey: envelopeSenderIdentityKey,
 					sharedWith: ['adopted-reader'],
 				},
 			},
@@ -222,6 +227,7 @@ if (!CHILD_RUN) {
 		knownByOrigin = undefined
 		genesisError = undefined
 		identityKeyCalls = 0
+		envelopeSenderIdentityKey = OWNER_IDENTITY_KEY
 		relayError = undefined
 		stateSaveError = undefined
 		config = { shareWith: [] }
@@ -430,6 +436,32 @@ if (!CHILD_RUN) {
 			expect(calls.seals[0]?.plaintext.meta.description).toBe(
 				'Description from chain',
 			)
+		})
+
+		test('keeps the previous publisher as a reader after an ordinal handoff', async () => {
+			envelopeSenderIdentityKey = PREVIOUS_OWNER_IDENTITY_KEY
+			knownByFile = {
+				...existingRecord(),
+				latestOutpoint: `${'e'.repeat(64)}_0`,
+			}
+			ordfsContent = {
+				bytes: Uint8Array.of(1, 2, 3),
+				contentType: 'application/x-bitplan',
+				origin: ORIGIN,
+				outpoint: VERSION_OUTPOINT,
+				sequence: 3,
+			}
+
+			await uploadCommand(htmlFile, { yes: true })
+
+			expect(calls.seals[0]?.sharedWith).toEqual([
+				'adopted-reader',
+				PREVIOUS_OWNER_IDENTITY_KEY,
+			])
+			expect(calls.saves[0]?.record.sharedWithRaw).toEqual([
+				'adopted-reader',
+				PREVIOUS_OWNER_IDENTITY_KEY,
+			])
 		})
 
 		test('does not reapply stale local team refs when adopting a newer tip', async () => {

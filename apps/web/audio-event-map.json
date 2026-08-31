@@ -29,9 +29,7 @@
     },
     "async": {
       "status": "reviewed",
-      "items": [
-        "sonner toast success/error/warning/info"
-      ]
+      "items": ["sonner toast success/error/warning/info"]
     },
     "auth": {
       "status": "reviewed",
@@ -254,10 +252,7 @@
       "browser_evidence": [
         {
           "url": "http://127.0.0.1:3000/docs",
-          "steps": [
-            "Set the viewport to 390x844.",
-            "Click Open menu."
-          ],
+          "steps": ["Set the viewport to 390x844.", "Click Open menu."],
           "observation": "Only navigation/nav-menu-open.mp3 played. The sheet listed Docs, My drafts, and Sponsors.",
           "result": "pass"
         }

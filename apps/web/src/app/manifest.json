@@ -1,7 +1,7 @@
 {
   "name": "BitPlan",
   "short_name": "BitPlan",
-  "description": "Create, encrypt, publish, and review plans with your BRC-100 wallet.",
+  "description": "Create and review encrypted 1Sat Ordinal plan inscriptions. Wallet access uses BRC-100.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

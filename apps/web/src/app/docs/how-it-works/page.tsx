@@ -74,7 +74,7 @@ const decryptedPlan = new SymmetricKey(keyBytes).decrypt(encryptedPlan)
 
 export const metadata: Metadata = {
   description:
-    "How BitPlan uses a BRC-100 wallet to encrypt, publish, version, and read HTML drafts.",
+    "How BitPlan uses the BRC-100 wallet interface to publish and read encrypted 1Sat Ordinal inscriptions.",
   title: "How it works",
 };
 
@@ -83,10 +83,11 @@ export default function HowItWorksPage() {
     <>
       <h1>How it works</h1>
       <p>
-        BitPlan publishes encrypted HTML drafts as versioned 1Sat Ordinals.
-        Private drafts are encrypted by the wallet. For sharing, the CLI uses
-        the SDK to encrypt the document once and asks the wallet to wrap its key
-        for each reader. The wallet always owns the identity keys, signs, and
+        BitPlan publishes encrypted HTML drafts as versioned 1Sat Ordinal
+        inscriptions. BRC-100 is the interface BitPlan uses to talk to the
+        wallet; it is not an inscription format. For sharing, the CLI uses the
+        SDK to encrypt the document once and asks the wallet to wrap its key for
+        each reader. The wallet always owns the identity keys, signs, and
         publishes.
       </p>
       <ArchitectureDiagram />

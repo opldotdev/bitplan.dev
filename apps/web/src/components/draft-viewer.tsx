@@ -24,7 +24,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
-import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
+import { type DraftsWallet, walletOwnsDraft } from "@/lib/drafts";
+import type { DraftMeta, DraftPlaintext } from "@/lib/envelope";
 import { EnvelopeAccessError, openEnvelope } from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
 import {
@@ -54,6 +55,7 @@ type WalletIssue =
 export interface LoadedDraft {
   content: OrdfsContent;
   currentVersion: number;
+  latestOutpoint: string | null;
   latestVersion: number;
   origin: string;
 }
@@ -104,6 +106,7 @@ export type ViewerState =
       phase: "decrypted";
       requestKey: string;
       draft: LoadedDraft;
+      canPublish: boolean;
       plaintext: DraftPlaintext;
     };
 
@@ -196,21 +199,36 @@ export async function resolveDraft(
   }
 
   return {
-    draft: { content, currentVersion, latestVersion, origin },
+    draft: {
+      content,
+      currentVersion,
+      latestOutpoint: latest.outpoint,
+      latestVersion,
+      origin,
+    },
     state: "found",
   };
 }
 
 /** Re-open a draft with an already-connected wallet after a version switch. */
 async function reopenDraft(
-  wallet: EnvelopeWallet,
-  bytes: Uint8Array
-): Promise<{ plaintext: DraftPlaintext | null; issue: WalletIssue | null }> {
+  wallet: DraftsWallet,
+  draft: LoadedDraft
+): Promise<{
+  canPublish: boolean;
+  plaintext: DraftPlaintext | null;
+  issue: WalletIssue | null;
+}> {
   try {
-    const opened = await openEnvelope(wallet, bytes);
-    return { issue: null, plaintext: opened.plaintext };
+    const opened = await openEnvelope(wallet, draft.content.bytes);
+    const canPublish = await canPublishDraft(wallet, draft);
+    return { canPublish, issue: null, plaintext: opened.plaintext };
   } catch (error) {
-    return { issue: accessIssue(error), plaintext: null };
+    return {
+      canPublish: false,
+      issue: accessIssue(error),
+      plaintext: null,
+    };
   }
 }
 
@@ -233,8 +251,19 @@ function walletIssueMessage(issue: WalletIssue): string {
   }
 }
 
-async function walletForDecrypt(): Promise<EnvelopeWallet | null> {
+async function walletForDecrypt(): Promise<DraftsWallet | null> {
   return getConnectedWallet() ?? (await reconnectAuthenticatedWallet());
+}
+
+async function canPublishDraft(
+  wallet: DraftsWallet,
+  draft: LoadedDraft
+): Promise<boolean> {
+  try {
+    return await walletOwnsDraft(wallet, draft.origin, draft.latestOutpoint);
+  } catch {
+    return false;
+  }
 }
 
 function VersionPill({
@@ -279,7 +308,7 @@ export function DraftViewer() {
   const [busy, setBusy] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
-  const walletRef = useRef<EnvelopeWallet | null>(null);
+  const walletRef = useRef<DraftsWallet | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -313,12 +342,13 @@ export function DraftViewer() {
       }
 
       walletRef.current = wallet;
-      const reopened = await reopenDraft(wallet, result.draft.content.bytes);
+      const reopened = await reopenDraft(wallet, result.draft);
       if (cancelled) {
         return;
       }
       if (reopened.plaintext) {
         setView({
+          canPublish: reopened.canPublish,
           draft: result.draft,
           phase: "decrypted",
           plaintext: reopened.plaintext,
@@ -361,23 +391,25 @@ export function DraftViewer() {
     }
 
     try {
-      const opened = await openEnvelope(walletRef.current, draft.content.bytes);
-      setView((current) =>
-        current.requestKey === requestKey && current.phase === "encrypted"
-          ? {
-              draft,
-              phase: "decrypted",
-              plaintext: opened.plaintext,
-              requestKey,
-            }
-          : current
-      );
-    } catch (error) {
-      setView((current) =>
-        current.requestKey === requestKey && current.phase === "encrypted"
-          ? { ...current, walletIssue: accessIssue(error) }
-          : current
-      );
+      const reopened = await reopenDraft(walletRef.current, draft);
+      setView((current) => {
+        if (
+          current.requestKey !== requestKey ||
+          current.phase !== "encrypted"
+        ) {
+          return current;
+        }
+        if (!reopened.plaintext) {
+          return { ...current, walletIssue: reopened.issue };
+        }
+        return {
+          canPublish: reopened.canPublish,
+          draft,
+          phase: "decrypted",
+          plaintext: reopened.plaintext,
+          requestKey,
+        };
+      });
     } finally {
       setBusy(false);
     }
@@ -409,6 +441,7 @@ export function DraftViewer() {
   if (view.phase === "decrypted") {
     return (
       <DecryptedView
+        canPublish={view.canPublish}
         currentVersion={view.draft.currentVersion}
         latestVersion={view.draft.latestVersion}
         onVersion={handleVersion}
@@ -608,12 +641,14 @@ function EncryptedView({
 }
 
 function DecryptedView({
+  canPublish,
   plaintext,
   currentVersion,
   latestVersion,
   onVersion,
   origin,
 }: {
+  canPublish: boolean;
   plaintext: DraftPlaintext;
   currentVersion: number;
   latestVersion: number;
@@ -645,7 +680,7 @@ function DecryptedView({
           <div className="flex-1" />
         )}
         <div className="ml-auto flex items-center gap-1">
-          <ShareDraftDialog origin={origin} />
+          {canPublish ? <ShareDraftDialog origin={origin} /> : null}
           <MetaInfo meta={plaintext.meta} />
           <ThemeToggle />
         </div>

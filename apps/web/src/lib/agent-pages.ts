@@ -10,7 +10,7 @@ Publish a self-contained HTML file with the CLI:
     npx bitplan auth
     npx bitplan upload ./plan.html
 
-The CLI talks to a BRC-100 wallet on your machine. The wallet encrypts, signs, and publishes a 1Sat Ordinal. Upload the same file again to reinscribe the same satoshi. One origin outpoint is the draft identity.
+BRC-100 is the interface the CLI uses to talk to a wallet. The published plan is a 1Sat Ordinal inscription; BRC-100 is not an inscription format. The wallet encrypts, signs, and publishes. Upload the same file again to reinscribe the same satoshi. One origin outpoint is the draft identity.
 
 This website is the viewer. It fetches public ciphertext from 1Sat and asks the connected wallet to decrypt. It stores no drafts.
 
@@ -34,7 +34,7 @@ CLI: https://www.npmjs.com/package/bitplan
 `,
   "/docs": `# Docs · BitPlan
 
-The CLI packages a self-contained HTML document and asks your BRC-100 wallet to publish it as an encrypted 1Sat Ordinal.
+The CLI packages a self-contained HTML document and uses the BRC-100 interface to ask your wallet to publish it as an encrypted 1Sat Ordinal inscription.
 
     npx bitplan
 
@@ -102,7 +102,7 @@ Docs: ${SITE_URL}/docs/envelope
 `,
   "/docs/how-it-works": `# How it works · BitPlan
 
-BitPlan publishes encrypted HTML drafts as versioned 1Sat Ordinals. Private drafts are encrypted by the wallet. For sharing, the CLI encrypts the document once and asks the wallet to wrap its key for each reader.
+BitPlan publishes encrypted HTML drafts as versioned 1Sat Ordinal inscriptions. BRC-100 is the interface BitPlan uses to talk to the wallet; it is not an inscription format. Private drafts are encrypted by the wallet. For sharing, the CLI encrypts the document once and asks the wallet to wrap its key for each reader.
 
 bitplan.dev fetches public ciphertext from 1Sat. In the browser, the connected wallet decrypts.
 
@@ -140,9 +140,14 @@ export const LLMS_TXT = `# BitPlan
 
 ## When to use this
 
-Use BitPlan when a user wants to publish, version, or read an encrypted HTML plan as a 1Sat Ordinal with a BRC-100 wallet.
+Use BitPlan when a user wants to publish, version, or read an encrypted HTML plan as a 1Sat Ordinal inscription using a BRC-100 wallet.
 
 Do not use BitPlan as a general file host, a server-side notes app, or a substitute for a BRC-100 wallet.
+
+## Terms
+
+- BRC-100 is the interface BitPlan uses to talk to a wallet. It is not an inscription format.
+- A published BitPlan is a 1Sat Ordinal inscription. Later versions reinscribe the same satoshi.
 
 ## CLI
 

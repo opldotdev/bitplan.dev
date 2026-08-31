@@ -1,12 +1,13 @@
 # bitplan
 
-Publish plan documents to Bitcoin as 1Sat Ordinals. Encrypted by default.
+Publish plan documents to Bitcoin as 1Sat Ordinal inscriptions. Encrypted by
+default.
 
 The CLI validates a self-contained HTML document, encrypts it with standard
-`@bsv/sdk` and BRC-100 wallet operations, then asks the wallet to inscribe it on
-BSV. Upload the same file again and the wallet spends the current draft coin
-with a new inscription, so one origin outpoint identifies the draft and its
-version history.
+`@bsv/sdk` and wallet operations, then uses the BRC-100 interface to ask the
+wallet to inscribe it on BSV. Upload the same file again and the wallet spends
+the current draft coin with a new inscription, so one origin outpoint identifies
+the draft and its version history.
 
 ## Requirements
 

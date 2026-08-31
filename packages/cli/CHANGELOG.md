@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.0.14
+
+### Changed
+
+- The README now clearly separates the BRC-100 wallet interface from 1Sat
+  Ordinal inscriptions.
+
+### Fixed
+
+- After a plan ordinal is transferred, the new owner can publish the next
+  version without removing the previous owner from the reader list.
+
 ## 0.0.13
 
 ### Added

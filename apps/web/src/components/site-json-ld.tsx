@@ -12,7 +12,7 @@ export const SITE_GRAPH = {
         url: `${GITHUB_URL}/issues`,
       },
       description:
-        "BitPlan publishes encrypted HTML plan documents as 1Sat Ordinals. The npm CLI is bitplan. bitplan.dev is the viewer.",
+        "BitPlan publishes encrypted HTML plans as 1Sat Ordinal inscriptions. Wallet access uses BRC-100. The npm CLI is bitplan and bitplan.dev is the viewer.",
       logo: `${SITE_URL}/icon.png`,
       name: "BitPlan",
       sameAs: [GITHUB_URL, "https://www.npmjs.com/package/bitplan"],
@@ -22,7 +22,7 @@ export const SITE_GRAPH = {
       "@id": `${SITE_URL}/#website`,
       "@type": "WebSite",
       description:
-        "Publish encrypted HTML plans through a BRC-100 wallet on Bitcoin. bitplan.dev is the viewer.",
+        "Encrypted HTML plans published as 1Sat Ordinal inscriptions. Wallet access uses BRC-100; bitplan.dev is the viewer.",
       name: "BitPlan",
       publisher: { "@id": `${SITE_URL}/#organization` },
       url: SITE_URL,
@@ -32,7 +32,7 @@ export const SITE_GRAPH = {
       "@type": "SoftwareApplication",
       applicationCategory: "DeveloperApplication",
       description:
-        "Command-line tool that encrypts an HTML plan and publishes it as a versioned 1Sat Ordinal through a BRC-100 wallet.",
+        "Command-line tool that uses the BRC-100 wallet interface to encrypt and publish an HTML plan as a versioned 1Sat Ordinal inscription.",
       downloadUrl: "https://www.npmjs.com/package/bitplan",
       installUrl: "https://www.npmjs.com/package/bitplan",
       name: "bitplan",

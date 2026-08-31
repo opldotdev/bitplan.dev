@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     },
   },
   description:
-    "Publish encrypted HTML plans through a BRC-100 wallet on Bitcoin. bitplan.dev is the viewer.",
+    "Encrypted HTML plans published as 1Sat Ordinal inscriptions. Wallet access uses BRC-100; bitplan.dev is the viewer.",
   metadataBase: new URL(SITE_URL),
   openGraph: {
     locale: "en_US",

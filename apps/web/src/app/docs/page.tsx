@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   description:
-    "Publish encrypted HTML plans through a BRC-100 wallet on Bitcoin.",
+    "Publish encrypted HTML plans as 1Sat Ordinal inscriptions using the BRC-100 wallet interface.",
   title: "Docs",
   twitter: { card: "summary_large_image" },
 };
@@ -16,11 +16,12 @@ export default function DocsIntroPage() {
     <>
       <h1>BitPlan</h1>
       <p>
-        The BitPlan CLI packages a self-contained HTML document and asks your
-        BRC-100 wallet to publish it as an encrypted 1Sat Ordinal. The package
-        on npm is <code>bitplan</code>. Upload it again to reinscribe the same
-        satoshi. One origin outpoint identifies the draft and its version
-        history. This site is the viewer. It stores no drafts server-side.
+        The BitPlan CLI packages a self-contained HTML document and uses the
+        BRC-100 interface to ask your wallet to publish it as an encrypted 1Sat
+        Ordinal inscription. The package on npm is <code>bitplan</code>. Upload
+        it again to reinscribe the same satoshi. One origin outpoint identifies
+        the draft and its version history. This site is the viewer. It stores no
+        drafts server-side.
       </p>
       <h2>BitPlan CLI setup</h2>
       <p>

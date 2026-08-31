@@ -97,3 +97,29 @@ export async function listWalletDrafts(
 
   return Array.from(byOrigin.values());
 }
+
+/** True only when this wallet holds the latest coin for an origin chain. */
+export async function walletOwnsDraft(
+  wallet: ListingWallet,
+  origin: string,
+  latestOutpoint: string | null
+): Promise<boolean> {
+  if (!latestOutpoint) {
+    return false;
+  }
+
+  let wantedOrigin: string;
+  let wantedOutpoint: string;
+  try {
+    wantedOrigin = toOrdinalOutpoint(origin);
+    wantedOutpoint = toOrdinalOutpoint(latestOutpoint);
+  } catch {
+    return false;
+  }
+
+  const drafts = await listWalletDrafts(wallet);
+  return drafts.some(
+    (draft) =>
+      draft.origin === wantedOrigin && draft.outpoint === wantedOutpoint
+  );
+}

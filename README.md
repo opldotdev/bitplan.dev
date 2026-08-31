@@ -4,9 +4,10 @@ Publish private, versioned HTML plans on Bitcoin.
 
 [Open BitPlan](https://bitplan.dev) · [Read the docs](https://bitplan.dev/docs) · [Install the CLI](https://www.npmjs.com/package/bitplan)
 
-BitPlan turns a self-contained HTML file into an encrypted 1Sat Ordinal. Your
-BRC-100 wallet handles encryption, signing, payment, and decryption. Each new
-version moves the same satoshi forward, giving the plan one permanent origin.
+BitPlan turns a self-contained HTML file into an encrypted 1Sat Ordinal
+inscription. BRC-100 is the interface BitPlan uses to ask your wallet to
+encrypt, sign, pay, and decrypt. Each new version moves the same satoshi
+forward, giving the plan one permanent origin.
 
 ## Quick start
 
@@ -49,7 +50,7 @@ flowchart TD
 
 ## Share a plan
 
-Add one or more BRC-100 identity keys when publishing:
+Add one or more wallet identity public keys when publishing:
 
 ```sh
 npx bitplan upload ./plan.html \

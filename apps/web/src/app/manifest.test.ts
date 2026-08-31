@@ -3,6 +3,12 @@ import { describe, expect, test } from "bun:test";
 import manifest from "./manifest.json";
 
 describe("web app manifest", () => {
+  test("separates the wallet interface from the inscription format", () => {
+    expect(manifest.description).toContain("1Sat Ordinal");
+    expect(manifest.description).toContain("BRC-100");
+    expect(manifest.description).not.toContain("BRC-100 inscription");
+  });
+
   test("declares only the wallet access BitPlan can know in advance", () => {
     expect(manifest.metanet).toEqual({
       counterpartyPermissions: {

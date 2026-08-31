@@ -12,6 +12,7 @@ const ORIGIN_B = `${"b".repeat(64)}_0`;
 
 function decryptedState(requestKey: string): ViewerState {
   return {
+    canPublish: false,
     draft: {
       content: {
         bytes: Uint8Array.of(1),
@@ -21,6 +22,7 @@ function decryptedState(requestKey: string): ViewerState {
         sequence: 0,
       },
       currentVersion: 1,
+      latestOutpoint: ORIGIN_A,
       latestVersion: 2,
       origin: ORIGIN_A,
     },
