@@ -51,4 +51,12 @@ describe("proxy", () => {
     );
     expect(await response.json()).toMatchObject({ code: "not-found" });
   });
+
+  test("application routes bypass document content negotiation", () => {
+    const response = proxy(
+      request("/api/sponsors/silver-1/image", "image/avif,image/webp,*/*")
+    );
+
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
 });

@@ -30,7 +30,9 @@ export function isDocumentPath(path: string): boolean {
 }
 
 export function isApiPath(path: string): boolean {
-  return path.startsWith("/ordfs");
+  return (
+    path === "/api" || path.startsWith("/api/") || path.startsWith("/ordfs")
+  );
 }
 
 export function wantsJsonNotFound(accept: string): boolean {

@@ -46,9 +46,9 @@ describe("agent accept", () => {
     ).toBe(false);
   });
 
-  test("OrdFS paths skip document content negotiation", () => {
+  test("API and OrdFS paths skip document content negotiation", () => {
     expect(isApiPath("/ordfs/content/nope")).toBe(true);
-    expect(isApiPath("/api/v1/orank-probe-test")).toBe(false);
+    expect(isApiPath("/api/sponsors/silver-1/image")).toBe(true);
     expect(isApiPath("/docs")).toBe(false);
   });
 });
