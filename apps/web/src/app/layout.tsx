@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UiSoundProvider } from "@/components/ui-sound-provider";
+import { WebMcpTools } from "@/components/webmcp-tools";
 import { SITE_URL } from "@/lib/site";
 
 import "./globals.css";
@@ -62,6 +63,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-dvh flex-col">
         <SiteJsonLd />
+        <WebMcpTools />
         <ThemeProvider>
           <TooltipProvider>
             <UiSoundProvider />

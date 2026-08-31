@@ -1,0 +1,30 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "BitPlan",
+    "identifier": "https://bitplan.dev"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:bitplan.dev:api:read",
+      "displayName": "BitPlan read API",
+      "type": "application/openapi+json",
+      "url": "https://bitplan.dev/openapi.json",
+      "representativeQueries": [
+        "fetch the latest encrypted BitPlan envelope by origin",
+        "find the BitPlan CLI package and API version policy"
+      ]
+    },
+    {
+      "identifier": "urn:air:bitplan.dev:skill:bitplan",
+      "displayName": "Use BitPlan",
+      "type": "text/markdown",
+      "url": "https://bitplan.dev/.well-known/agent-skills/bitplan/SKILL.md",
+      "representativeQueries": [
+        "publish an encrypted plan with a BRC-100 wallet",
+        "list or fetch my encrypted BitPlan drafts",
+        "share a BitPlan draft with another wallet identity"
+      ]
+    }
+  ]
+}

@@ -12,6 +12,11 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "no-referrer" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
+  {
+    key: "Link",
+    value:
+      '</.well-known/api-catalog>; rel="api-catalog", </openapi.json>; rel="service-desc"; type="application/openapi+json", </docs/api>; rel="service-doc"; type="text/html", </.well-known/ai-catalog.json>; rel="describedby"; type="application/json"',
+  },
 ] as const;
 
 const nextConfig: NextConfig = {
@@ -29,6 +34,15 @@ const nextConfig: NextConfig = {
           },
         ],
         source: "/d/:path*",
+      },
+      {
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: "*",
+          },
+        ],
+        source: "/.well-known/:path*",
       },
     ];
   },
