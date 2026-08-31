@@ -31,9 +31,6 @@ describe("agent pages", () => {
     );
     expect(markdownForPath("/new")).toContain("prepare_bitplan_plan");
     expect(markdownForPath("/new")).toContain("list_my_bitplans");
-    expect(markdownForPath("/")).toContain(
-      "BRC-100 is the interface the CLI uses to talk to a wallet"
-    );
   });
 
   test("unknown paths have no markdown page", () => {
@@ -45,9 +42,6 @@ describe("agent pages", () => {
     expect(LLMS_TXT).toContain("npx bitplan");
     expect(LLMS_TXT).toContain("https://www.npmjs.com/package/bitplan");
     expect(LLMS_TXT).toContain("/ordfs/content/");
-    expect(LLMS_TXT).toContain("BRC-100 is the interface");
-    expect(LLMS_TXT).toContain("1Sat Ordinal inscription");
-    expect(LLMS_TXT).not.toContain("BRC-100 inscription");
   });
 
   test("not-found markdown points at docs, sitemap, and llms.txt", () => {

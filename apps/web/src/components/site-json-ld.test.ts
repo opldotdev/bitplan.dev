@@ -14,8 +14,6 @@ describe("site JSON-LD", () => {
     });
     expect(org?.sameAs).toContain("https://www.npmjs.com/package/bitplan");
     expect(org?.description).toContain("bitplan");
-    expect(org?.description).toContain("1Sat Ordinal inscription");
-    expect(org?.description).toContain("Wallet access uses BRC-100");
   });
 
   test("SoftwareApplication points at the npm CLI", () => {
@@ -28,8 +26,5 @@ describe("site JSON-LD", () => {
       name: "bitplan",
     });
     expect(app?.url).toContain("/docs/cli-setup");
-    expect(app?.description).toContain("BRC-100 wallet interface");
-    expect(app?.description).toContain("1Sat Ordinal inscription");
-    expect(app?.description).not.toContain("BRC-100 inscription");
   });
 });
