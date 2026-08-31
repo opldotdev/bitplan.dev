@@ -23,7 +23,8 @@ export default function AgentsAndWalletsPage() {
         <h2>Use BitPlan on a desktop</h2>
         <p>
           Start and unlock a BRC-100 wallet on the same computer. BitPlan uses
-          its JSON endpoint at <code>http://127.0.0.1:3321</code> by default.
+          the wallet&apos;s BRC-5 JSON endpoint at
+          <code>http://127.0.0.1:3321</code> by default to make BRC-100 calls.
           Then an agent can run the same commands you run:
         </p>
         <div className="not-typeset my-4">
@@ -39,8 +40,9 @@ export default function AgentsAndWalletsPage() {
           Use <code>--wallet-url</code> if the wallet listens somewhere else.
           JSON mode returns one value that an agent can read without scraping
           the normal terminal text. It does not weaken wallet permissions, and
-          publishing still requires <code>--yes</code>. The CLI never asks for a
-          mnemonic or identity private key.
+          <code>--yes</code> skips only the CLI confirmation; the wallet still
+          controls authorization. The CLI never asks for a mnemonic or identity
+          private key.
         </p>
       </section>
 
@@ -61,18 +63,19 @@ export default function AgentsAndWalletsPage() {
       </section>
 
       <section id="unattended">
-        <h2>Unattended agents need narrower access</h2>
+        <h2>Unattended wallet access is not ready</h2>
         <p>
-          Do not give a background agent control of your main wallet. Give it a
-          separate, revocable BitPlan identity with access only to the BitPlan
-          protocol and basket. Keep spending low, or require approval before a
-          plan is published.
+          Do not give a background agent control of your main wallet. A safe
+          unattended workflow would need a separate wallet identity, narrow
+          protocol and basket permissions, spending limits, and a clear way to
+          revoke the agent. BitPlan and 1Sat Wallet do not provide that complete
+          workflow today.
         </p>
         <p>
-          A new identity cannot open old plans that were encrypted only for your
-          main wallet. Share a new version with that identity first. Publishing
-          the next version spends the plan&apos;s current one-satoshi output, so
-          the wallet holding that output must approve the update.
+          Revoking future wallet access does not erase plan versions already
+          encrypted for an identity. Treat sharing a plan like sharing a file:
+          you can stop future access, but you cannot take back a copy the
+          recipient could already decrypt.
         </p>
       </section>
 
@@ -83,7 +86,7 @@ export default function AgentsAndWalletsPage() {
           <li>
             authenticate the application origin before reusing permissions;
           </li>
-          <li>serve the standard BRC-100 JSON interface;</li>
+          <li>carry standard BRC-100 calls over a documented substrate;</li>
           <li>list BitPlan outputs and encrypt or decrypt plan data;</li>
           <li>create, sign, and publish plan transactions;</li>
           <li>show, remember, and revoke permissions;</li>
