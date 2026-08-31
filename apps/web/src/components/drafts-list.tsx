@@ -177,15 +177,9 @@ function EmptyDrafts() {
         </EmptyMedia>
         <EmptyTitle>No drafts in this wallet yet</EmptyTitle>
         <EmptyDescription>
-          Publish one with{" "}
-          <code className="font-mono">npx bitplan upload ./plan.html</code>.
+          Create one here, or publish HTML with the BitPlan CLI.
         </EmptyDescription>
       </EmptyHeader>
-      <EmptyContent>
-        <Button asChild variant="outline">
-          <Link href="/docs/cli-setup">CLI setup</Link>
-        </Button>
-      </EmptyContent>
     </Empty>
   );
 }

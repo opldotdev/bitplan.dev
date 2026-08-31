@@ -14,6 +14,7 @@ import {
   MAGIC,
   openEnvelope,
   parseEnvelope,
+  sealPrivateEnvelope,
   sharedWith,
 } from "./envelope";
 
@@ -128,36 +129,6 @@ const PLAINTEXT: DraftPlaintext = {
   },
 };
 
-async function sealEnvelope(
-  wallet: {
-    encrypt: (args: {
-      counterparty: "self";
-      keyID: string;
-      plaintext: number[];
-      protocolID: [number, string];
-    }) => Promise<{ ciphertext: number[] }>;
-  },
-  plaintext: DraftPlaintext,
-  keyID: string
-): Promise<Uint8Array> {
-  const body = Array.from(new TextEncoder().encode(JSON.stringify(plaintext)));
-  const encrypted = await wallet.encrypt({
-    counterparty: "self",
-    keyID,
-    plaintext: body,
-    protocolID: [2, "bitplan"],
-  });
-  const header: EnvelopeHeader = {
-    key: {
-      keyID,
-      mode: "brc2-self",
-      protocolID: [2, "bitplan"],
-    },
-    v: 1,
-  };
-  return frameEnvelope(header, Uint8Array.from(encrypted.ciphertext));
-}
-
 function validHeader(): EnvelopeHeader {
   return {
     key: {
@@ -172,7 +143,7 @@ function validHeader(): EnvelopeHeader {
 describe("envelope round trip", () => {
   test("seals and opens through a mock wallet involution", async () => {
     const { calls, wallet } = createMockWallet();
-    const envelope = await sealEnvelope(wallet, PLAINTEXT, "key-1");
+    const envelope = await sealPrivateEnvelope(wallet, PLAINTEXT, "key-1");
     const opened = await openEnvelope(wallet, envelope);
 
     expect(opened.plaintext).toEqual(PLAINTEXT);
@@ -183,7 +154,7 @@ describe("envelope round trip", () => {
 
   test("encrypts the document through the wallet, not a homemade content key", async () => {
     const { calls, wallet } = createMockWallet();
-    const envelope = await sealEnvelope(wallet, PLAINTEXT, "key-1");
+    const envelope = await sealPrivateEnvelope(wallet, PLAINTEXT, "key-1");
     const { ciphertext } = parseEnvelope(envelope);
     const body = Array.from(
       new TextEncoder().encode(JSON.stringify(PLAINTEXT))
@@ -200,7 +171,7 @@ describe("envelope round trip", () => {
 
   test("a tampered ciphertext does not round-trip as the document", async () => {
     const { wallet } = createMockWallet();
-    const envelope = await sealEnvelope(wallet, PLAINTEXT, "key-1");
+    const envelope = await sealPrivateEnvelope(wallet, PLAINTEXT, "key-1");
     const last = envelope.length - 1;
     // biome-ignore lint/suspicious/noBitwiseOperators: flip bits to corrupt the body
     envelope[last] = (envelope[last] ?? 0) ^ 0xff;
@@ -210,7 +181,7 @@ describe("envelope round trip", () => {
 
   test("reads the protocolID out of the header", async () => {
     const { calls, wallet } = createMockWallet();
-    const envelope = await sealEnvelope(wallet, PLAINTEXT, "key-1");
+    const envelope = await sealPrivateEnvelope(wallet, PLAINTEXT, "key-1");
     await openEnvelope(wallet, envelope);
     expect(calls.decrypt[0]?.protocolID).toEqual([2, "bitplan"]);
   });

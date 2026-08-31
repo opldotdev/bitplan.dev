@@ -163,7 +163,15 @@ export async function connectBrowserWalletClient(): Promise<WalletInterface> {
   if (!cachedClient) {
     throw new Error("Wallet connection was not established.");
   }
-  return cachedClient;
+  try {
+    if (!isGranted(await cachedClient.isAuthenticated({}))) {
+      throw new Error("Wallet session is no longer authenticated.");
+    }
+    return cachedClient;
+  } catch (error) {
+    resetWalletConnection();
+    throw error;
+  }
 }
 
 /** Clears the tab-local cache. Tests only. */

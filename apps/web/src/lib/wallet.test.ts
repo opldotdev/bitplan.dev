@@ -143,4 +143,15 @@ describe("connectBrowserWallet", () => {
     expect(client).toBe(getConnectedWalletClient());
     expect(getConnectedWallet()).not.toBe(client);
   });
+
+  test("drops a stale wallet before an explicit action", async () => {
+    await connectBrowserWalletClient();
+    isAuthenticatedImpl = () => Promise.resolve({ authenticated: false });
+
+    await expect(connectBrowserWalletClient()).rejects.toThrow(
+      "no longer authenticated"
+    );
+    expect(isWalletConnected()).toBe(false);
+    expect(getConnectedWalletClient()).toBeNull();
+  });
 });

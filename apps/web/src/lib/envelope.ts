@@ -110,6 +110,8 @@ export interface ParsedEnvelope {
  */
 export type EnvelopeWallet = Pick<WalletInterface, "decrypt" | "getPublicKey">;
 
+type EncryptingEnvelopeWallet = Pick<WalletInterface, "encrypt">;
+
 export function sharedWith(header: EnvelopeHeader): string[] {
   if (header.v === 1) {
     return [];
@@ -135,6 +137,32 @@ export function fromBase64(value: string): Uint8Array {
     out[i] = binary.charCodeAt(i);
   }
   return out;
+}
+
+/** Seal a wallet-only draft with the same BRC-2 envelope used by the CLI. */
+export async function sealPrivateEnvelope(
+  wallet: EncryptingEnvelopeWallet,
+  plaintext: DraftPlaintext,
+  keyID: string
+): Promise<Uint8Array> {
+  const body = new TextEncoder().encode(JSON.stringify(plaintext));
+  const encrypted = await wallet.encrypt({
+    counterparty: "self",
+    keyID,
+    plaintext: Array.from(body),
+    protocolID: [2, "bitplan"],
+  });
+  return frameEnvelope(
+    {
+      key: {
+        keyID,
+        mode: "brc2-self",
+        protocolID: [2, "bitplan"],
+      },
+      v: 1,
+    },
+    Uint8Array.from(encrypted.ciphertext)
+  );
 }
 
 function headerSha256(header: EnvelopeHeader): string {

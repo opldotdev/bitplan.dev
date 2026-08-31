@@ -95,4 +95,15 @@ describe("Draft metadata", () => {
       value: "a".repeat(40),
     });
   });
+
+  test("identifies plans created on the website", () => {
+    const state = decryptedState("test");
+    if (state.phase !== "decrypted") {
+      throw new Error("Expected decrypted state.");
+    }
+
+    expect(
+      metaRows({ ...state.plaintext.meta, cliVersion: "web" })
+    ).toContainEqual({ label: "Created by", value: "bitplan.dev" });
+  });
 });
