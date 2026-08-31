@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import type { WalletInterface } from "@bsv/sdk";
 
-import { prepareDraft, publishDraft } from "./draft-publish";
+import {
+  draftInputFromAgent,
+  prepareDraft,
+  publishDraft,
+} from "./draft-publish";
 
 const NOW = new Date("2026-08-30T12:00:00.000Z");
 const TXID = "a".repeat(64);
@@ -13,6 +17,17 @@ afterEach(() => {
 });
 
 describe("prepareDraft", () => {
+  test("accepts only text fields from browser agents", () => {
+    expect(draftInputFromAgent({ body: "Plan", title: "Title" })).toEqual({
+      body: "Plan",
+      repository: "",
+      title: "Title",
+    });
+    expect(() => draftInputFromAgent({ body: 1, title: "Title" })).toThrow(
+      "as text"
+    );
+  });
+
   test("builds deterministic safe HTML and repository metadata", () => {
     const input = {
       body: 'Outcome\n\n<img src=x onerror="steal()">',

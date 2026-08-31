@@ -29,6 +29,21 @@ export interface PublishedDraft {
   relayed: boolean;
 }
 
+export function draftInputFromAgent(value: unknown): DraftInput {
+  if (!value || typeof value !== "object") {
+    throw new Error("The agent must provide a title and plan.");
+  }
+  const { body, repository, title } = value as Record<string, unknown>;
+  if (
+    typeof body !== "string" ||
+    typeof title !== "string" ||
+    (repository !== undefined && typeof repository !== "string")
+  ) {
+    throw new Error("The agent must provide a title and plan as text.");
+  }
+  return { body, repository: repository ?? "", title };
+}
+
 interface Repository {
   host: string;
   name: string;

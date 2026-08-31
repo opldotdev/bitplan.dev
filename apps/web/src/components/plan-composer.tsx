@@ -1,13 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { type ChangeEvent, type FormEvent, useCallback, useState } from "react";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { registerWebMcpTool } from "@/components/webmcp-tools";
 import {
+  draftInputFromAgent,
   type PublishedDraft,
   prepareDraft,
   publishDraft,
@@ -32,6 +40,50 @@ export function PlanComposer() {
   const [publishing, setPublishing] = useState(false);
   const [repository, setRepository] = useState("");
   const [title, setTitle] = useState("");
+
+  useEffect(
+    () =>
+      registerWebMcpTool({
+        description:
+          "Put a complete BitPlan draft into the review screen. This does not connect a wallet, spend funds, or publish; the user must review and publish it manually.",
+        execute: (value) => {
+          const input = draftInputFromAgent(value);
+          const next = prepareDraft(input);
+          setBody(input.body);
+          setError(undefined);
+          setPrepared(next);
+          setRepository(input.repository);
+          setTitle(input.title);
+          return {
+            publishRequiresUserAction: true,
+            status: "ready-for-review",
+            title: next.meta.title,
+          };
+        },
+        inputSchema: {
+          additionalProperties: false,
+          properties: {
+            body: {
+              description: "The complete plan in plain text.",
+              maxLength: 50_000,
+              minLength: 1,
+              type: "string",
+            },
+            repository: {
+              description: "Optional HTTPS repository URL.",
+              format: "uri",
+              type: "string",
+            },
+            title: { maxLength: 160, minLength: 1, type: "string" },
+          },
+          required: ["body", "title"],
+          type: "object",
+        },
+        name: "prepare_bitplan_plan",
+        title: "Prepare a BitPlan",
+      }),
+    []
+  );
 
   const review = useCallback(
     (event: FormEvent<HTMLFormElement>) => {

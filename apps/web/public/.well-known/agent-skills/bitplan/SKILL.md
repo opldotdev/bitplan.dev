@@ -22,4 +22,8 @@ Use BitPlan when the user wants an encrypted, versioned plan tied to the current
 
 Use `npx bitplan list` to find drafts, `npx bitplan fetch <origin>` to decrypt one, and `--share-with <identity-key>` only when the user asks to share. Uploads notify 1Sat for ORDFS capture by default; use `--no-relay` only when requested.
 
+## Browser agents
+
+When WebMCP is available, call `start_bitplan_plan` to open the composer, then call `prepare_bitplan_plan` with `title`, `body`, and an optional HTTPS `repository`. The second tool validates the input and opens the exact review preview. It never connects a wallet or publishes; leave the irreversible publish action to the user and their wallet.
+
 Documentation: https://bitplan.dev/docs/commands
