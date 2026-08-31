@@ -88,6 +88,12 @@ Private plans use BRC-100 wallet encryption with [2, "bitplan"], a public keyID,
 
 See ${SITE_URL}/docs/how-it-works
 `,
+  "/new": `# New plan · BitPlan
+
+Create and review a private BitPlan in the browser at ${SITE_URL}/new.
+
+Browser agents with WebMCP can call \`start_bitplan_plan\` to open the composer, then \`prepare_bitplan_plan\` with a title, plan body, and optional HTTPS repository URL. The tool validates and stages the exact review preview. It never connects a wallet or publishes; the user must approve publishing through their BRC-100 wallet.
+`,
   "/privacy": `# Privacy · BitPlan
 
 BitPlan does not keep a drafts database or user accounts. Encrypted plan documents are inscriptions on Bitcoin. This website fetches public ciphertext from 1Sat and renders it in your browser after your wallet decrypts it.

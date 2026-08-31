@@ -12,6 +12,7 @@ describe("agent pages", () => {
     expect(markdownForPath("/docs")).toContain("Docs");
     expect(markdownForPath("/docs/")).toContain("Docs");
     expect(markdownForPath("/docs/api")).toContain("Sunset");
+    expect(markdownForPath("/new")).toContain("prepare_bitplan_plan");
   });
 
   test("unknown paths have no markdown page", () => {
