@@ -67,6 +67,32 @@ export default function AgentsAndWalletsPage() {
         </p>
       </section>
 
+      <section id="teams">
+        <h2>Share with a team</h2>
+        <p>Save wallet IDs with names, then put those contacts in a team:</p>
+        <div className="not-typeset my-4">
+          <CommandCopy command="npx bitplan contact set alice &lt;identity-key&gt;" />
+        </div>
+        <div className="not-typeset my-4">
+          <CommandCopy command="npx bitplan team add acme-dev alice" />
+        </div>
+        <div className="not-typeset my-4">
+          <CommandCopy command="npx bitplan config --share-with acme-dev" />
+        </div>
+        <p>
+          Contact names, their public wallet keys, and team membership are
+          defined in <code>~/.bitplan/config.json</code>. A local draft may
+          remember a team name so it can resolve the current members when you
+          publish. Neither names nor membership go to the server or on-chain;
+          only public wallet keys appear in the shared envelope. BitPlan has no
+          accounts, membership database, or plan database.
+        </p>
+        <p>
+          Remove a member and the next version of a locally tracked plan will
+          leave them out. Versions already shared with them cannot be revoked.
+        </p>
+      </section>
+
       <section id="web-agents">
         <h2>Browser agents</h2>
         <p>

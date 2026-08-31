@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.13
+
+### Added
+
+- Local `contact` and `team` commands give public wallet identity keys readable
+  names and reusable groups without adding accounts or a server-side database.
+- `config --share-with` and `upload --share-with` accept identity keys, contact
+  names, or team names. Named readers are resolved again for each new version.
+
 ## 0.0.12
 
 ### Added

@@ -17,6 +17,18 @@ describe("agent pages", () => {
     expect(markdownForPath("/docs/agents")).toContain(
       "npx bitplan config --share-with"
     );
+    expect(markdownForPath("/docs/agents")).toContain(
+      "npx bitplan team add acme-dev alice"
+    );
+    expect(markdownForPath("/docs/agents")).toContain(
+      "only public identity keys appear in the shared envelope"
+    );
+    expect(markdownForPath("/docs/commands")).toContain(
+      "npx bitplan contact list"
+    );
+    expect(markdownForPath("/docs/commands")).toContain(
+      "npx bitplan team delete <name>"
+    );
     expect(markdownForPath("/new")).toContain("prepare_bitplan_plan");
     expect(markdownForPath("/new")).toContain("list_my_bitplans");
   });

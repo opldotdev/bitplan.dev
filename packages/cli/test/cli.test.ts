@@ -57,6 +57,8 @@ describe('cli surface', () => {
 			'auth',
 			'whoami',
 			'config',
+			'contact',
+			'team',
 			'version',
 			'upload',
 			'list',
@@ -64,6 +66,25 @@ describe('cli surface', () => {
 		])
 		const auth = commandNamed(program, 'auth')
 		expect(auth.commands.map((c) => c.name())).toEqual(['login'])
+	})
+
+	test('exposes local contact and team management commands', () => {
+		const contact = commandNamed(program, 'contact')
+		expect(contact.commands.map((command) => command.name())).toEqual([
+			'set',
+			'remove',
+			'list',
+		])
+		const team = commandNamed(program, 'team')
+		expect(team.commands.map((command) => command.name())).toEqual([
+			'set',
+			'add',
+			'remove',
+			'delete',
+			'list',
+		])
+		expect(flagsOf(commandNamed(contact, 'list'))).toContain('--json')
+		expect(flagsOf(commandNamed(team, 'list'))).toContain('--json')
 	})
 
 	test('config manages default readers', () => {

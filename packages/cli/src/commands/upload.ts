@@ -4,6 +4,11 @@ import path from 'node:path'
 import readline from 'node:readline/promises'
 import type { WalletInterface } from '@bsv/sdk'
 import {
+	readerLabel,
+	resolveNamedReaders,
+	resolveReaderInputs,
+} from '../addressBook.js'
+import {
 	ENVELOPE_OVERHEAD_ESTIMATE,
 	FEE_SATS_PER_KB,
 	isBitplanContentType,
@@ -34,6 +39,7 @@ import type { RelayResult } from '../relay.js'
 import { relayBeef } from '../relay.js'
 import { scanForSecrets } from '../secretScan.js'
 import {
+	type ConfigFile,
 	type DraftRecord,
 	findDraftByFile,
 	findDraftByOrigin,
@@ -70,9 +76,8 @@ export async function uploadCommand(
 	if (options.json && !options.yes) {
 		throw new CliError('--json requires --yes because publishing is permanent.')
 	}
-	const requestedRecipients = [
-		...new Set((options.shareWith ?? []).map(normalizeIdentityKey)),
-	]
+	const config = readConfig()
+	const requestedReaders = resolveReaderInputs(options.shareWith ?? [], config)
 
 	const resolvedFile = path.resolve(file)
 	if (!fs.existsSync(resolvedFile)) {
@@ -99,9 +104,20 @@ export async function uploadCommand(
 			? known
 			: findDraftByOrigin(targetOrigin)?.record
 		: undefined
-	const defaultRecipients = targetOrigin
+	const defaultRawReaders = targetOrigin ? [] : (config.shareWith ?? [])
+	const defaultNamedRefs = targetOrigin ? [] : (config.shareWithRefs ?? [])
+	let namedRefs = options.private
 		? []
-		: (readConfig().shareWith ?? []).map(normalizeIdentityKey)
+		: [
+				...new Set([
+					...(targetOrigin ? [] : defaultNamedRefs),
+					...requestedReaders.namedRefs,
+				]),
+			]
+	// Validate explicit and new-draft defaults before contacting the wallet.
+	// Existing draft refs are applied only after confirming this machine still
+	// has the current chain tip; stale local policy must not leak into adoption.
+	let resolvedNamedReaders = resolveNamedReaders(namedRefs, config)
 
 	const validation = validateHtml(html)
 	if (!validation.ok) {
@@ -132,6 +148,7 @@ export async function uploadCommand(
 	let keyID: string
 	let nextVersion: number | null
 	let previousRecipients: string[] = []
+	let fixedReaders = defaultRawReaders
 	if (targetOrigin) {
 		coin = await findCoinByOrigin(wallet, targetOrigin)
 		const local = targetLocal
@@ -140,6 +157,16 @@ export async function uploadCommand(
 			nextVersion =
 				local.latestVersion === null ? null : local.latestVersion + 1
 			previousRecipients = local.sharedWith ?? []
+			fixedReaders = local.sharedWithRaw ?? previousRecipients
+			namedRefs = options.private
+				? []
+				: [
+						...new Set([
+							...(local.shareWithRefs ?? []),
+							...requestedReaders.namedRefs,
+						]),
+					]
+			resolvedNamedReaders = resolveNamedReaders(namedRefs, config)
 		} else {
 			// Adopting a draft with no local history. The keyID it was sealed
 			// with lives in the header of the published envelope — that is why
@@ -155,6 +182,9 @@ export async function uploadCommand(
 			keyID = adopted.keyID
 			nextVersion = adopted.sequence === null ? null : adopted.sequence + 2
 			previousRecipients = adopted.sharedWith
+			fixedReaders = adopted.sharedWith
+			namedRefs = options.private ? [] : requestedReaders.namedRefs
+			resolvedNamedReaders = resolveNamedReaders(namedRefs, config)
 			if (options.description === undefined) {
 				meta.description = adopted.description
 			}
@@ -163,22 +193,29 @@ export async function uploadCommand(
 		keyID = newKeyId()
 		nextVersion = 1
 	}
-	let sharedWith = options.private
+	fixedReaders = options.private
 		? []
 		: [
 				...new Set(
-					[
-						...previousRecipients,
-						...defaultRecipients,
-						...requestedRecipients,
-					].map(normalizeIdentityKey),
+					[...fixedReaders, ...requestedReaders.rawKeys].map(
+						normalizeIdentityKey,
+					),
 				),
 			]
+	let sharedWith = options.private
+		? []
+		: [...new Set([...fixedReaders, ...resolvedNamedReaders])]
 	if (sharedWith.length > MAX_SHARED_RECIPIENTS) {
 		throw new CliError(
 			`A shared draft supports at most ${MAX_SHARED_RECIPIENTS} recipient identities; got ${sharedWith.length}.`,
 		)
 	}
+	let addedReaders = sharedWith.filter(
+		(identityKey) => !previousRecipients.includes(identityKey),
+	)
+	let removedReaders = previousRecipients.filter(
+		(identityKey) => !sharedWith.includes(identityKey),
+	)
 	scanPlaintext(plaintext, resolvedFile, options.allowFinding)
 
 	// Confirm before sealing: sealing triggers the wallet's own BRC-2
@@ -195,7 +232,8 @@ export async function uploadCommand(
 		version: nextVersion,
 		walletUrl: url,
 		sharedWith,
-		privateReset: options.private === true && previousRecipients.length > 0,
+		removedReaders,
+		config,
 		skip: options.yes === true,
 		quiet: options.json === true,
 	})
@@ -211,6 +249,20 @@ export async function uploadCommand(
 		}
 		sharedWith = sharedWith.filter(
 			(recipientIdentityKey) => recipientIdentityKey !== ownerIdentityKey,
+		)
+		fixedReaders = fixedReaders.filter(
+			(recipientIdentityKey) => recipientIdentityKey !== ownerIdentityKey,
+		)
+		addedReaders = sharedWith.filter(
+			(identityKey) => !previousRecipients.includes(identityKey),
+		)
+		removedReaders = previousRecipients.filter(
+			(identityKey) => !sharedWith.includes(identityKey),
+		)
+	}
+	if (!options.json && targetOrigin && addedReaders.length > 0) {
+		console.log(
+			`Added:    ${addedReaders.map((key) => readerLabel(key, config)).join(', ')}`,
 		)
 	}
 
@@ -246,6 +298,8 @@ export async function uploadCommand(
 		title: meta.title,
 		description: meta.description,
 		sharedWith,
+		sharedWithRaw: fixedReaders,
+		shareWithRefs: namedRefs.length > 0 ? namedRefs : undefined,
 	}
 	let stateSaved = true
 	try {
@@ -306,6 +360,7 @@ export async function uploadCommand(
 						mode: sharedWith.length === 0 ? 'wallet-only' : 'shared',
 						readers: sharedWith,
 					},
+					changes: { added: addedReaders, removed: removedReaders },
 					stateSaved,
 					relay,
 					viewer,
@@ -447,7 +502,8 @@ interface ConfirmInput {
 	version: number | null
 	walletUrl: string
 	sharedWith: string[]
-	privateReset: boolean
+	removedReaders: string[]
+	config: ConfigFile
 	skip: boolean
 	quiet: boolean
 }
@@ -470,19 +526,25 @@ async function confirmPublish(input: ConfirmInput): Promise<void> {
 	}
 	console.log(`Wallet:   ${input.walletUrl}`)
 	if (input.sharedWith.length === 0) {
-		console.log('Access:   This wallet only')
+		console.log('Readers:  This wallet only')
 	} else {
-		console.log(
-			`Access:   This wallet + ${input.sharedWith.length} shared identit${input.sharedWith.length === 1 ? 'y' : 'ies'}`,
-		)
+		console.log('Readers requested:')
 		for (const identityKey of input.sharedWith) {
 			console.log(`          ${identityKey}`)
 		}
+		console.log(
+			'          The publishing wallet is ignored if it is in this list.',
+		)
 		console.log('          Recipient identity keys are public in the envelope.')
 	}
-	if (input.privateReset) {
+	if (input.origin && input.removedReaders.length > 0) {
 		console.log(
-			'          This version removes prior recipients; older shared versions remain readable.',
+			`Removed:  ${input.removedReaders.map((key) => readerLabel(key, input.config)).join(', ')}`,
+		)
+	}
+	if (input.removedReaders.length > 0) {
+		console.log(
+			'          Removed readers can still read older versions that were shared with them.',
 		)
 	}
 	console.log('')

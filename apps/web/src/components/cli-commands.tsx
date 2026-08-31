@@ -14,12 +14,20 @@ const COMMANDS = [
     hint: "Optional label, shown in list and My drafts.",
   },
   {
-    cmd: "npx bitplan upload ./plan.html --share-with <identity-key>",
-    hint: "Publish the next version for this wallet and the named reader.",
+    cmd: "npx bitplan upload ./plan.html --share-with <identity-key|contact|team>",
+    hint: "Publish the next version for this wallet and these readers.",
   },
   {
-    cmd: "npx bitplan config --share-with <identity-key>",
-    hint: "Include this reader on every new plan.",
+    cmd: "npx bitplan config --share-with <identity-key|contact|team>",
+    hint: "Save a default reader for new plans.",
+  },
+  {
+    cmd: "npx bitplan contact set alice <identity-key>",
+    hint: "Save a public wallet key under a local name.",
+  },
+  {
+    cmd: "npx bitplan team add acme-dev alice",
+    hint: "Add a saved contact to a local team.",
   },
   {
     cmd: "npx bitplan list",

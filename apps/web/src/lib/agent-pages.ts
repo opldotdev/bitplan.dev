@@ -56,6 +56,14 @@ Never give an agent a wallet mnemonic or private key. To read new plans with ano
 
     npx bitplan config --share-with <wallet-identity-key>
 
+For a local team, save contacts and share by team name:
+
+    npx bitplan contact set alice <identity-key>
+    npx bitplan team add acme-dev alice
+    npx bitplan config --share-with acme-dev
+
+Contact names, their public keys, and team membership are defined in ~/.bitplan/config.json. A local draft may remember a name so it can resolve the current members when publishing. Neither names nor membership go to BitPlan servers or on-chain; only public identity keys appear in the shared envelope. BitPlan has no accounts, membership database, or plan database. Removing a member excludes them from the next version of locally tracked plans that remember the team, but cannot revoke older versions.
+
 Docs: ${SITE_URL}/docs/agents
 `,
   "/docs/cli-setup": `# CLI setup · BitPlan
@@ -70,11 +78,19 @@ Docs: ${SITE_URL}/docs/cli-setup
 `,
   "/docs/commands": `# Commands · BitPlan
 
-CLI commands: upload, list, fetch, config, whoami, version, auth.
+CLI commands: upload, list, fetch, config, contact, team, whoami, version, auth.
 
     npx bitplan upload ./plan.html
     npx bitplan list
     npx bitplan fetch <origin>
+    npx bitplan contact set <name> <identity-key>
+    npx bitplan contact remove <name>
+    npx bitplan contact list
+    npx bitplan team set <name> <contacts...>
+    npx bitplan team add <name> <contacts...>
+    npx bitplan team remove <name> <contacts...>
+    npx bitplan team delete <name>
+    npx bitplan team list
 
 Docs: ${SITE_URL}/docs/commands
 `,

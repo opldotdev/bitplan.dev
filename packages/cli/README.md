@@ -56,8 +56,9 @@ npx bitplan whoami
 npx bitplan version
 ```
 
-Share the next version with one or more wallet identity public keys. Existing
-readers remain authorized unless you explicitly publish a private version:
+Share the next version with one or more wallet identity public keys, local
+contacts, or local teams. Existing raw-key readers remain authorized unless you
+explicitly publish a private version:
 
 ```sh
 npx bitplan upload ./plan.html --share-with <identity-key>
@@ -74,10 +75,26 @@ document key for each reader. Identity keys and the access list are public, and
 readable by their original recipients. Security level 2 lets the wallet ask for
 permission for each new reader.
 
+Give public identity keys memorable local names, then group those contacts:
+
+```sh
+npx bitplan contact set alice <identity-key>
+npx bitplan contact set bob <identity-key>
+npx bitplan team set acme-dev alice bob
+npx bitplan upload ./plan.html --share-with acme-dev
+```
+
+`contact list` and `team list [name]` show the address book; both accept
+`--json`. Use `team add`, `team remove`, or `team set` to change membership.
+The next version of a locally tracked draft using that team resolves its
+members again, so removed members are left out of that version. Versions that
+were already shared remain readable by their original readers.
+
 Save one or more default readers for every new plan:
 
 ```sh
 npx bitplan config --share-with <identity-key>
+npx bitplan config --share-with acme-dev
 npx bitplan config --clear-share-with
 ```
 
@@ -136,7 +153,7 @@ bitplan upload <file>
   --draft <origin>         Update a specific draft
   --new                    Always create a new draft
   --description <text>     Set a short description
-  --share-with <key>       Add a reader identity key (repeatable)
+  --share-with <reader>    Add a key, contact, or team (repeatable)
   --private                Make the new version wallet-only
   --no-relay               Skip the default 1Sat notification for ORDFS capture
   -y, --yes                Skip the confirmation prompt
@@ -154,8 +171,18 @@ bitplan fetch <origin|url>
   --version <n>
 
 bitplan config
-  --share-with <key>       Share every new plan with this identity (repeatable)
+  --share-with <reader>    Default key, contact, or team (repeatable)
   --clear-share-with       Clear default readers
+
+bitplan contact set <name> <identity-key>
+bitplan contact remove <name>
+bitplan contact list [--json]
+
+bitplan team set <name> <contacts...>
+bitplan team add <name> <contacts...>
+bitplan team remove <name> <contacts...>
+bitplan team delete <name>
+bitplan team list [name] [--json]
 
 bitplan version
 ```
@@ -204,9 +231,11 @@ The scan runs on the plaintext even though the output is encrypted.
 
 `~/.bitplan/` (directory `0700`, files `0600`):
 
-- `config.json`: optional `walletUrl` and `ordfsUrl` overrides.
+- `config.json`: optional wallet/ORDFS overrides, default readers, contacts,
+  and teams. Contacts contain public identity keys only.
 - `drafts.json`: which local file maps to which draft: origin, keyID, latest
-  outpoint, latest version.
+  outpoint, latest version, and any local contact/team references used for its
+  access list.
 
 Neither file holds key material. Losing `drafts.json` costs convenience only:
 origins are on chain, and each draft's keyID is in its envelope header.

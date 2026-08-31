@@ -1,4 +1,14 @@
 import { Command } from 'commander'
+import {
+	contactListCommand,
+	contactRemoveCommand,
+	contactSetCommand,
+	teamAddCommand,
+	teamDeleteCommand,
+	teamListCommand,
+	teamRemoveCommand,
+	teamSetCommand,
+} from './commands/addressBook.js'
 import { authCommand } from './commands/auth.js'
 import { configCommand } from './commands/config.js'
 import { fetchCommand } from './commands/fetch.js'
@@ -40,13 +50,74 @@ export function buildProgram(): Command {
 		.command('config')
 		.description('Set defaults for new plans.')
 		.option(
-			'--share-with <identity-key>',
-			'Share every new plan with an identity key (repeatable)',
+			'--share-with <reader>',
+			'Share every new plan with a key, contact, or team (repeatable)',
 			collect,
 			[],
 		)
 		.option('--clear-share-with', 'Stop sharing new plans by default')
 		.action((options) => configCommand(options))
+
+	const contact = program
+		.command('contact')
+		.description('Manage local names for wallet identities.')
+
+	contact
+		.command('set')
+		.description('Add or update a contact.')
+		.argument('<name>', 'Local contact name')
+		.argument('<identity-key>', 'Wallet identity public key')
+		.action((name, identityKey) => contactSetCommand(name, identityKey))
+
+	contact
+		.command('remove')
+		.description('Remove an unused contact.')
+		.argument('<name>', 'Local contact name')
+		.action((name) => contactRemoveCommand(name))
+
+	contact
+		.command('list')
+		.description('List contacts.')
+		.option('--json', 'Print raw JSON')
+		.action((options) => contactListCommand(options))
+
+	const team = program
+		.command('team')
+		.description('Manage local groups of contacts.')
+
+	team
+		.command('set')
+		.description('Create or replace a team.')
+		.argument('<name>', 'Local team name')
+		.argument('<contacts...>', 'Contact names')
+		.action((name, contacts) => teamSetCommand(name, contacts))
+
+	team
+		.command('add')
+		.description('Add contacts to a team, creating it if needed.')
+		.argument('<name>', 'Local team name')
+		.argument('<contacts...>', 'Contact names')
+		.action((name, contacts) => teamAddCommand(name, contacts))
+
+	team
+		.command('remove')
+		.description('Remove contacts from a team.')
+		.argument('<name>', 'Local team name')
+		.argument('<contacts...>', 'Contact names')
+		.action((name, contacts) => teamRemoveCommand(name, contacts))
+
+	team
+		.command('delete')
+		.description('Delete an unused team.')
+		.argument('<name>', 'Local team name')
+		.action((name) => teamDeleteCommand(name))
+
+	team
+		.command('list')
+		.description('List teams or inspect one team.')
+		.argument('[name]', 'Local team name')
+		.option('--json', 'Print raw JSON')
+		.action((name, options) => teamListCommand(name, options))
 
 	program
 		.command('version')
@@ -63,8 +134,8 @@ export function buildProgram(): Command {
 		.option('--new', 'Always create a new draft')
 		.option('--description <text>', 'Set a short description for the draft')
 		.option(
-			'--share-with <identity-key>',
-			'Grant read access to an identity key (repeatable)',
+			'--share-with <reader>',
+			'Grant access to a key, contact, or team (repeatable)',
 			collect,
 			[],
 		)
@@ -118,7 +189,7 @@ function collect(value: string, previous: string[]): string[] {
 export async function main(argv: string[]): Promise<void> {
 	const program = buildProgram()
 	program.exitOverride()
-	for (const command of program.commands) command.exitOverride()
+	for (const command of program.commands) overrideExit(command)
 
 	if (argv.slice(2).length === 0) {
 		program.outputHelp()
@@ -126,4 +197,9 @@ export async function main(argv: string[]): Promise<void> {
 	}
 
 	await program.parseAsync(argv)
+}
+
+function overrideExit(command: Command): void {
+	command.exitOverride()
+	for (const child of command.commands) overrideExit(child)
 }

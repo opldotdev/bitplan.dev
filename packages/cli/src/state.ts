@@ -11,6 +11,8 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { normalizeReaderName } from './addressBook.js'
+import { normalizeIdentityKey } from './envelope.js'
 import { CliError } from './errors.js'
 import { isOutpoint } from './outpoint.js'
 
@@ -30,8 +32,12 @@ export interface DraftRecord {
 	updatedAt: string
 	title?: string | null
 	description?: string | null
-	/** Additional identity public keys authorized on the latest local version. */
+	/** Identity public keys authorized on the latest local version. */
 	sharedWith?: string[]
+	/** Fixed identity keys explicitly attached to this draft. */
+	sharedWithRaw?: string[]
+	/** Local contact/team names re-resolved before every publish. */
+	shareWithRefs?: string[]
 }
 
 export interface DraftsFile {
@@ -45,6 +51,12 @@ export interface ConfigFile {
 	ordfsUrl?: string
 	/** Public wallet identities included on every new plan. */
 	shareWith?: string[]
+	/** Local contact/team names included on every new plan. */
+	shareWithRefs?: string[]
+	/** Local labels for public wallet identities. */
+	contacts?: Record<string, string>
+	/** Local groups made only from contact names. */
+	teams?: Record<string, string[]>
 }
 
 export function stateDir(): string {
@@ -125,21 +137,23 @@ export function readConfig(file: string = configPath()): ConfigFile {
 	if (parsed.ordfsUrl !== undefined && typeof parsed.ordfsUrl !== 'string') {
 		throw invalidState(file, 'ordfsUrl must be a string')
 	}
-	if (
-		parsed.shareWith !== undefined &&
-		(!Array.isArray(parsed.shareWith) ||
-			parsed.shareWith.some(
-				(identityKey) =>
-					typeof identityKey !== 'string' ||
-					!COMPRESSED_IDENTITY_KEY.test(identityKey),
-			))
-	) {
-		throw invalidState(file, 'shareWith must contain identity public keys')
-	}
+	const shareWith = validateIdentityKeys(parsed.shareWith, file, 'shareWith')
+	const contacts = validateContacts(parsed.contacts, file)
+	const teams = validateTeams(parsed.teams, contacts, file)
+	const shareWithRefs = validateReaderRefs(
+		parsed.shareWithRefs,
+		contacts,
+		teams,
+		file,
+		'shareWithRefs',
+	)
 	return {
 		walletUrl: parsed.walletUrl as string | undefined,
 		ordfsUrl: parsed.ordfsUrl as string | undefined,
-		shareWith: parsed.shareWith as string[] | undefined,
+		shareWith,
+		shareWithRefs,
+		contacts,
+		teams,
 	}
 }
 
@@ -263,22 +277,161 @@ function validateDraftRecord(
 			)
 		}
 	}
-	if (value.sharedWith !== undefined) {
-		if (
-			!Array.isArray(value.sharedWith) ||
-			value.sharedWith.some(
-				(identityKey) =>
-					typeof identityKey !== 'string' ||
-					!COMPRESSED_IDENTITY_KEY.test(identityKey),
+	for (const field of ['sharedWith', 'sharedWithRaw'] as const) {
+		try {
+			validateIdentityKeys(
+				value[field],
+				file,
+				`record for ${JSON.stringify(filePath)} ${field}`,
 			)
-		) {
+		} catch {
 			throw invalidState(
 				file,
-				`record for ${JSON.stringify(filePath)} has invalid sharedWith identity keys`,
+				`record for ${JSON.stringify(filePath)} has invalid ${field} identity keys`,
 			)
 		}
 	}
+	if (value.shareWithRefs !== undefined) {
+		if (!Array.isArray(value.shareWithRefs)) {
+			throw invalidState(
+				file,
+				`record for ${JSON.stringify(filePath)} has invalid shareWithRefs`,
+			)
+		}
+		for (const ref of value.shareWithRefs) {
+			if (typeof ref !== 'string' || normalizeStoredName(ref) === null) {
+				throw invalidState(
+					file,
+					`record for ${JSON.stringify(filePath)} has invalid shareWithRefs`,
+				)
+			}
+		}
+	}
 	return value as unknown as DraftRecord
+}
+
+function validateIdentityKeys(
+	value: unknown,
+	file: string,
+	field: string,
+): string[] | undefined {
+	if (value === undefined) return undefined
+	if (!Array.isArray(value)) {
+		throw invalidState(file, `${field} must contain identity public keys`)
+	}
+	const keys: string[] = []
+	for (const identityKey of value) {
+		if (
+			typeof identityKey !== 'string' ||
+			!COMPRESSED_IDENTITY_KEY.test(identityKey)
+		) {
+			throw invalidState(file, `${field} must contain identity public keys`)
+		}
+		try {
+			keys.push(normalizeIdentityKey(identityKey))
+		} catch {
+			throw invalidState(file, `${field} must contain identity public keys`)
+		}
+	}
+	return [...new Set(keys)]
+}
+
+function validateContacts(
+	value: unknown,
+	file: string,
+): Record<string, string> | undefined {
+	if (value === undefined) return undefined
+	if (!isObject(value)) throw invalidState(file, 'contacts must be an object')
+	const contacts: Record<string, string> = {}
+	for (const [name, identityKey] of Object.entries(value)) {
+		if (normalizeStoredName(name) === null || typeof identityKey !== 'string') {
+			throw invalidState(
+				file,
+				'contacts contains an invalid name or identity key',
+			)
+		}
+		try {
+			contacts[name] = normalizeIdentityKey(identityKey)
+		} catch {
+			throw invalidState(
+				file,
+				`contact ${JSON.stringify(name)} has an invalid identity key`,
+			)
+		}
+	}
+	return contacts
+}
+
+function validateTeams(
+	value: unknown,
+	contacts: Record<string, string> | undefined,
+	file: string,
+): Record<string, string[]> | undefined {
+	if (value === undefined) return undefined
+	if (!isObject(value)) throw invalidState(file, 'teams must be an object')
+	const teams: Record<string, string[]> = {}
+	for (const [name, members] of Object.entries(value)) {
+		if (normalizeStoredName(name) === null || contacts?.[name]) {
+			throw invalidState(
+				file,
+				`team ${JSON.stringify(name)} has an invalid or conflicting name`,
+			)
+		}
+		if (!Array.isArray(members)) {
+			throw invalidState(
+				file,
+				`team ${JSON.stringify(name)} must contain contact names`,
+			)
+		}
+		const normalized: string[] = []
+		for (const member of members) {
+			if (
+				typeof member !== 'string' ||
+				normalizeStoredName(member) === null ||
+				!contacts?.[member]
+			) {
+				throw invalidState(
+					file,
+					`team ${JSON.stringify(name)} contains an unknown contact`,
+				)
+			}
+			normalized.push(member)
+		}
+		teams[name] = [...new Set(normalized)]
+	}
+	return teams
+}
+
+function validateReaderRefs(
+	value: unknown,
+	contacts: Record<string, string> | undefined,
+	teams: Record<string, string[]> | undefined,
+	file: string,
+	field: string,
+): string[] | undefined {
+	if (value === undefined) return undefined
+	if (!Array.isArray(value))
+		throw invalidState(file, `${field} must be an array`)
+	const refs: string[] = []
+	for (const ref of value) {
+		if (
+			typeof ref !== 'string' ||
+			normalizeStoredName(ref) === null ||
+			(!contacts?.[ref] && !teams?.[ref])
+		) {
+			throw invalidState(file, `${field} contains an unknown contact or team`)
+		}
+		refs.push(ref)
+	}
+	return [...new Set(refs)]
+}
+
+function normalizeStoredName(value: string): string | null {
+	try {
+		return normalizeReaderName(value) === value ? value : null
+	} catch {
+		return null
+	}
 }
 
 export function writeDrafts(

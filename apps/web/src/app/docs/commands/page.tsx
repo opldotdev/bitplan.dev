@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/table";
 
 export const metadata: Metadata = {
-  description: "bitplan CLI commands for upload, list, fetch, and whoami.",
+  description:
+    "bitplan CLI commands for publishing, reading, contacts, and teams.",
   title: "Commands",
 };
 
@@ -20,7 +21,7 @@ const FLAGS = [
   {
     command: "upload <file>",
     flags:
-      "--draft <origin>, --new, --description <text>, --share-with <identity-key>, --private, --no-relay, -y, --json, --allow-finding <id>",
+      "--draft <origin>, --new, --description <text>, --share-with <identity-key|contact|team>, --private, --no-relay, -y, --json, --allow-finding <id>",
   },
   {
     command: "list",
@@ -36,7 +37,16 @@ const FLAGS = [
   },
   {
     command: "config",
-    flags: "--share-with <identity-key>, --clear-share-with",
+    flags: "--share-with <identity-key|contact|team>, --clear-share-with",
+  },
+  {
+    command: "contact",
+    flags: "set <name> <identity-key>, remove <name>, list [--json]",
+  },
+  {
+    command: "team",
+    flags:
+      "set <name> <contacts...>, add <name> <contacts...>, remove <name> <contacts...>, delete <name>, list [name] [--json]",
   },
   {
     command: "version",
@@ -88,8 +98,22 @@ export default function CommandsPage() {
         0.0.6+ or the current website to read.
       </p>
       <p>
-        <code>config --share-with</code> saves default readers for new plans.
-        Use <code>config --clear-share-with</code> to clear them.
+        <code>--share-with</code> accepts a public identity key, contact, or
+        team. <code>config --share-with</code> saves the choice as a default for
+        new plans. Use <code>config --clear-share-with</code> to clear it.
+      </p>
+      <p>
+        Contact names, their public keys, and team membership are defined in{" "}
+        <code>~/.bitplan/config.json</code>. A local draft may remember a name
+        so it can resolve the current members when you publish. Neither names
+        nor membership go to BitPlan servers or on-chain; only public identity
+        keys appear in the shared envelope. BitPlan has no accounts, team
+        directory, or plan database.
+      </p>
+      <p>
+        Removing a team member excludes them from the next version of locally
+        tracked plans that remember that team. It cannot remove access to
+        versions already shared with them.
       </p>
       <p>
         <code>fetch --meta</code> writes metadata to stderr, including whether

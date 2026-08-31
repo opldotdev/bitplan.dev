@@ -13,7 +13,7 @@ import path from 'node:path'
 import type { WalletInterface } from '@bsv/sdk'
 import type { DraftPlaintext } from '../src/envelope.js'
 import type { BitplanCoin, PublishResult } from '../src/ordinals.js'
-import type { DraftRecord } from '../src/state.js'
+import type { ConfigFile, DraftRecord } from '../src/state.js'
 
 const CHILD_RUN = process.env.BITPLAN_UPLOAD_TEST_CHILD === '1'
 const ORIGIN = `${'a'.repeat(64)}_0`
@@ -80,7 +80,7 @@ if (!CHILD_RUN) {
 	let identityKeyCalls = 0
 	let relayError: Error | undefined
 	let stateSaveError: Error | undefined
-	let defaultShareWith: string[]
+	let config: ConfigFile
 	let ordfsContent:
 		| {
 				bytes: Uint8Array
@@ -101,7 +101,7 @@ if (!CHILD_RUN) {
 			calls.saves.push({ file, record })
 			if (stateSaveError) throw stateSaveError
 		},
-		readConfig: () => ({ shareWith: defaultShareWith }),
+		readConfig: () => config,
 	}))
 
 	mock.module('../src/wallet.js', () => ({
@@ -224,7 +224,7 @@ if (!CHILD_RUN) {
 		identityKeyCalls = 0
 		relayError = undefined
 		stateSaveError = undefined
-		defaultShareWith = []
+		config = { shareWith: [] }
 		ordfsContent = undefined
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bitplan-upload-test-'))
 		htmlFile = path.join(tempDir, 'plan.html')
@@ -243,7 +243,7 @@ if (!CHILD_RUN) {
 
 	describe('uploadCommand orchestration', () => {
 		test('shares a new plan with configured default readers', async () => {
-			defaultShareWith = ['default-reader']
+			config.shareWith = ['default-reader']
 
 			await uploadCommand(htmlFile, { yes: true })
 
@@ -327,13 +327,87 @@ if (!CHILD_RUN) {
 			])
 		})
 
+		test('re-resolves a named team and replaces its prior member keys', async () => {
+			const alice =
+				'02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9'
+			const bob =
+				'02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5'
+			config = {
+				contacts: { alice, bob },
+				teams: { dev: ['alice'] },
+			}
+			knownByFile = {
+				...existingRecord(),
+				sharedWith: [alice, bob],
+				sharedWithRaw: [],
+				shareWithRefs: ['dev'],
+			}
+
+			await uploadCommand(htmlFile, { yes: true })
+
+			expect(calls.seals[0]?.sharedWith).toEqual([alice])
+			expect(calls.saves[0]?.record).toMatchObject({
+				sharedWith: [alice],
+				sharedWithRaw: [],
+				shareWithRefs: ['dev'],
+			})
+			expect(console.log).toHaveBeenCalledWith('Removed:  bob')
+			expect(console.log).toHaveBeenCalledWith(
+				expect.stringContaining('older versions'),
+			)
+		})
+
+		test('keeps legacy readers literal when no named provenance exists', async () => {
+			const alice =
+				'02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9'
+			const bob =
+				'02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5'
+			config = {
+				contacts: { alice, bob },
+				teams: { dev: ['alice'] },
+			}
+			knownByFile = { ...existingRecord(), sharedWith: [alice, bob] }
+
+			await uploadCommand(htmlFile, { yes: true })
+
+			expect(calls.seals[0]?.sharedWith).toEqual([alice, bob])
+			expect(calls.saves[0]?.record.sharedWithRaw).toEqual([alice, bob])
+		})
+
+		test('remembers named defaults on a new local draft', async () => {
+			const alice =
+				'02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9'
+			config = {
+				contacts: { alice },
+				teams: { dev: ['alice'] },
+				shareWithRefs: ['dev'],
+			}
+
+			await uploadCommand(htmlFile, { new: true, yes: true })
+
+			expect(calls.seals[0]?.sharedWith).toEqual([alice])
+			expect(calls.saves[0]?.record.shareWithRefs).toEqual(['dev'])
+			expect(calls.saves[0]?.record.sharedWithRaw).toEqual([])
+		})
+
 		test('--private removes readers from the new version', async () => {
-			knownByFile = { ...existingRecord(), sharedWith: ['existing-reader'] }
+			knownByFile = {
+				...existingRecord(),
+				sharedWith: ['existing-reader'],
+				sharedWithRaw: [],
+				shareWithRefs: ['dev'],
+			}
+			config = {
+				contacts: { alice: OWNER_IDENTITY_KEY },
+				teams: { dev: ['alice'] },
+			}
 
 			await uploadCommand(htmlFile, { private: true, yes: true })
 
 			expect(calls.seals[0]?.sharedWith).toEqual([])
 			expect(calls.saves[0]?.record.sharedWith).toEqual([])
+			expect(calls.saves[0]?.record.sharedWithRaw).toEqual([])
+			expect(calls.saves[0]?.record.shareWithRefs).toBeUndefined()
 		})
 
 		test('adopts metadata and readers only from the wallet coin tip', async () => {
@@ -356,6 +430,35 @@ if (!CHILD_RUN) {
 			expect(calls.seals[0]?.plaintext.meta.description).toBe(
 				'Description from chain',
 			)
+		})
+
+		test('does not reapply stale local team refs when adopting a newer tip', async () => {
+			const alice =
+				'0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+			config = {
+				contacts: { alice },
+				teams: { dev: ['alice'] },
+			}
+			knownByFile = {
+				...existingRecord(),
+				latestOutpoint: `${'e'.repeat(64)}_0`,
+				sharedWith: [alice],
+				sharedWithRaw: [],
+				shareWithRefs: ['dev'],
+			}
+			ordfsContent = {
+				bytes: Uint8Array.of(1, 2, 3),
+				contentType: 'application/x-bitplan',
+				origin: ORIGIN,
+				outpoint: VERSION_OUTPOINT,
+				sequence: 3,
+			}
+
+			await uploadCommand(htmlFile, { yes: true })
+
+			expect(calls.seals[0]?.sharedWith).toEqual(['adopted-reader'])
+			expect(calls.saves[0]?.record.sharedWithRaw).toEqual(['adopted-reader'])
+			expect(calls.saves[0]?.record.shareWithRefs).toBeUndefined()
 		})
 
 		test('refuses a stale ORDFS tip before inheriting its readers', async () => {
@@ -411,6 +514,15 @@ if (!CHILD_RUN) {
 			expect(calls.saves).toEqual([])
 		})
 
+		test('rejects an unknown named reader before wallet I/O', async () => {
+			await expect(
+				uploadCommand(htmlFile, { shareWith: ['missing-team'], yes: true }),
+			).rejects.toThrow('Unknown contact or team')
+
+			expect(calls.connectWallet).toEqual([])
+			expect(calls.seals).toEqual([])
+		})
+
 		test('a non-interactive publish requires --yes before key prompts, sealing, or publishing', async () => {
 			expect(process.stdin.isTTY).not.toBe(true)
 
@@ -452,6 +564,7 @@ if (!CHILD_RUN) {
 						outpoint: GENESIS_OUTPOINT,
 						version: 1,
 						access: { mode: 'wallet-only', readers: [] },
+						changes: { added: [], removed: [] },
 						stateSaved: true,
 						relay: { state: 'accepted', txStatus: 'SEEN_ON_NETWORK' },
 						viewer: `https://bitplan.dev/d/${GENESIS_OUTPOINT}`,

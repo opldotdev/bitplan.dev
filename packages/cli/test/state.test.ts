@@ -188,6 +188,47 @@ describe('state store', () => {
 		expect(modeOf(file)).toBe(STATE_FILE_MODE)
 	})
 
+	test('legacy config remains valid and new address-book fields round-trip', () => {
+		const file = path.join(dir, 'config.json')
+		const alice =
+			'0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+		fs.writeFileSync(file, JSON.stringify({ walletUrl: 'http://wallet.test' }))
+		expect(readConfig(file).walletUrl).toBe('http://wallet.test')
+
+		writeConfig(
+			{
+				contacts: { alice },
+				teams: { dev: ['alice'] },
+				shareWithRefs: ['dev'],
+			},
+			file,
+		)
+		expect(readConfig(file)).toMatchObject({
+			contacts: { alice },
+			teams: { dev: ['alice'] },
+			shareWithRefs: ['dev'],
+		})
+	})
+
+	test('rejects conflicting, nested, or unknown address-book names', () => {
+		const file = path.join(dir, 'config.json')
+		const alice =
+			'0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+		for (const config of [
+			{ contacts: { Alice: alice } },
+			{ contacts: { dev: alice }, teams: { dev: ['dev'] } },
+			{ contacts: { alice }, teams: { dev: ['missing'] } },
+			{
+				contacts: { alice },
+				teams: { dev: ['alice'] },
+				shareWithRefs: ['ops'],
+			},
+		]) {
+			fs.writeFileSync(file, JSON.stringify(config))
+			expect(() => readConfig(file)).toThrow(/invalid|conflicting|unknown/)
+		}
+	})
+
 	test('rejects malformed default reader identities', () => {
 		const file = path.join(dir, 'config.json')
 		fs.writeFileSync(file, JSON.stringify({ shareWith: ['not-a-public-key'] }))
