@@ -60,6 +60,7 @@ export function buildProgram(): Command {
 			'Remove shared readers from the new version (older versions stay shared)',
 		)
 		.option('-y, --yes', 'Skip the confirmation prompt')
+		.option('--json', 'Print the publish result as JSON (requires --yes)')
 		.option(
 			'--allow-finding <id>',
 			'Waive one secret-scanner finding (repeatable)',
@@ -88,6 +89,7 @@ export function buildProgram(): Command {
 		.description('Download and decrypt a published draft.')
 		.argument('<origin|url>', 'Draft origin outpoint or viewer URL')
 		.option('--meta', 'Print draft metadata to stderr')
+		.option('--json', 'Print the HTML and metadata as JSON')
 		.option('--version <n>', 'Fetch a specific version (default: latest)')
 		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
 		.option('--ordfs-url <url>', 'ORDFS gateway base URL')

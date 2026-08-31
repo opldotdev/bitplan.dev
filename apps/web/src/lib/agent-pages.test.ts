@@ -11,8 +11,14 @@ describe("agent pages", () => {
     expect(markdownForPath("/")).toContain("npx bitplan");
     expect(markdownForPath("/docs")).toContain("Docs");
     expect(markdownForPath("/docs/")).toContain("Docs");
-    expect(markdownForPath("/docs/api")).toContain("Sunset");
+    expect(markdownForPath("/docs/agents")).toContain(
+      "Never give an agent a wallet mnemonic"
+    );
+    expect(markdownForPath("/docs/agents")).toContain(
+      "Phone-to-desktop wallet approval is not available yet"
+    );
     expect(markdownForPath("/new")).toContain("prepare_bitplan_plan");
+    expect(markdownForPath("/new")).toContain("list_my_bitplans");
   });
 
   test("unknown paths have no markdown page", () => {
@@ -23,14 +29,13 @@ describe("agent pages", () => {
     expect(LLMS_TXT).toContain("When to use this");
     expect(LLMS_TXT).toContain("npx bitplan");
     expect(LLMS_TXT).toContain("https://www.npmjs.com/package/bitplan");
-    expect(LLMS_TXT).toContain("/api/v1/content/");
+    expect(LLMS_TXT).toContain("/ordfs/content/");
   });
 
   test("not-found markdown points at docs, sitemap, and llms.txt", () => {
     expect(markdownNotFound()).toContain("/docs");
     expect(markdownNotFound()).toContain("/sitemap.xml");
     expect(markdownNotFound()).toContain("/llms.txt");
-    expect(markdownNotFound()).toContain("/openapi.json");
   });
 
   test("agent discovery files describe real BitPlan capabilities", async () => {

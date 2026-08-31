@@ -15,7 +15,7 @@ const securityHeaders = [
   {
     key: "Link",
     value:
-      '</.well-known/api-catalog>; rel="api-catalog", </openapi.json>; rel="service-desc"; type="application/openapi+json", </docs/api>; rel="service-doc"; type="text/html", </.well-known/ai-catalog.json>; rel="describedby"; type="application/json"',
+      '</.well-known/ai-catalog.json>; rel="describedby"; type="application/json"',
   },
 ] as const;
 

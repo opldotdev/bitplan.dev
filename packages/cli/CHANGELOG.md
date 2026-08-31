@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.11
+
+### Added
+
+- `upload --json --yes` prints one structured publish result for agents and
+  scripts.
+- `fetch --json` prints the decrypted HTML and metadata as one JSON value.
+
 ## 0.0.10
 
 ### Changed

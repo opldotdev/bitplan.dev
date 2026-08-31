@@ -29,10 +29,8 @@ export default function ContactPage() {
           decrypt a draft, the wallet that published it is the one that can.
         </p>
         <p>
-          OpenAPI for the public read surface is at{" "}
-          <a href="/openapi.json">/openapi.json</a>. Agent instructions are at{" "}
-          <a href="/llms.txt">/llms.txt</a>. Docs start at{" "}
-          <a href="/docs">/docs</a>.
+          Agent instructions are at <a href="/llms.txt">/llms.txt</a>. Docs
+          start at <a href="/docs">/docs</a>.
         </p>
       </div>
     </main>

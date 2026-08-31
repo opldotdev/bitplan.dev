@@ -79,10 +79,10 @@ export default function Home() {
           <h2 className="font-medium text-lg tracking-tight">
             Open a BitPlan draft
           </h2>
-          <h3 className="font-medium text-sm">Docs and OpenAPI</h3>
+          <h3 className="font-medium text-sm">Docs</h3>
           <p className="text-muted-foreground">
-            BitPlan docs start at /docs. The OpenAPI read surface is
-            /openapi.json. API versioning and Sunset policy are at /docs/api.
+            BitPlan docs start at /docs. They explain the CLI, wallet flow,
+            encrypted envelope, and agent integration.
           </p>
           <h3 className="font-medium text-sm">Viewer</h3>
           <p className="text-muted-foreground">

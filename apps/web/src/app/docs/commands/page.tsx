@@ -20,7 +20,7 @@ const FLAGS = [
   {
     command: "upload <file>",
     flags:
-      "--draft <origin>, --new, --description <text>, --share-with <identity-key>, --private, --no-relay, -y, --allow-finding <id>",
+      "--draft <origin>, --new, --description <text>, --share-with <identity-key>, --private, --no-relay, -y, --json, --allow-finding <id>",
   },
   {
     command: "list",
@@ -28,7 +28,7 @@ const FLAGS = [
   },
   {
     command: "fetch <origin|url>",
-    flags: "--meta, --version <n>",
+    flags: "--meta, --json, --version <n>",
   },
   {
     command: "auth / whoami",
@@ -87,6 +87,12 @@ export default function CommandsPage() {
         <code>fetch --meta</code> writes metadata to stderr, including whether
         the envelope is private or shared and the public reader list. HTML
         remains on stdout so it can be redirected to a file.
+      </p>
+      <p>
+        Agents and scripts can use <code>upload --yes --json</code> or{" "}
+        <code>fetch --json</code> to receive one JSON value. JSON output never
+        counts as permission to publish; upload still requires the explicit{" "}
+        <code>--yes</code> flag and wallet approval.
       </p>
       <p>
         By default, <code>upload</code> sends the wallet-returned Atomic BEEF to

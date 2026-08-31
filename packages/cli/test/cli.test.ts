@@ -97,6 +97,7 @@ describe('cli surface', () => {
 				'--private',
 				'--no-relay',
 				'--yes',
+				'--json',
 				'--allow-finding',
 				'--wallet-url',
 			]),
@@ -122,12 +123,12 @@ describe('cli surface', () => {
 		)
 	})
 
-	test('fetch takes a reference and a --meta flag', () => {
+	test('fetch takes a reference, metadata, and JSON flags', () => {
 		const fetch = commandNamed(program, 'fetch')
 		expect(fetch.registeredArguments.map((a) => a.name())).toEqual([
 			'origin|url',
 		])
-		expect(flagsOf(fetch)).toEqual(expect.arrayContaining(['--meta']))
+		expect(flagsOf(fetch)).toEqual(expect.arrayContaining(['--meta', '--json']))
 	})
 
 	test('--allow-finding is repeatable', () => {

@@ -6,6 +6,7 @@ import { connectWallet } from '../wallet.js'
 
 export interface FetchOptions {
 	meta?: boolean
+	json?: boolean
 	version?: string
 	walletUrl?: string
 	ordfsUrl?: string
@@ -52,32 +53,30 @@ export async function fetchCommand(
 	const { wallet } = await connectWallet(options.walletUrl)
 	const { header, plaintext } = await openEnvelope(wallet, content.bytes)
 
-	if (options.meta) {
-		const version = content.sequence === null ? null : content.sequence + 1
-		console.error(
-			JSON.stringify(
-				{
-					origin: content.origin ?? origin,
-					outpoint: content.outpoint,
-					version,
-					contentType: content.contentType,
-					envelopeVersion: header.v,
-					keyID: header.key.keyID,
-					access:
-						header.v === 1
-							? { mode: 'wallet-only', readers: [] }
-							: {
-									mode: 'shared',
-									senderIdentityKey: header.key.senderIdentityKey,
-									readers: sharedWith(header),
-								},
-					meta: plaintext.meta,
-				},
-				null,
-				2,
-			),
-		)
+	const metadata = {
+		origin: content.origin ?? origin,
+		outpoint: content.outpoint,
+		version: content.sequence === null ? null : content.sequence + 1,
+		contentType: content.contentType,
+		envelopeVersion: header.v,
+		keyID: header.key.keyID,
+		access:
+			header.v === 1
+				? { mode: 'wallet-only', readers: [] }
+				: {
+						mode: 'shared',
+						senderIdentityKey: header.key.senderIdentityKey,
+						readers: sharedWith(header),
+					},
+		meta: plaintext.meta,
 	}
+
+	if (options.json) {
+		console.log(JSON.stringify({ ...metadata, html: plaintext.html }, null, 2))
+		return
+	}
+
+	if (options.meta) console.error(JSON.stringify(metadata, null, 2))
 
 	process.stdout.write(plaintext.html)
 	if (!plaintext.html.endsWith('\n')) process.stdout.write('\n')

@@ -92,6 +92,19 @@ npx bitplan fetch https://bitplan.dev/d/<origin>
 npx bitplan fetch <origin> --version 2
 ```
 
+Agents and scripts can ask for one JSON value instead of parsing the text made
+for people:
+
+```sh
+npx bitplan upload ./plan.html --yes --json
+npx bitplan fetch <origin> --json
+```
+
+The upload result includes the origin, current outpoint, version, access list,
+relay status, and viewer URL. `--json` still requires `--yes`; it never treats a
+machine-readable response as permission to publish. Fetch JSON includes both
+the decrypted HTML and its metadata, so `--meta` is not needed.
+
 The CLI stores optional config and file-to-origin mappings in `~/.bitplan`.
 
 Pass `--wallet-url` to point at a different BRC-100 endpoint; `upload` and
@@ -117,6 +130,7 @@ bitplan upload <file>
   --private                Make the new version wallet-only
   --no-relay               Skip the default 1Sat notification for ORDFS capture
   -y, --yes                Skip the confirmation prompt
+  --json                   Print one JSON result (requires --yes)
   --allow-finding <id>     Waive one secret-scanner finding (repeatable)
 
 bitplan list
@@ -126,6 +140,7 @@ bitplan list
 
 bitplan fetch <origin|url>
   --meta
+  --json                   Print the HTML and metadata as JSON
   --version <n>
 
 bitplan version

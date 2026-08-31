@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BSV Desktop: authenticate native BRC-100 callers</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 760px;
+      padding: 48px 24px 80px;
+    }
+    h1, h2 { line-height: 1.2; }
+    h1 { font-size: clamp(2rem, 6vw, 3.5rem); letter-spacing: -0.04em; }
+    h2 { margin-top: 2.5rem; }
+    .summary {
+      border-left: 4px solid currentColor;
+      font-size: 1.15rem;
+      padding-left: 1rem;
+    }
+    .status {
+      border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+      border-radius: 12px;
+      display: inline-block;
+      padding: 0.35rem 0.7rem;
+    }
+    code {
+      background: color-mix(in srgb, currentColor 10%, transparent);
+      border-radius: 4px;
+      padding: 0.1rem 0.3rem;
+    }
+    li { margin: 0.45rem 0; }
+  </style>
+</head>
+<body>
+  <p class="status">Draft for maintainer review · not submitted</p>
+  <h1>Authenticate native BRC-100 callers before reusing saved permissions</h1>
+
+  <p class="summary">
+    BSV Desktop correctly exposes the standard BRC-100 methods. The concern is
+    narrower: a native application identifies itself with a caller-supplied
+    <code>Originator</code> header, so another local process can claim the same
+    application domain.
+  </p>
+
+  <h2>Why this matters</h2>
+  <p>
+    BRC-100 permissions are scoped to an application originator. After a user
+    saves a permission for one application, a separate local process may be
+    able to present the same domain and ask the wallet to reuse that permission.
+  </p>
+  <p>
+    The wallet lock and permission prompts still provide useful protection.
+    This is not a claim that keys are exposed or that every forged request will
+    succeed automatically.
+  </p>
+
+  <h2>What the standard expects</h2>
+  <p>
+    BRC-116 says the wallet, browser, operating system, or communication
+    substrate is expected to confirm that an originator is authentic and
+    prevent forged requests. Browser-managed <code>Origin</code> headers help
+    with web applications. A caller-controlled native header does not identify
+    one local application from another.
+  </p>
+
+  <h2>Expected behavior</h2>
+  <p>
+    BSV Desktop should reuse saved permissions only when it can verify that the
+    request came from the application to which those permissions were granted.
+  </p>
+
+  <h2>Possible direction</h2>
+  <p>
+    Keep the existing BRC-5 endpoints for compatibility, but distinguish
+    verified and unverified native callers. The maintainers could:
+  </p>
+  <ul>
+    <li>Pair a native application once and issue it a local credential.</li>
+    <li>Bind that credential to the approved originator.</li>
+    <li>Authenticate later calls with mTLS, signed challenges, or trusted operating-system IPC.</li>
+    <li>Reuse persistent permissions only on an authenticated channel.</li>
+    <li>Prompt, use an ephemeral grant, or reject sensitive calls from an unverified header.</li>
+  </ul>
+  <p>
+    The important property is simple: copying an application's domain string
+    should not copy its saved wallet permissions.
+  </p>
+
+  <h2>Safe verification</h2>
+  <ol>
+    <li>Use an unfunded test wallet profile.</li>
+    <li>Grant a harmless protocol permission to a test native application.</li>
+    <li>Make the original request through that process.</li>
+    <li>Start a different process with no pairing or application credential.</li>
+    <li>Send the same request with the same <code>Originator</code> value.</li>
+    <li>Check whether the second process receives the saved permission.</li>
+  </ol>
+
+  <h2>What this report is not asking for</h2>
+  <ul>
+    <li>It does not ask BSV Desktop to remove BRC-5 or its local API.</li>
+    <li>It does not claim the 28 BRC-100 methods are missing.</li>
+    <li>It does not ask for removal of BSV Desktop's additional token APIs.</li>
+    <li>It does not prescribe one cross-platform authentication technology.</li>
+  </ul>
+
+  <h2>Before submitting an issue</h2>
+  <ul>
+    <li>Ask whether another authentication layer exists outside the inspected HTTP path.</li>
+    <li>Reproduce only with a harmless permission and a test wallet.</li>
+    <li>Let the BSV Desktop maintainers choose severity and implementation.</li>
+    <li>Keep the issue focused on origin authentication and saved permission reuse.</li>
+  </ul>
+
+  <h2>References</h2>
+  <ul>
+    <li>BRC-5: HTTP wallet communication substrate</li>
+    <li>BRC-100: standard wallet-to-application interface</li>
+    <li>BRC-116 section 3.1: originator identity and forgery prevention</li>
+    <li>Observed in BSV Desktop 2.8.3</li>
+  </ul>
+</body>
+</html>

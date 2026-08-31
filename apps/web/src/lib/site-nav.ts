@@ -13,9 +13,9 @@ export const DOCS_NAV: DocsNavItem[] = [
   { href: "/docs", label: "Introduction" },
   { href: "/docs/how-it-works", label: "How it works" },
   { href: "/docs/cli-setup", label: "CLI setup" },
+  { href: "/docs/agents", label: "Agents and wallets" },
   { href: "/docs/commands", label: "Commands" },
   { href: "/docs/envelope", label: "Envelope" },
-  { href: "/docs/api", label: "API" },
 ];
 
 export function isActivePath(pathname: string | null, href: string): boolean {

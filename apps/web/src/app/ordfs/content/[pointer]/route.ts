@@ -1,4 +1,4 @@
-import { API_RATE_LIMIT_HEADERS, jsonApiError } from "@/lib/api-error";
+import { jsonApiError } from "@/lib/api-error";
 import { parseEnvelope } from "@/lib/envelope";
 import { toOrdinalOutpoint } from "@/lib/outpoint";
 
@@ -176,10 +176,7 @@ function parseLength(value: string | null): number | null {
 }
 
 function responseHeaders(upstream: Headers): Headers {
-  const headers = new Headers({
-    ...SAFE_RESPONSE_HEADERS,
-    ...API_RATE_LIMIT_HEADERS,
-  });
+  const headers = new Headers(SAFE_RESPONSE_HEADERS);
   for (const name of ["x-ord-seq", "x-origin", "x-outpoint"]) {
     const value = upstream.get(name);
     if (value) {

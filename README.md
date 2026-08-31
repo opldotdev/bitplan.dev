@@ -71,9 +71,9 @@ flowchart TD
 
 - [How BitPlan works](https://bitplan.dev/docs/how-it-works)
 - [CLI setup](https://bitplan.dev/docs/cli-setup)
+- [Agents and wallets](https://bitplan.dev/docs/agents)
 - [CLI commands](https://bitplan.dev/docs/commands)
 - [Encrypted envelope](https://bitplan.dev/docs/envelope)
-- [Read API](https://bitplan.dev/docs/api)
 
 ## Repository
 

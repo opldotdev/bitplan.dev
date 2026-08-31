@@ -1,0 +1,43 @@
+{
+  "name": "BitPlan",
+  "short_name": "BitPlan",
+  "description": "Create, encrypt, publish, and review plans with your BRC-100 wallet.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#e8632c",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "metanet": {
+    "schemaVersion": 1,
+    "groupPermissions": {
+      "description": "Let BitPlan find the plans held in your wallet.",
+      "basketAccess": [
+        {
+          "basket": "1sat",
+          "description": "Find your BitPlan plan coins."
+        }
+      ]
+    },
+    "counterpartyPermissions": {
+      "description": "Let you open a plan shared by another wallet.",
+      "protocols": [
+        {
+          "protocolName": "bitplan",
+          "description": "Decrypt a BitPlan plan shared with you."
+        }
+      ]
+    }
+  }
+}

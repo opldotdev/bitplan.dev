@@ -420,6 +420,37 @@ if (!CHILD_RUN) {
 			expect(calls.saves).toEqual([])
 		})
 
+		test('--json requires explicit confirmation before wallet I/O', async () => {
+			await expect(
+				uploadCommand(htmlFile, { new: true, json: true }),
+			).rejects.toThrow('--json requires --yes')
+
+			expect(calls.connectWallet).toEqual([])
+		})
+
+		test('--json prints one machine-readable publish result', async () => {
+			await uploadCommand(htmlFile, { new: true, json: true, yes: true })
+
+			expect(console.log).toHaveBeenCalledTimes(1)
+			expect(console.log).toHaveBeenCalledWith(
+				JSON.stringify(
+					{
+						published: true,
+						kind: 'draft',
+						origin: GENESIS_OUTPOINT,
+						outpoint: GENESIS_OUTPOINT,
+						version: 1,
+						access: { mode: 'wallet-only', readers: [] },
+						stateSaved: true,
+						relay: { state: 'accepted', txStatus: 'SEEN_ON_NETWORK' },
+						viewer: `https://bitplan.dev/d/${GENESIS_OUTPOINT}`,
+					},
+					null,
+					2,
+				),
+			)
+		})
+
 		test('a publish failure never records a draft as successfully uploaded', async () => {
 			genesisError = new Error('wallet rejected publish')
 

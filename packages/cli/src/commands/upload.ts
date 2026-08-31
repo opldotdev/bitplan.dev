@@ -30,6 +30,7 @@ import {
 	publishVersion,
 } from '../ordinals.js'
 import { toOrdinalOutpoint } from '../outpoint.js'
+import type { RelayResult } from '../relay.js'
 import { relayBeef } from '../relay.js'
 import { scanForSecrets } from '../secretScan.js'
 import {
@@ -52,6 +53,7 @@ export interface UploadOptions {
 	walletUrl?: string
 	ordfsUrl?: string
 	relay?: boolean
+	json?: boolean
 }
 
 export async function uploadCommand(
@@ -63,6 +65,9 @@ export async function uploadCommand(
 	}
 	if (options.private && (options.shareWith?.length ?? 0) > 0) {
 		throw new CliError('--private and --share-with cannot be used together.')
+	}
+	if (options.json && !options.yes) {
+		throw new CliError('--json requires --yes because publishing is permanent.')
 	}
 	const requestedRecipients = [
 		...new Set((options.shareWith ?? []).map(normalizeIdentityKey)),
@@ -186,6 +191,7 @@ export async function uploadCommand(
 		sharedWith,
 		privateReset: options.private === true && previousRecipients.length > 0,
 		skip: options.yes === true,
+		quiet: options.json === true,
 	})
 
 	let ownerIdentityKey: string | undefined
@@ -214,15 +220,17 @@ export async function uploadCommand(
 		? await publishVersion(wallet, coin, envelope)
 		: await publishGenesis(wallet, envelope)
 
-	console.log(coin ? 'Published a new version.' : 'Published a new draft.')
-	console.log(`Origin:   ${published.origin}`)
-	console.log(`Outpoint: ${published.outpoint}`)
-	console.log(`Version:  ${nextVersion ?? 'unknown (no local history)'}`)
-	console.log(
-		sharedWith.length === 0
-			? 'Access:   This wallet only'
-			: `Access:   This wallet + ${sharedWith.length} shared identit${sharedWith.length === 1 ? 'y' : 'ies'}`,
-	)
+	if (!options.json) {
+		console.log(coin ? 'Published a new version.' : 'Published a new draft.')
+		console.log(`Origin:   ${published.origin}`)
+		console.log(`Outpoint: ${published.outpoint}`)
+		console.log(`Version:  ${nextVersion ?? 'unknown (no local history)'}`)
+		console.log(
+			sharedWith.length === 0
+				? 'Access:   This wallet only'
+				: `Access:   This wallet + ${sharedWith.length} shared identit${sharedWith.length === 1 ? 'y' : 'ies'}`,
+		)
+	}
 	const record: DraftRecord = {
 		origin: published.origin,
 		keyID,
@@ -233,9 +241,11 @@ export async function uploadCommand(
 		description: meta.description,
 		sharedWith,
 	}
+	let stateSaved = true
 	try {
 		saveDraftRecord(resolvedFile, record)
 	} catch (error) {
+		stateSaved = false
 		console.warn(
 			`Warning: the draft was published, but local state was not saved: ${error instanceof Error ? error.message : String(error)}`,
 		)
@@ -244,27 +254,63 @@ export async function uploadCommand(
 		)
 	}
 
+	let relay:
+		| RelayResult
+		| { state: 'skipped' | 'unavailable' | 'failed'; error?: string } = {
+		state: 'skipped',
+	}
 	if (options.relay !== false) {
 		if (published.beef) {
 			try {
-				const relay = await relayBeef(published.beef, published.txid)
-				console.log(
-					relay.state === 'accepted'
-						? `Relay:    1Sat accepted (${relay.txStatus})`
-						: `Relay:    1Sat is still processing (${relay.txStatus})`,
-				)
+				relay = await relayBeef(published.beef, published.txid)
+				if (!options.json) {
+					console.log(
+						relay.state === 'accepted'
+							? `Relay:    1Sat accepted (${relay.txStatus})`
+							: `Relay:    1Sat is still processing (${relay.txStatus})`,
+					)
+				}
 			} catch (error) {
+				relay = {
+					state: 'failed',
+					error: error instanceof Error ? error.message : String(error),
+				}
 				console.warn(
-					`Warning: the wallet published the draft, but 1Sat relay failed: ${error instanceof Error ? error.message : String(error)}`,
+					`Warning: the wallet published the draft, but 1Sat relay failed: ${relay.error}`,
 				)
 			}
 		} else {
+			relay = { state: 'unavailable' }
 			console.warn(
 				'Warning: the wallet published the draft but returned no Atomic BEEF, so it could not be relayed to 1Sat.',
 			)
 		}
 	}
-	console.log(`Viewer:   ${viewerUrl(published.origin)}`)
+	const viewer = viewerUrl(published.origin)
+	if (options.json) {
+		console.log(
+			JSON.stringify(
+				{
+					published: true,
+					kind: coin ? 'version' : 'draft',
+					origin: published.origin,
+					outpoint: published.outpoint,
+					version: nextVersion,
+					access: {
+						mode: sharedWith.length === 0 ? 'wallet-only' : 'shared',
+						readers: sharedWith,
+					},
+					stateSaved,
+					relay,
+					viewer,
+				},
+				null,
+				2,
+			),
+		)
+	} else {
+		console.log(`Viewer:   ${viewer}`)
+	}
 }
 
 export function resolveDescription(
@@ -397,9 +443,11 @@ interface ConfirmInput {
 	sharedWith: string[]
 	privateReset: boolean
 	skip: boolean
+	quiet: boolean
 }
 
 async function confirmPublish(input: ConfirmInput): Promise<void> {
+	if (input.quiet) return
 	const kind = input.origin ? 'New version' : 'New draft'
 	console.log('')
 	console.log(`${kind} of: ${input.file}`)

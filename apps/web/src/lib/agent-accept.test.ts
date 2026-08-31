@@ -46,9 +46,9 @@ describe("agent accept", () => {
     ).toBe(false);
   });
 
-  test("API prefixes are /api and /ordfs", () => {
-    expect(isApiPath("/api/v1/orank-probe-test")).toBe(true);
+  test("OrdFS paths skip document content negotiation", () => {
     expect(isApiPath("/ordfs/content/nope")).toBe(true);
+    expect(isApiPath("/api/v1/orank-probe-test")).toBe(false);
     expect(isApiPath("/docs")).toBe(false);
   });
 });

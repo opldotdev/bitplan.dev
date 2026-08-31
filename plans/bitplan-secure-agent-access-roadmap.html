@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BitPlan: secure access across agents, desktop, and mobile</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 860px;
+      padding: 48px 24px 88px;
+    }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 {
+      font-size: clamp(2.2rem, 7vw, 4.6rem);
+      letter-spacing: -0.05em;
+      margin-bottom: 1rem;
+    }
+    h2 { margin-top: 3rem; }
+    h3 { margin-bottom: 0.35rem; }
+    p { max-width: 72ch; }
+    .eyebrow {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .summary {
+      border-left: 4px solid currentColor;
+      font-size: 1.2rem;
+      padding-left: 1rem;
+    }
+    .flow, .grid {
+      display: grid;
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    .flow { grid-template-columns: repeat(4, 1fr); }
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    .card {
+      border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+      border-radius: 14px;
+      padding: 1rem;
+    }
+    .card p { margin-bottom: 0; }
+    .phase {
+      border-top: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+      padding: 1.25rem 0;
+    }
+    code {
+      background: color-mix(in srgb, currentColor 10%, transparent);
+      border-radius: 4px;
+      padding: 0.1rem 0.3rem;
+    }
+    li { margin: 0.45rem 0; }
+    @media (max-width: 720px) {
+      .flow, .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <p class="eyebrow">High-level product and engineering plan · 2026-08-30</p>
+  <h1>BitPlan everywhere, without passing around a mnemonic</h1>
+
+  <p class="summary">
+    Make BitPlan useful where plans are written—coding agents and desktop
+    environments—while keeping mobile review effortless and keeping root keys
+    inside a real BRC-100 wallet.
+  </p>
+
+  <h2>The outcome</h2>
+  <p>
+    A person can create or review a plan on a phone, continue working with it on
+    a desktop, and authorize a coding agent to read or update it. None of those
+    workflows should require copying the owner's mnemonic into the application
+    or agent environment.
+  </p>
+
+  <div class="flow">
+    <div class="card"><strong>Plan</strong><br>Encrypted and versioned by BitPlan</div>
+    <div class="card"><strong>Wallet</strong><br>Owns keys, permissions, and publishing authority</div>
+    <div class="card"><strong>Agent</strong><br>Reads only the plans it is allowed to use</div>
+    <div class="card"><strong>Mobile</strong><br>Reviews and approves without becoming a key courier</div>
+  </div>
+
+  <h2>Decisions already made</h2>
+  <ul>
+    <li>BitPlan will remain a BRC-100 application and will not embed an owner wallet.</li>
+    <li>The normal workflow will not copy the owner's mnemonic into an agent.</li>
+    <li>Publishing control and reading access remain separate capabilities.</li>
+    <li>The product name is <strong>1Sat Wallet</strong>, covering mobile and desktop.</li>
+    <li>BSV Desktop is not our implementation project. We will report focused interoperability or security issues upstream when needed.</li>
+    <li>MCP is useful agent ergonomics, but it is not required to create or use a BitPlan. The existing CLI is the first working agent interface.</li>
+  </ul>
+
+  <h2>What works today</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>CLI wallet access</h3>
+      <p>The BitPlan CLI already connects to a local BRC-100 wallet, encrypts plans, publishes versions, lists owned plans, and decrypts a known plan.</p>
+    </div>
+    <div class="card">
+      <h3>Mobile reading</h3>
+      <p>BitPlan already connects inside BSV Browser because that browser supplies an injected BRC-100 wallet.</p>
+    </div>
+    <div class="card">
+      <h3>Shared readers</h3>
+      <p>Envelope v2 wraps one document key for the owner and each invited identity, so readers do not need the owner's mnemonic.</p>
+    </div>
+    <div class="card">
+      <h3>Separate authority</h3>
+      <p>The current 1-sat plan coin authorizes the next version. A reader identity does not automatically receive publishing authority.</p>
+    </div>
+  </div>
+
+  <h2>The gaps</h2>
+  <ol>
+    <li><strong>Agent ergonomics:</strong> agents can run the CLI, but typed and narrowly scoped tools would be safer and easier to discover.</li>
+    <li><strong>Shared-plan discovery:</strong> a recipient can decrypt a known origin but cannot automatically list everything shared with it.</li>
+    <li><strong>Device enrollment:</strong> adding a desktop or agent reader still needs a clear pairing and approval ceremony.</li>
+    <li><strong>Wallet availability:</strong> 1Sat Wallet does not yet expose the full BRC-100 interface to external desktop applications.</li>
+    <li><strong>Origin authentication:</strong> saved application permissions are only safe when the wallet can authenticate the requesting application.</li>
+    <li><strong>Plaintext boundary:</strong> once an agent reads a plan, that plan enters the agent's model context. The product must make that explicit.</li>
+  </ol>
+
+  <h2>BitPlan workstreams</h2>
+
+  <div class="phase">
+    <h3>1. Dogfood the existing CLI</h3>
+    <p>
+      Use the CLI now for agent-created plans. Improve its JSON outputs and
+      non-interactive behavior only where real agent use reveals friction. This
+      provides value before any new protocol or connector exists.
+    </p>
+  </div>
+
+  <div class="phase">
+    <h3>2. Add a local BitPlan MCP server</h3>
+    <p>
+      Wrap BitPlan's existing library and BRC-100 client in focused tools such
+      as <code>list_plans</code>, <code>read_plan</code>,
+      <code>prepare_update</code>, and <code>publish_plan</code>. Do not expose a
+      raw wallet proxy or mnemonic tools. Publishing remains a separate,
+      reviewable operation.
+    </p>
+  </div>
+
+  <div class="phase">
+    <h3>3. Build an encrypted “shared with me” index</h3>
+    <p>
+      Store plan origins, current versions, encrypted metadata, and membership
+      in a discoverable index. A server or overlay may host ciphertext, but it
+      should not learn plan contents. This closes the largest current product
+      gap for secondary devices and agent identities.
+    </p>
+  </div>
+
+  <div class="phase">
+    <h3>4. Add device and agent roles</h3>
+    <p>
+      Let an owner approve a separate device or agent identity as a reader.
+      Keep roles explicit: reader, editor that prepares local changes, and
+      publisher that can use the plan coin. Default agents to reader/editor,
+      not owner.
+    </p>
+  </div>
+
+  <div class="phase">
+    <h3>5. Improve future revocation and privacy</h3>
+    <p>
+      Rotate keys for future versions when a member is removed and investigate
+      a later envelope format that leaks less recipient metadata. Be honest
+      that an immutable older version, or plaintext already read by an agent,
+      cannot be taken back.
+    </p>
+  </div>
+
+  <h2>Wallet work delegated to 1Sat Wallet</h2>
+  <ul>
+    <li>One transport-independent dispatcher for the complete BRC-100 interface.</li>
+    <li>BRC-116-aligned permissions with authenticated originators.</li>
+    <li>A QR-paired encrypted phone-to-desktop wallet session.</li>
+    <li>A macOS target that can serve desktop applications without exporting the seed.</li>
+    <li>Stable identity derivation and wallet-state migration or synchronization.</li>
+    <li>An end-to-end BitPlan acceptance test using the real CLI or BitPlan library.</li>
+  </ul>
+
+  <h2>Publishing policy for agents</h2>
+  <ul>
+    <li>Reading access can be persistent and plan-scoped.</li>
+    <li>Edits are prepared as local files with a visible diff.</li>
+    <li>Publishing shows the origin, next version, content hash, recipients, and estimated cost.</li>
+    <li>The wallet holding the plan coin approves or grants the publishing action.</li>
+    <li>Every agent read and publish attempt is auditable.</li>
+    <li>No tool returns or accepts a mnemonic, WIF, or raw root private key.</li>
+  </ul>
+
+  <h2>Success looks like</h2>
+  <ol>
+    <li>A coding agent lists and reads approved plans through a wallet without seeing its mnemonic.</li>
+    <li>The same plan appears on mobile for review and on desktop for implementation.</li>
+    <li>A newly paired device discovers plans shared with it without receiving origin links manually.</li>
+    <li>An agent can prepare a new version, while publication remains an explicit wallet-controlled step.</li>
+    <li>Removing a device prevents access to future versions after key rotation.</li>
+    <li>BitPlan works with multiple conforming BRC-100 wallets rather than depending on one vendor.</li>
+  </ol>
+
+  <h2>Recommended sequence</h2>
+  <ol>
+    <li>Use and refine the CLI immediately.</li>
+    <li>Add the local MCP server as a small adapter over existing BitPlan code.</li>
+    <li>Design and implement the encrypted shared-plan index.</li>
+    <li>Add device and agent enrollment to BitPlan.</li>
+    <li>Integrate the general BRC-100 transport delivered by 1Sat Wallet.</li>
+    <li>Iterate on privacy, revocation, and unattended-agent policy from real use.</li>
+  </ol>
+
+  <h2>Open questions</h2>
+  <ul>
+    <li>Should the encrypted shared-plan index live in an overlay, a conventional service, or both?</li>
+    <li>Should agent access use a dedicated local identity, a remote phone wallet, or a selectable combination?</li>
+    <li>Which plan sections may an agent read by default, and which require an additional approval?</li>
+    <li>When should BitPlan introduce a v3 envelope rather than extending the v2 index around it?</li>
+    <li>What level of publishing autonomy is useful without weakening the human-controlled plan coin?</li>
+  </ul>
+</body>
+</html>

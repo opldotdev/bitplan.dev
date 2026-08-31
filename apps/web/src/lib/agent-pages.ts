@@ -40,17 +40,21 @@ The CLI packages a self-contained HTML document and asks your BRC-100 wallet to 
 
 - How it works: ${SITE_URL}/docs/how-it-works
 - CLI setup: ${SITE_URL}/docs/cli-setup
+- Agents and wallets: ${SITE_URL}/docs/agents
 - Commands: ${SITE_URL}/docs/commands
 - Envelope: ${SITE_URL}/docs/envelope
-- API: ${SITE_URL}/docs/api
 `,
-  "/docs/api": `# BitPlan API
+  "/docs/agents": `# Agents and wallets · BitPlan
 
-Public read surface is API v1 at ${SITE_URL}/api/v1. OpenAPI: ${SITE_URL}/openapi.json. CLI: https://www.npmjs.com/package/bitplan
+A coding agent uses the BitPlan CLI. The CLI calls a BRC-100 wallet on the same computer. The wallet keeps the keys and decides which operations are allowed.
 
-Breaking changes increment the path to /api/v2. Deprecated operations send a Deprecation header (RFC 9745) and a Sunset header at least 90 days before removal. Nothing is deprecated today.
+    npx bitplan list --json
+    npx bitplan fetch <origin> --json
+    npx bitplan upload ./plan.html --yes --json
 
-Docs: ${SITE_URL}/docs/api
+Never give an agent a wallet mnemonic or private key. Use a trusted desktop wallet with a standard BRC-100 endpoint. Phone-to-desktop wallet approval is not available yet.
+
+Docs: ${SITE_URL}/docs/agents
 `,
   "/docs/cli-setup": `# CLI setup · BitPlan
 
@@ -93,6 +97,8 @@ See ${SITE_URL}/docs/how-it-works
 Create and review a private BitPlan in the browser at ${SITE_URL}/new.
 
 Browser agents with WebMCP can call \`start_bitplan_plan\` to open the composer, then \`prepare_bitplan_plan\` with a title, plan body, and optional HTTPS repository URL. The tool validates and stages the exact review preview. It never connects a wallet or publishes; the user must approve publishing through their BRC-100 wallet.
+
+On any page, \`list_my_bitplans\` can list plan IDs and viewer links from a wallet the user already connected to that tab. \`open_bitplan\` opens one in the visible viewer. Neither tool returns decrypted plan text to the agent.
 `,
   "/privacy": `# Privacy · BitPlan
 
@@ -136,17 +142,16 @@ Do not use BitPlan as a general file host, a server-side notes app, or a substit
 - How it works: ${SITE_URL}/docs/how-it-works
 - Envelope: ${SITE_URL}/docs/envelope
 - CLI setup: ${SITE_URL}/docs/cli-setup
-- API versioning: ${SITE_URL}/docs/api
-- OpenAPI: ${SITE_URL}/openapi.json
+- Agents and wallets: ${SITE_URL}/docs/agents
 - Source: ${GITHUB_URL}
 
 ## HTTP
 
-Read a published envelope (API v1):
+Read a published encrypted envelope:
 
-    GET ${SITE_URL}/api/v1/content/<origin>:-1
+    GET ${SITE_URL}/ordfs/content/<origin>:-1
 
-The same bytes are at \`GET ${SITE_URL}/ordfs/content/<origin>:-1\`. Unknown \`/api/v1\` paths return JSON. CLI package: \`GET ${SITE_URL}/api/v1/cli\`. Version policy: \`GET ${SITE_URL}/api/v1/version\`. OpenAPI: ${SITE_URL}/openapi.json. The CLI is the npm package bitplan: https://www.npmjs.com/package/bitplan
+This returns public ciphertext from 1Sat. The CLI is the npm package bitplan: https://www.npmjs.com/package/bitplan
 
 Publishing and decrypting go through the user's wallet via \`npx bitplan\`. Drafts at /d/<origin> are ciphertext and are not indexed.
 `;
@@ -170,6 +175,5 @@ Look next:
 - Docs: ${SITE_URL}/docs
 - Sitemap: ${SITE_URL}/sitemap.xml
 - llms.txt: ${SITE_URL}/llms.txt
-- OpenAPI: ${SITE_URL}/openapi.json
 `;
 }
