@@ -128,7 +128,9 @@ export function UiSoundProvider() {
     window.addEventListener("pointerdown", unlock, { once: true });
     window.addEventListener("keydown", unlock, { once: true });
 
-    const onClick = (event: MouseEvent) => {
+    let playedOnPointerDown = false;
+
+    const playClick = (event: Event) => {
       const element = closestElement(event.target);
       if (!element || isDisabled(element)) {
         return;
@@ -137,6 +139,22 @@ export function UiSoundProvider() {
       if (sound) {
         playUiSound(sound);
       }
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      unlockUiSound();
+      if (event.pointerType === "mouse" && event.button === 0) {
+        playClick(event);
+        playedOnPointerDown = true;
+      }
+    };
+
+    const onClick = (event: MouseEvent) => {
+      if (playedOnPointerDown) {
+        playedOnPointerDown = false;
+        return;
+      }
+      playClick(event);
     };
 
     const onPointerOver = (event: PointerEvent) => {
@@ -181,6 +199,7 @@ export function UiSoundProvider() {
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("click", onClick);
     document.addEventListener("pointerover", onPointerOver);
     const unwrapToasts = wrapToasts();
@@ -188,6 +207,7 @@ export function UiSoundProvider() {
     return () => {
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", unlock);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("click", onClick);
       document.removeEventListener("pointerover", onPointerOver);
       observer.disconnect();

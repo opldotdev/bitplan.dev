@@ -34,7 +34,6 @@ export const UI_SOUND_VOLUME = 0.3;
 export const UI_SOUND_HOVER_VOLUME = 0.15;
 export const UI_SOUND_HOVER_THROTTLE_MS = 150;
 
-const pool = new Map<UiSoundName, HTMLAudioElement>();
 let unlocked = false;
 let lastHoverAt = 0;
 let lastHoverTarget: EventTarget | null = null;
@@ -61,48 +60,28 @@ export function isUiSoundName(value: string): value is UiSoundName {
 }
 
 export function unlockUiSound(): void {
-  if (!canUseDom() || unlocked) {
+  if (!canUseDom()) {
     return;
   }
   unlocked = true;
-  for (const name of Object.keys(UI_SOUND_FILES) as UiSoundName[]) {
-    getAudio(name);
-  }
 }
 
 export function isUiSoundUnlocked(): boolean {
   return unlocked;
 }
 
-function getAudio(name: UiSoundName): HTMLAudioElement | null {
-  if (!canUseDom() || typeof Audio === "undefined") {
-    return null;
-  }
-  const existing = pool.get(name);
-  if (existing) {
-    return existing;
-  }
-  const audio = new Audio(UI_SOUND_FILES[name]);
-  audio.preload = "auto";
-  pool.set(name, audio);
-  return audio;
-}
-
 export function playUiSound(
   name: UiSoundName,
   options?: { volume?: number }
 ): void {
-  if (!(canUseDom() && unlocked) || prefersReducedMotion()) {
+  if (!canUseDom() || prefersReducedMotion()) {
     return;
   }
-  const audio = getAudio(name);
-  if (!audio) {
-    return;
-  }
+  unlocked = true;
   try {
-    audio.volume = options?.volume ?? UI_SOUND_VOLUME;
-    audio.currentTime = 0;
-    audio.play().catch(() => undefined);
+    const shot = new Audio(UI_SOUND_FILES[name]);
+    shot.volume = options?.volume ?? UI_SOUND_VOLUME;
+    shot.play().catch(() => undefined);
   } catch {
     // Audio must never block the interaction it accompanies.
   }
@@ -128,5 +107,4 @@ export function resetUiSoundForTests(): void {
   unlocked = false;
   lastHoverAt = 0;
   lastHoverTarget = null;
-  pool.clear();
 }

@@ -23,7 +23,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
 import { EnvelopeAccessError, openEnvelope } from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
@@ -62,13 +62,9 @@ export function DraftResolving() {
   return (
     <div className="flex min-h-dvh flex-col">
       <ViewerHeader />
-      <div className="mx-auto flex w-full max-w-[42rem] flex-1 flex-col justify-center px-6 py-10">
-        <div className="space-y-3">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-9 w-56" />
-        </div>
+      <div className="mx-auto flex w-full max-w-[42rem] flex-1 flex-col items-center justify-center gap-3 px-6 py-10">
+        <Spinner className="size-6" />
+        <p className="text-muted-foreground text-sm">Opening draft…</p>
       </div>
     </div>
   );
@@ -302,18 +298,17 @@ export function DraftViewer() {
         return;
       }
 
-      setView({
-        draft: result.draft,
-        phase: "encrypted",
-        requestKey,
-        walletIssue: null,
-      });
-
       const wallet = walletRef.current ?? (await walletForDecrypt());
       if (cancelled) {
         return;
       }
       if (!wallet) {
+        setView({
+          draft: result.draft,
+          phase: "encrypted",
+          requestKey,
+          walletIssue: null,
+        });
         return;
       }
 
@@ -545,6 +540,13 @@ function EncryptedView({
   const versionLabel = isLatest
     ? `v${currentVersion} · latest`
     : `v${currentVersion} of ${latestVersion}`;
+  const needsConnect = walletIssue === null || walletIssue === "connect-failed";
+  let connectLabel = "Connect wallet";
+  if (busy) {
+    connectLabel = "Connecting…";
+  } else if (walletIssue === "connect-failed") {
+    connectLabel = "Try again";
+  }
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -566,14 +568,28 @@ function EncryptedView({
               <dd className="font-mono text-xs">{content.contentType}</dd>
             </dl>
             <div className="space-y-2">
-              <Button
-                className="w-full"
-                disabled={busy}
-                onClick={onConnect}
-                type="button"
-              >
-                {walletIssue ? "Try again" : "Connect wallet to decrypt"}
-              </Button>
+              {needsConnect ? (
+                <Button
+                  className="w-full"
+                  disabled={busy}
+                  onClick={onConnect}
+                  type="button"
+                >
+                  {busy ? <Spinner data-icon="inline-start" /> : null}
+                  {connectLabel}
+                </Button>
+              ) : (
+                <Button
+                  className="w-full"
+                  disabled={busy}
+                  onClick={onConnect}
+                  type="button"
+                  variant="outline"
+                >
+                  {busy ? <Spinner data-icon="inline-start" /> : null}
+                  Try again
+                </Button>
+              )}
               {walletIssue ? (
                 <p className="text-center text-destructive text-sm">
                   {walletIssueMessage(walletIssue)}
@@ -736,7 +752,10 @@ export function metaRows(meta: DraftMeta): { label: string; value: string }[] {
     { label: "Commit", value: meta.gitCommitSha ?? "None" },
     { label: "Commit message", value: meta.gitCommitSubject ?? "None" },
     { label: "Working tree", value: gitStatus },
-    { label: "CLI", value: meta.cliVersion },
+    {
+      label: meta.cliVersion === "web" ? "Created by" : "CLI",
+      value: meta.cliVersion === "web" ? "bitplan.dev" : meta.cliVersion,
+    },
     { label: "File SHA-256", value: meta.fileSha256 },
   ];
 }
