@@ -177,9 +177,21 @@ describe('state store', () => {
 
 	test('writeConfig round-trips walletUrl at 0600', () => {
 		const file = path.join(dir, 'config.json')
-		writeConfig({ walletUrl: 'http://127.0.0.1:3321' }, file)
-		expect(readConfig(file)).toEqual({ walletUrl: 'http://127.0.0.1:3321' })
+		const shareWith = [
+			'02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5',
+		]
+		writeConfig({ shareWith, walletUrl: 'http://127.0.0.1:3321' }, file)
+		expect(readConfig(file)).toEqual({
+			shareWith,
+			walletUrl: 'http://127.0.0.1:3321',
+		})
 		expect(modeOf(file)).toBe(STATE_FILE_MODE)
+	})
+
+	test('rejects malformed default reader identities', () => {
+		const file = path.join(dir, 'config.json')
+		fs.writeFileSync(file, JSON.stringify({ shareWith: ['not-a-public-key'] }))
+		expect(() => readConfig(file)).toThrow(/shareWith/)
 	})
 
 	test('no key material is ever written', () => {

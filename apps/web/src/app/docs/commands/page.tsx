@@ -35,6 +35,10 @@ const FLAGS = [
     flags: "--wallet-url <url>, --json on whoami",
   },
   {
+    command: "config",
+    flags: "--share-with <identity-key>, --clear-share-with",
+  },
+  {
     command: "version",
     flags: "prints the installed CLI version",
   },
@@ -82,6 +86,10 @@ export default function CommandsPage() {
         identity. <code>--private</code> makes only the new version wallet-only;
         older shared versions cannot be revoked. Shared drafts require CLI
         0.0.6+ or the current website to read.
+      </p>
+      <p>
+        <code>config --share-with</code> saves default readers for new plans.
+        Use <code>config --clear-share-with</code> to clear them.
       </p>
       <p>
         <code>fetch --meta</code> writes metadata to stderr, including whether

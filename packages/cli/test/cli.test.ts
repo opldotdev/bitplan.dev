@@ -56,6 +56,7 @@ describe('cli surface', () => {
 		expect(program.commands.map((c) => c.name())).toEqual([
 			'auth',
 			'whoami',
+			'config',
 			'version',
 			'upload',
 			'list',
@@ -63,6 +64,13 @@ describe('cli surface', () => {
 		])
 		const auth = commandNamed(program, 'auth')
 		expect(auth.commands.map((c) => c.name())).toEqual(['login'])
+	})
+
+	test('config manages default readers', () => {
+		const config = commandNamed(program, 'config')
+		expect(flagsOf(config)).toEqual(
+			expect.arrayContaining(['--share-with', '--clear-share-with']),
+		)
 	})
 
 	test('bare invocation prints usage, not a silent exit', async () => {

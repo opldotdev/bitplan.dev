@@ -52,7 +52,9 @@ A coding agent uses the BitPlan CLI. The CLI calls a BRC-100 wallet on the same 
     npx bitplan fetch <origin> --json
     npx bitplan upload ./plan.html --yes --json
 
-Never give an agent a wallet mnemonic or private key. Use a trusted desktop wallet with a standard BRC-100 endpoint. Phone-to-desktop wallet approval is not available yet.
+Never give an agent a wallet mnemonic or private key. To read new plans with another wallet, save its public identity as a default reader:
+
+    npx bitplan config --share-with <wallet-identity-key>
 
 Docs: ${SITE_URL}/docs/agents
 `,
@@ -68,7 +70,7 @@ Docs: ${SITE_URL}/docs/cli-setup
 `,
   "/docs/commands": `# Commands · BitPlan
 
-CLI commands: upload, list, fetch, whoami, version, auth.
+CLI commands: upload, list, fetch, config, whoami, version, auth.
 
     npx bitplan upload ./plan.html
     npx bitplan list

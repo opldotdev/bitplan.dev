@@ -37,6 +37,7 @@ import {
 	type DraftRecord,
 	findDraftByFile,
 	findDraftByOrigin,
+	readConfig,
 	saveDraftRecord,
 } from '../state.js'
 import { CLI_VERSION } from '../version.js'
@@ -98,6 +99,9 @@ export async function uploadCommand(
 			? known
 			: findDraftByOrigin(targetOrigin)?.record
 		: undefined
+	const defaultRecipients = targetOrigin
+		? []
+		: (readConfig().shareWith ?? []).map(normalizeIdentityKey)
 
 	const validation = validateHtml(html)
 	if (!validation.ok) {
@@ -163,9 +167,11 @@ export async function uploadCommand(
 		? []
 		: [
 				...new Set(
-					[...previousRecipients, ...requestedRecipients].map(
-						normalizeIdentityKey,
-					),
+					[
+						...previousRecipients,
+						...defaultRecipients,
+						...requestedRecipients,
+					].map(normalizeIdentityKey),
 				),
 			]
 	if (sharedWith.length > MAX_SHARED_RECIPIENTS) {

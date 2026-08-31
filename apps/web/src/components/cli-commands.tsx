@@ -18,6 +18,10 @@ const COMMANDS = [
     hint: "Publish the next version for this wallet and the named reader.",
   },
   {
+    cmd: "npx bitplan config --share-with <identity-key>",
+    hint: "Include this reader on every new plan.",
+  },
+  {
     cmd: "npx bitplan list",
     hint: "Drafts this wallet holds.",
   },

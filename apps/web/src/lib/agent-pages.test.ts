@@ -15,7 +15,7 @@ describe("agent pages", () => {
       "Never give an agent a wallet mnemonic"
     );
     expect(markdownForPath("/docs/agents")).toContain(
-      "Phone-to-desktop wallet approval is not available yet"
+      "npx bitplan config --share-with"
     );
     expect(markdownForPath("/new")).toContain("prepare_bitplan_plan");
     expect(markdownForPath("/new")).toContain("list_my_bitplans");

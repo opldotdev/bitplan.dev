@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.12
+
+### Added
+
+- `config --share-with <identity-key>` saves default readers for every new
+  plan. `config --clear-share-with` clears them.
+
 ## 0.0.11
 
 ### Added

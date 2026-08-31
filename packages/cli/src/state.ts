@@ -43,6 +43,8 @@ export interface ConfigFile {
 	walletUrl?: string
 	/** ORDFS gateway base URL. */
 	ordfsUrl?: string
+	/** Public wallet identities included on every new plan. */
+	shareWith?: string[]
 }
 
 export function stateDir(): string {
@@ -123,9 +125,21 @@ export function readConfig(file: string = configPath()): ConfigFile {
 	if (parsed.ordfsUrl !== undefined && typeof parsed.ordfsUrl !== 'string') {
 		throw invalidState(file, 'ordfsUrl must be a string')
 	}
+	if (
+		parsed.shareWith !== undefined &&
+		(!Array.isArray(parsed.shareWith) ||
+			parsed.shareWith.some(
+				(identityKey) =>
+					typeof identityKey !== 'string' ||
+					!COMPRESSED_IDENTITY_KEY.test(identityKey),
+			))
+	) {
+		throw invalidState(file, 'shareWith must contain identity public keys')
+	}
 	return {
 		walletUrl: parsed.walletUrl as string | undefined,
 		ordfsUrl: parsed.ordfsUrl as string | undefined,
+		shareWith: parsed.shareWith as string[] | undefined,
 	}
 }
 

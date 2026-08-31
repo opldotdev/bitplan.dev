@@ -1,5 +1,6 @@
 import { Command } from 'commander'
 import { authCommand } from './commands/auth.js'
+import { configCommand } from './commands/config.js'
 import { fetchCommand } from './commands/fetch.js'
 import { listCommand } from './commands/list.js'
 import { uploadCommand } from './commands/upload.js'
@@ -34,6 +35,18 @@ export function buildProgram(): Command {
 		.option('--json', 'Print raw JSON')
 		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
 		.action(whoamiCommand)
+
+	program
+		.command('config')
+		.description('Set defaults for new plans.')
+		.option(
+			'--share-with <identity-key>',
+			'Share every new plan with an identity key (repeatable)',
+			collect,
+			[],
+		)
+		.option('--clear-share-with', 'Stop sharing new plans by default')
+		.action((options) => configCommand(options))
 
 	program
 		.command('version')

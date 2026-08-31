@@ -74,6 +74,16 @@ document key for each reader. Identity keys and the access list are public, and
 readable by their original recipients. Security level 2 lets the wallet ask for
 permission for each new reader.
 
+Save one or more default readers for every new plan:
+
+```sh
+npx bitplan config --share-with <identity-key>
+npx bitplan config --clear-share-with
+```
+
+Updates keep their existing readers. Use `--share-with` to add a reader to one
+plan, or `--private` to publish the new version for this wallet only.
+
 List the drafts this wallet holds. The default table shortens origins and
 outpoints. `--verbose` switches to one labeled detail block per draft so full
 identifiers and timestamps do not stretch the table:
@@ -142,6 +152,10 @@ bitplan fetch <origin|url>
   --meta
   --json                   Print the HTML and metadata as JSON
   --version <n>
+
+bitplan config
+  --share-with <key>       Share every new plan with this identity (repeatable)
+  --clear-share-with       Clear default readers
 
 bitplan version
 ```

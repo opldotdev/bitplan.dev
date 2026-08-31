@@ -80,6 +80,7 @@ if (!CHILD_RUN) {
 	let identityKeyCalls = 0
 	let relayError: Error | undefined
 	let stateSaveError: Error | undefined
+	let defaultShareWith: string[]
 	let ordfsContent:
 		| {
 				bytes: Uint8Array
@@ -100,6 +101,7 @@ if (!CHILD_RUN) {
 			calls.saves.push({ file, record })
 			if (stateSaveError) throw stateSaveError
 		},
+		readConfig: () => ({ shareWith: defaultShareWith }),
 	}))
 
 	mock.module('../src/wallet.js', () => ({
@@ -222,6 +224,7 @@ if (!CHILD_RUN) {
 		identityKeyCalls = 0
 		relayError = undefined
 		stateSaveError = undefined
+		defaultShareWith = []
 		ordfsContent = undefined
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bitplan-upload-test-'))
 		htmlFile = path.join(tempDir, 'plan.html')
@@ -239,6 +242,14 @@ if (!CHILD_RUN) {
 	})
 
 	describe('uploadCommand orchestration', () => {
+		test('shares a new plan with configured default readers', async () => {
+			defaultShareWith = ['default-reader']
+
+			await uploadCommand(htmlFile, { yes: true })
+
+			expect(calls.seals[0]?.sharedWith).toEqual(['default-reader'])
+		})
+
 		test('shared size estimates count the document once', () => {
 			const plaintextBytes = 50_000
 			const privateBytes = estimateEnvelopeBytes(plaintextBytes, 0)

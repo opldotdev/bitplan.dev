@@ -1,8 +1,9 @@
 "use client";
 
-import { FileLock2, Wallet } from "lucide-react";
+import { Check, Copy, FileLock2, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +31,7 @@ import type { DraftMeta } from "@/lib/envelope";
 import { openEnvelope } from "@/lib/envelope";
 import { truncateMiddle } from "@/lib/format";
 import { fetchOrdfsContent } from "@/lib/ordfs";
+import { normalizeIdentityKey } from "@/lib/sharing";
 import { seqToVersion } from "@/lib/version";
 import {
   connectBrowserWallet,
@@ -47,7 +49,7 @@ type ListState =
   | { phase: "idle" }
   | { phase: "connecting" }
   | { phase: "wallet-error" }
-  | { phase: "loaded"; rows: DraftRow[] };
+  | { phase: "loaded"; rows: DraftRow[]; wallet: DraftsWallet };
 
 async function toRow(wallet: DraftsWallet, coin: DraftCoin): Promise<DraftRow> {
   try {
@@ -110,7 +112,7 @@ export function DraftsList() {
     setState({ phase: "connecting" });
     try {
       const wallet = await connectBrowserWallet();
-      setState({ phase: "loaded", rows: await loadRows(wallet) });
+      setState({ phase: "loaded", rows: await loadRows(wallet), wallet });
     } catch {
       setState({ phase: "wallet-error" });
     }
@@ -131,7 +133,7 @@ export function DraftsList() {
       try {
         const rows = await loadRows(wallet);
         if (!cancelled) {
-          setState({ phase: "loaded", rows });
+          setState({ phase: "loaded", rows, wallet });
         }
       } catch {
         if (!cancelled) {
@@ -149,13 +151,56 @@ export function DraftsList() {
     return <DraftsSkeleton />;
   }
   if (state.phase === "loaded") {
-    return state.rows.length === 0 ? (
-      <EmptyDrafts />
-    ) : (
-      <Groups rows={state.rows} />
-    );
+    return <LoadedDrafts rows={state.rows} wallet={state.wallet} />;
   }
   return <ConnectEmpty onConnect={connect} state={state.phase} />;
+}
+
+export async function walletIdentityKey(
+  wallet: Pick<DraftsWallet, "getPublicKey">
+): Promise<string> {
+  const result = await wallet.getPublicKey({ identityKey: true });
+  if (!result.publicKey) {
+    throw new Error("The wallet did not return an identity key.");
+  }
+  const identityKey = normalizeIdentityKey(result.publicKey);
+  if (!identityKey) {
+    throw new Error("The wallet returned an invalid identity key.");
+  }
+  return identityKey;
+}
+
+function LoadedDrafts({
+  rows,
+  wallet,
+}: {
+  rows: DraftRow[];
+  wallet: DraftsWallet;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copyWalletId = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(await walletIdentityKey(wallet));
+      setCopied(true);
+      toast.success("Wallet ID copied");
+    } catch {
+      setCopied(false);
+      toast.error("Could not copy the wallet ID");
+    }
+  }, [wallet]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button onClick={copyWalletId} size="sm" type="button" variant="ghost">
+          {copied ? <Check /> : <Copy />}
+          {copied ? "Copied" : "Copy wallet ID"}
+        </Button>
+      </div>
+      {rows.length === 0 ? <EmptyDrafts /> : <Groups rows={rows} />}
+    </div>
+  );
 }
 
 function DraftsSkeleton() {
