@@ -7,6 +7,7 @@ import { SiteJsonLd } from "@/components/site-json-ld";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { UiSoundProvider } from "@/components/ui-sound-provider";
 import { SITE_URL } from "@/lib/site";
 
 import "./globals.css";
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SiteJsonLd />
         <ThemeProvider>
           <TooltipProvider>
+            <UiSoundProvider />
             <SiteChrome>{children}</SiteChrome>
             <CommandMenu />
             <Toaster />

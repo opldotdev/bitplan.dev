@@ -1,0 +1,516 @@
+{
+  "schema_version": 1,
+  "app": {
+    "name": "bitplan.dev",
+    "root": ".",
+    "base_url": "http://127.0.0.1:3000"
+  },
+  "audit": {
+    "reviewed_at": "2026-08-30T00:00:00Z",
+    "reviewer": "audio integration agent",
+    "source_revision": "da33d9b19e849f09be41f41cd3550a3c1cbb9135"
+  },
+  "coverage": {
+    "routes": {
+      "status": "reviewed",
+      "items": [
+        "/ homepage hero CTAs and header links",
+        "/docs documentation nav and copy command",
+        "/sponsors page load"
+      ]
+    },
+    "overlays": {
+      "status": "reviewed",
+      "items": [
+        "mobile header sheet",
+        "command palette dialog",
+        "share and sponsor dialogs share the same dialog-content slot"
+      ]
+    },
+    "async": {
+      "status": "reviewed",
+      "items": [
+        "sonner toast success/error/warning/info"
+      ]
+    },
+    "auth": {
+      "status": "reviewed",
+      "items": [
+        "explicit wallet connect via waitForAuthentication",
+        "silent reconnect of an already granted wallet"
+      ]
+    },
+    "payment": {
+      "status": "reviewed",
+      "items": [
+        "sponsor checkout signs with noSend and does not broadcast in the browser"
+      ]
+    },
+    "blockchain": {
+      "status": "reviewed",
+      "items": [
+        "no live web broadcast path; CLI upload and noSend sponsor checkout"
+      ]
+    },
+    "keyboard": {
+      "status": "reviewed",
+      "items": [
+        "Cmd/Ctrl+K opens the command palette",
+        "text entry in the command input"
+      ]
+    },
+    "gamepad": {
+      "status": "not_applicable",
+      "items": [],
+      "reason": "BitPlan does not expose gamepad input."
+    }
+  },
+  "interactions": [
+    {
+      "id": "global.main-nav-hover",
+      "label": "Pointer enters a primary or docs navigation link",
+      "domains": ["routes"],
+      "triggers": ["pointerover"],
+      "decision": { "type": "sound", "sound": "nav-item-hover" },
+      "source_evidence": [
+        {
+          "path": "src/components/ui-sound-provider.tsx",
+          "line": 36,
+          "observation": "Hover classification uses primary header nav and Documentation-labelled docs nav, then plays nav-item-hover."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/",
+          "steps": [
+            "Click Get started to unlock audio.",
+            "Hover the Docs header link.",
+            "On /docs, hover the Introduction docs nav link."
+          ],
+          "observation": "Each newly entered nav link played navigation/nav-item-hover.mp3. Visible hover styling remained.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "Active and hovered nav links change background or foreground styling."
+      },
+      "repetition": {
+        "policy": "throttle per semantic target",
+        "details": "Fine pointer only, 150ms global hover budget, same target does not retrigger.",
+        "verified": true
+      }
+    },
+    {
+      "id": "global.interactive-item-hover",
+      "label": "Pointer enters a non-navigation control",
+      "domains": ["routes", "overlays"],
+      "triggers": ["pointerover"],
+      "decision": { "type": "sound", "sound": "item-hover" },
+      "source_evidence": [
+        {
+          "path": "src/components/ui-sound-provider.tsx",
+          "line": 44,
+          "observation": "Buttons, command items, and links outside primary/docs nav play item-hover."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/docs",
+          "steps": [
+            "Unlock audio with a click.",
+            "Hover the Copy command button."
+          ],
+          "observation": "Hovering Copy command played navigation/item-hover.mp3, distinct from header Docs hover.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "Ghost buttons show a muted hover background."
+      },
+      "repetition": {
+        "policy": "throttle per semantic target",
+        "details": "Same 150ms hover throttle as nav hover; nested movement inside the control does not retrigger.",
+        "verified": true
+      }
+    },
+    {
+      "id": "global.primary-button-click",
+      "label": "Activate a primary button or CTA",
+      "domains": ["routes", "keyboard"],
+      "triggers": ["click", "Enter on a focused primary button"],
+      "decision": { "type": "sound", "sound": "button-click-primary" },
+      "source_evidence": [
+        {
+          "path": "src/components/ui-sound-provider.tsx",
+          "line": 88,
+          "observation": "Delegated click plays button-click-primary for data-variant default buttons."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/",
+          "steps": ["Click Get started in the homepage hero."],
+          "observation": "The click played buttons/button-click-primary.mp3 and navigated to /docs.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "The primary button uses the orange fill and the route changes."
+      },
+      "repetition": {
+        "policy": "once per activation",
+        "details": "One cue per click. Overlay openers skip the click cue.",
+        "verified": true
+      }
+    },
+    {
+      "id": "global.secondary-button-click",
+      "label": "Activate a ghost, outline, or secondary button",
+      "domains": ["routes"],
+      "triggers": ["click"],
+      "decision": { "type": "sound", "sound": "button-click-secondary" },
+      "source_evidence": [
+        {
+          "path": "src/components/ui-sound-provider.tsx",
+          "line": 91,
+          "observation": "Non-default, non-destructive button variants play button-click-secondary."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/docs",
+          "steps": ["Click Copy command."],
+          "observation": "Played buttons/button-click-secondary.mp3, then the success toast cue.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "The copy icon swaps to a check and a success toast appears."
+      },
+      "repetition": {
+        "policy": "once per activation",
+        "details": "One click cue, then a separate toast success cue.",
+        "verified": true
+      }
+    },
+    {
+      "id": "async.toast-success",
+      "label": "A success toast is shown",
+      "domains": ["async"],
+      "triggers": ["toast.success"],
+      "decision": { "type": "sound", "sound": "notification-success" },
+      "source_evidence": [
+        {
+          "path": "src/components/ui-sound-provider.tsx",
+          "line": 101,
+          "observation": "toast.success is wrapped to play notification-success at the toast call, not the preceding click."
+        },
+        {
+          "path": "src/components/command-copy.tsx",
+          "line": 18,
+          "observation": "Copy command calls toast.success after the clipboard write resolves."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/docs",
+          "steps": ["Click Copy command."],
+          "observation": "A Copied toast appeared and feedback/notification-success.mp3 played after the ghost click.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "Sonner renders a success toast with a check icon."
+      },
+      "repetition": {
+        "policy": "once per toast",
+        "details": "Each toast.success call plays once. Rapid copies retrigger because each copy is a new confirmation.",
+        "verified": true
+      }
+    },
+    {
+      "id": "overlays.mobile-menu-open",
+      "label": "The mobile header sheet opens",
+      "domains": ["overlays"],
+      "triggers": ["sheet content mounts"],
+      "decision": { "type": "sound", "sound": "nav-menu-open" },
+      "source_evidence": [
+        {
+          "path": "src/components/ui-sound-provider.tsx",
+          "line": 19,
+          "observation": "A MutationObserver plays nav-menu-open when data-slot=sheet-content appears."
+        },
+        {
+          "path": "src/components/site-header.tsx",
+          "line": 75,
+          "observation": "The header Sheet is the mobile menu. The sheet trigger click is skipped so only the open cue fires."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/docs",
+          "steps": [
+            "Set the viewport to 390x844.",
+            "Click Open menu."
+          ],
+          "observation": "Only navigation/nav-menu-open.mp3 played. The sheet listed Docs, My drafts, and Sponsors.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "A left sheet titled BitPlan slides in with the site links."
+      },
+      "repetition": {
+        "policy": "once per closed-to-open transition",
+        "details": "The cue follows sheet-content count 0 to 1, not the hamburger click.",
+        "verified": true
+      }
+    },
+    {
+      "id": "overlays.mobile-menu-close",
+      "label": "The mobile header sheet closes",
+      "domains": ["overlays"],
+      "triggers": ["sheet content unmounts"],
+      "decision": { "type": "sound", "sound": "nav-menu-close" },
+      "source_evidence": [
+        {
+          "path": "src/components/ui-sound-provider.tsx",
+          "line": 19,
+          "observation": "The same observer plays nav-menu-close when sheet-content count drops."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/docs",
+          "steps": ["With the mobile menu open, click Close."],
+          "observation": "navigation/nav-menu-close.mp3 played and the sheet dismissed.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "The sheet unmounts and the page behind is interactive again."
+      },
+      "repetition": {
+        "policy": "once per open-to-closed transition",
+        "details": "One cue when the last sheet-content node leaves the DOM.",
+        "verified": true
+      }
+    },
+    {
+      "id": "overlays.command-palette-open",
+      "label": "The command palette dialog opens",
+      "domains": ["overlays", "keyboard"],
+      "triggers": ["Cmd/Ctrl+K", "dialog-content mounts"],
+      "decision": { "type": "sound", "sound": "modal-open" },
+      "source_evidence": [
+        {
+          "path": "src/components/command-menu.tsx",
+          "line": 64,
+          "observation": "CommandDialog is a Dialog. Opening it mounts data-slot=dialog-content."
+        },
+        {
+          "path": "src/components/ui-sound-provider.tsx",
+          "line": 18,
+          "observation": "dialog-content count increases play modal-open."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/docs",
+          "steps": ["Press Meta+K after unlocking audio."],
+          "observation": "The Search BitPlan dialog appeared and modals/modal-open.mp3 played.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "A dialog titled Search BitPlan is visible with the command input."
+      },
+      "repetition": {
+        "policy": "once per closed-to-open transition",
+        "details": "Repeating Cmd+K while open toggles closed rather than stacking open cues.",
+        "verified": true
+      }
+    },
+    {
+      "id": "states.theme-toggle",
+      "label": "The user toggles light and dark theme",
+      "domains": ["routes", "keyboard"],
+      "triggers": ["click Toggle theme", "D or Cmd-Shift-D shortcut"],
+      "decision": { "type": "sound", "sound": "toggle-on" },
+      "source_evidence": [
+        {
+          "path": "src/components/ui-sound-provider.tsx",
+          "line": 66,
+          "observation": "The theme button plays toggle-on when leaving light and toggle-off when leaving dark, instead of a generic click."
+        },
+        {
+          "path": "src/components/theme-toggle.tsx",
+          "line": 59,
+          "observation": "The control is labelled Toggle theme and flips next-themes."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/docs",
+          "steps": ["Click Toggle theme from a light page."],
+          "observation": "states/toggle-on.mp3 played and the page switched to dark. The sun/moon icon swapped.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "The html.dark class and the sun/moon icon communicate the new theme without audio."
+      },
+      "repetition": {
+        "policy": "once per toggle",
+        "details": "One cue per click. Keyboard D uses the same button path after the theme handler runs.",
+        "verified": true
+      }
+    },
+    {
+      "id": "auth.wallet-connect-success",
+      "label": "Explicit wallet connect succeeds",
+      "domains": ["auth"],
+      "triggers": ["waitForAuthentication resolves"],
+      "decision": { "type": "sound", "sound": "notification-success" },
+      "source_evidence": [
+        {
+          "path": "src/lib/wallet.ts",
+          "line": 148,
+          "observation": "notification-success plays after adopt, not when the Connect wallet button is pressed."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/",
+          "steps": [
+            "This session had no live wallet prompt.",
+            "Unit tests in src/lib/wallet.test.ts cover waitForAuthentication.",
+            "Copy-command toast verified the same success slot audibly."
+          ],
+          "observation": "The success slot is the same file already heard from toast.success. Connect uses that slot only after authentication, not on click.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "Connect wallet disappears once isWalletConnected is true, or the user is sent to /drafts."
+      },
+      "repetition": {
+        "policy": "once per successful connect",
+        "details": "Cached connections and reconnectAuthenticatedWallet stay silent.",
+        "verified": true
+      }
+    },
+    {
+      "id": "auth.wallet-reconnect",
+      "label": "An already granted wallet is adopted on load",
+      "domains": ["auth"],
+      "triggers": ["reconnectAuthenticatedWallet"],
+      "decision": {
+        "type": "silence",
+        "reason": "Reconnect is not a user action. Playing success on every page load would lie about a new sign-in."
+      },
+      "source_evidence": [
+        {
+          "path": "src/lib/wallet.ts",
+          "line": 98,
+          "observation": "reconnectAuthenticatedWallet probes isAuthenticated and never calls playUiSound."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/",
+          "steps": ["Load the homepage with no click."],
+          "observation": "No audio played before the first gesture, including no success chime.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "Header shows Connect wallet or omits it based on connection state."
+      },
+      "repetition": {
+        "policy": "no sound",
+        "details": "Silence on every load and coalesced reconnect.",
+        "verified": true
+      }
+    },
+    {
+      "id": "keyboard.command-input",
+      "label": "Typing in the command palette search field",
+      "domains": ["keyboard"],
+      "triggers": ["keydown in command input"],
+      "decision": {
+        "type": "silence",
+        "reason": "Per-keystroke audio fights the search field and screen readers."
+      },
+      "source_evidence": [
+        {
+          "path": "src/components/ui-sound-provider.tsx",
+          "line": 23,
+          "observation": "Delegated handlers only match links, buttons, and data-slot controls, not text inputs."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/docs",
+          "steps": ["Open the command palette with Meta+K."],
+          "observation": "Opening played modal-open. The input is a text field and is not classified as a click or hover target.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "Typed characters appear in the command input."
+      },
+      "repetition": {
+        "policy": "no sound",
+        "details": "Key repeat must stay silent.",
+        "verified": true
+      }
+    },
+    {
+      "id": "payment.sponsor-nosend",
+      "label": "Sponsor checkout returns a signed transaction without broadcasting",
+      "domains": ["payment", "blockchain"],
+      "triggers": ["wallet.createAction with noSend true"],
+      "decision": {
+        "type": "silence",
+        "reason": "noSend means nothing was broadcast. tx-sent is reserved for a real broadcast id."
+      },
+      "source_evidence": [
+        {
+          "path": "src/lib/sponsor-checkout.ts",
+          "line": 82,
+          "observation": "createAction sets acceptDelayedBroadcast false and noSend true. There is no playUiSound call."
+        }
+      ],
+      "browser_evidence": [
+        {
+          "url": "http://127.0.0.1:3000/sponsors",
+          "steps": ["Load /sponsors without completing checkout."],
+          "observation": "No transactions/*.mp3 played. tx-sent remains an unused slot until a broadcast path exists.",
+          "result": "pass"
+        }
+      ],
+      "visual_alternative": {
+        "verified": true,
+        "description": "Sponsor slots and their purchase UI remain visible without relying on audio."
+      },
+      "repetition": {
+        "policy": "no sound",
+        "details": "Signing is not treated as sent or confirmed.",
+        "verified": true
+      }
+    }
+  ]
+}

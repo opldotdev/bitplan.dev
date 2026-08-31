@@ -1,0 +1,389 @@
+{
+  "name": "custom",
+  "version": "1.0.0",
+  "vibe": "BitPlan document viewer. Quiet physical objects in a reading room. Every event is a different material and envelope.",
+  "sounds": {
+    "item-hover": {
+      "file": "navigation/item-hover.mp3",
+      "duration_ms": 276,
+      "prompt": "A near-silent brush of linen across paper. One tiny grain of friction, no pitch, no second note. Extremely short hover cue, about 80 milliseconds of air and fabric only.",
+      "picked": true,
+      "accepted_at": "2026-08-30T23:51:18Z",
+      "accepted_from": {
+        "slot": "item-hover",
+        "url": "/files/.picker/item-hover/rev-1788133874-13.mp3",
+        "kind": "revision"
+      },
+      "edits": {
+        "trimStartMs": 204.0,
+        "trimEndMs": 0.0,
+        "attackMs": 0.0,
+        "releaseMs": 0.0,
+        "gainDb": 0.0,
+        "reverbPercent": 0.0,
+        "delayMs": 120.0,
+        "delayMixPercent": 0.0
+      },
+      "assignment_history": [
+        {
+          "url": "/files/.picker/item-hover/history-1788133878-14.mp3",
+          "replaced_at": "2026-08-30T23:51:18Z"
+        }
+      ]
+    },
+    "nav-item-hover": {
+      "file": "navigation/nav-item-hover.mp3",
+      "duration_ms": 480,
+      "prompt": "A single dry tick of a fingernail on a wooden shelf edge. One instantaneous grain, slightly sharper than fabric, no melody, no second note. Very short navigation hover. Quiet, close, no reverb.",
+      "picked": true,
+      "accepted_at": "2026-08-30T23:57:02Z",
+      "accepted_from": {
+        "slot": "nav-item-hover",
+        "url": "/files/.picker/nav-item-hover/cand-1788134217-36.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": [
+        {
+          "url": "/files/.picker/nav-item-hover/history-1788134222-37.mp3",
+          "replaced_at": "2026-08-30T23:57:02Z"
+        }
+      ]
+    },
+    "nav-tab-switch": {
+      "file": "navigation/nav-tab-switch.mp3",
+      "duration_ms": 480,
+      "prompt": "A tiny lateral slide of one index card across another, left to right. Two dry paper layers rubbing, not a percussive hit. Short tab-change UI sound, under 300 milliseconds.",
+      "picked": true,
+      "accepted_at": "2026-08-30T23:51:48Z",
+      "accepted_from": {
+        "slot": "nav-tab-switch",
+        "url": "/files/.picker/nav-tab-switch/cand-1788133904-15.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "nav-back": {
+      "file": "navigation/nav-back.mp3",
+      "duration_ms": 480,
+      "prompt": "A soft reverse page-turn. One leaf folding back toward the left with a slight downward puff of air. Dry paper only. Short back-navigation UI sound.",
+      "picked": true,
+      "accepted_at": "2026-08-30T23:57:56Z",
+      "accepted_from": {
+        "slot": "nav-back",
+        "url": "/files/.picker/nav-back/rev-1788134274-40.mp3",
+        "kind": "revision"
+      },
+      "edits": {
+        "trimStartMs": 0.0,
+        "trimEndMs": 0.0,
+        "attackMs": 0.0,
+        "releaseMs": 0.0,
+        "gainDb": -10.0,
+        "reverbPercent": 0.0,
+        "delayMs": 120.0,
+        "delayMixPercent": 0.0
+      },
+      "assignment_history": [
+        {
+          "url": "/files/.picker/nav-back/history-1788134276-41.mp3",
+          "replaced_at": "2026-08-30T23:57:56Z"
+        }
+      ]
+    },
+    "nav-forward": {
+      "file": "navigation/nav-forward.mp3",
+      "duration_ms": 480,
+      "prompt": "A soft forward page-turn. One leaf lifting to the right, a little brighter air than a back turn. Dry paper only. Short forward-navigation UI sound.",
+      "picked": true,
+      "accepted_at": "2026-08-30T23:51:58Z",
+      "accepted_from": {
+        "slot": "nav-forward",
+        "url": "/files/.picker/nav-forward/cand-1788133915-17.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "button-click-primary": {
+      "file": "buttons/button-click-primary.mp3",
+      "duration_ms": 480,
+      "prompt": "Subtle, Quiet grandiose library interface. Watercolor paper grain, warm wood and ink. Subtle short clicks. Refined, calm, trustworthy. Not digital bleeps, not 8-bit, not arcade, not glassy sci-fi., main action tap click, short UI sound, minimal interface feedback",
+      "picked": true,
+      "accepted_at": "2026-08-31T00:08:37Z",
+      "accepted_from": {
+        "slot": "button-click-primary",
+        "url": "/files/.picker/button-click-primary/cand-1788134029-28.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": [
+        {
+          "url": "/files/.picker/button-click-primary/history-1788134917-1.mp3",
+          "replaced_at": "2026-08-31T00:08:37Z"
+        }
+      ]
+    },
+    "button-click-secondary": {
+      "file": "buttons/button-click-secondary.mp3",
+      "duration_ms": 480,
+      "prompt": "A light fingertip tap on thin cardstock. Higher and thinner than a desk knock, papery, one transient only, almost inaudible. Very short UI tap. Paper only.",
+      "picked": true,
+      "accepted_at": "2026-08-30T23:54:03Z",
+      "accepted_from": {
+        "slot": "button-click-secondary",
+        "url": "/files/.picker/button-click-secondary/cand-1788134036-29.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "button-click-destructive": {
+      "file": "buttons/button-click-destructive.mp3",
+      "duration_ms": 480,
+      "prompt": "A short firmer knock on thick bound leather. Still quiet, harder attack than a normal click, low and dry. Very short UI warning tap. Leather and wood only.",
+      "picked": true,
+      "accepted_at": "2026-08-30T23:54:31Z",
+      "accepted_from": {
+        "slot": "button-click-destructive",
+        "url": "/files/.picker/button-click-destructive/cand-1788134067-31.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "nav-menu-open": {
+      "prompt": "A quiet bloom of air as a heavy cloth-bound folio opens. Slow swell then settle. Felt and paper only, no musical notes, no metal. Short menu-open UI sound, under 400 milliseconds.",
+      "picked": true,
+      "file": "navigation/nav-menu-open.mp3",
+      "duration_ms": 480,
+      "accepted_at": "2026-08-31T00:08:47Z",
+      "accepted_from": {
+        "slot": "nav-menu-open",
+        "url": "/files/.picker/nav-menu-open/cand-1788134651-1.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "nav-menu-close": {
+      "prompt": "A single downward felt mute as that folio closes. One soft droplet of sound falling and stopping. No second hit, no latch click, no bell. Short menu-close UI sound.",
+      "picked": true,
+      "file": "navigation/nav-menu-close.mp3",
+      "duration_ms": 480,
+      "accepted_at": "2026-08-31T00:08:43Z",
+      "accepted_from": {
+        "slot": "nav-menu-close",
+        "url": "/files/.picker/nav-menu-close/cand-1788134656-2.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "notification-success": {
+      "prompt": "Three quiet felt-piano notes in a low-mid major third, each quieter than the last, landing on the tonic. Resolved cadence, warm hammers, piano body only. Short success confirmation, about 400 milliseconds.",
+      "picked": true,
+      "file": "feedback/notification-success.mp3"
+    },
+    "notification-error": {
+      "prompt": "A dry knuckle knock on a table, then one descending muted gut-string scrape. Concern without panic. No buzzer, no siren, no rising whoop. Short recoverable error UI sound.",
+      "picked": true,
+      "file": "feedback/notification-error.mp3"
+    },
+    "notification-warning": {
+      "prompt": "One held slightly sour woodwind interval, two close pitches that do not resolve. Mid-urgency, still quiet. No alarm klaxon, no repeating beep. Short warning UI tone, under 400 milliseconds.",
+      "picked": true,
+      "file": "feedback/notification-warning.mp3"
+    },
+    "notification-info": {
+      "prompt": "A single small glass-rim tick. One pitch only, no second note, no melody, cool and thin, almost no sustain. Short information notice.",
+      "picked": true,
+      "file": "feedback/notification-info.mp3"
+    },
+    "notification-badge": {
+      "prompt": "The tiniest ceramic counter tap, like one bead touching a saucer once. Extremely short, no ring, no sustain, no melody.",
+      "picked": true,
+      "file": "feedback/notification-badge.mp3"
+    },
+    "toggle-on": {
+      "prompt": "A small metal latch engaging in two parts: a dull seat, then a brighter clack. Mechanical, short, close-mic. Switch turning on.",
+      "picked": true,
+      "file": "states/toggle-on.mp3"
+    },
+    "toggle-off": {
+      "prompt": "The same small metal latch releasing in two parts reversed: a bright unhook, then a dull rest, slightly lower than toggle on. Mechanical, short. No beep. Switch turning off.",
+      "picked": true,
+      "file": "states/toggle-off.mp3"
+    },
+    "checkbox-check": {
+      "prompt": "A graphite pencil making one dry tick-mark on an index card. Papery, close, no metal spring, no click-clack. Short checkbox select.",
+      "picked": true,
+      "file": "states/checkbox-check.mp3",
+      "duration_ms": 227,
+      "accepted_at": "2026-08-31T00:09:30Z",
+      "accepted_from": {
+        "slot": "checkbox-check",
+        "url": "/files/.picker/checkbox-check/rev-1788134967-7.mp3",
+        "kind": "revision"
+      },
+      "edits": {
+        "trimStartMs": 0.0,
+        "trimEndMs": 253.0,
+        "attackMs": 0.0,
+        "releaseMs": 0.0,
+        "gainDb": 0.0,
+        "reverbPercent": 0.0,
+        "delayMs": 120.0,
+        "delayMixPercent": 0.0
+      },
+      "assignment_history": [
+        {
+          "url": "/files/.picker/checkbox-check/history-1788134970-8.mp3",
+          "replaced_at": "2026-08-31T00:09:30Z"
+        }
+      ]
+    },
+    "checkbox-uncheck": {
+      "prompt": "A soft rubber eraser lifting off paper. One reverse of a pencil tick, airy, no mechanical click. Short checkbox deselect.",
+      "picked": true,
+      "file": "states/checkbox-uncheck.mp3",
+      "duration_ms": 405,
+      "accepted_at": "2026-08-31T00:10:10Z",
+      "accepted_from": {
+        "slot": "checkbox-uncheck",
+        "url": "/files/.picker/checkbox-uncheck/rev-1788135008-15.mp3",
+        "kind": "revision"
+      },
+      "edits": {
+        "trimStartMs": 0.0,
+        "trimEndMs": 0.0,
+        "attackMs": 0.0,
+        "releaseMs": 0.0,
+        "gainDb": -6.5,
+        "reverbPercent": 0.0,
+        "delayMs": 120.0,
+        "delayMixPercent": 0.0
+      },
+      "assignment_history": []
+    },
+    "loading-complete": {
+      "prompt": "A tiny dry focus tick, then a short harmonic bloom of warm air. Content is ready to use. Air and a single tick, not a cadence.",
+      "picked": true,
+      "file": "states/loading-complete.mp3",
+      "duration_ms": 480,
+      "accepted_at": "2026-08-31T00:10:52Z",
+      "accepted_from": {
+        "slot": "loading-complete",
+        "url": "/files/.picker/loading-complete/cand-1788135024-17.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "modal-open": {
+      "prompt": "Air filling a small felt-lined box as the lid lifts. Slow intimate bloom, close to the ear. Felt and air only. Short modal-open UI sound.",
+      "picked": true,
+      "file": "modals/modal-open.mp3",
+      "duration_ms": 480,
+      "accepted_at": "2026-08-31T00:10:50Z",
+      "accepted_from": {
+        "slot": "modal-open",
+        "url": "/files/.picker/modal-open/cand-1788135044-21.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "modal-close": {
+      "prompt": "A felt-lined lid settling shut. One downward muted thump, then silence. No latch rattle, no melody. Short modal-close UI sound.",
+      "picked": true,
+      "file": "modals/modal-close.mp3",
+      "duration_ms": 480,
+      "accepted_at": "2026-08-31T00:10:51Z",
+      "accepted_from": {
+        "slot": "modal-close",
+        "url": "/files/.picker/modal-close/cand-1788135047-22.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "dropdown-open": {
+      "prompt": "A small paper fan unfolding two folds. Dry, quick, slightly upward. Paper only. Short dropdown-expand UI sound.",
+      "picked": true,
+      "file": "modals/dropdown-open.mp3",
+      "duration_ms": 480,
+      "accepted_at": "2026-08-31T00:11:13Z",
+      "accepted_from": {
+        "slot": "dropdown-open",
+        "url": "/files/.picker/dropdown-open/cand-1788135068-28.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "dropdown-close": {
+      "prompt": "A paper fan folding once. Faster and drier than the open, slight downward motion. No click. Short dropdown-collapse UI sound.",
+      "picked": true,
+      "file": "modals/dropdown-close.mp3",
+      "duration_ms": 480,
+      "accepted_at": "2026-08-31T00:11:25Z",
+      "accepted_from": {
+        "slot": "dropdown-close",
+        "url": "/files/.picker/dropdown-close/cand-1788135080-30.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "tx-sent": {
+      "prompt": "A thick envelope sliding into a wooden mail slot. Paper on wood, one whoosh then a stop. Quiet work, not a celebration. Short transaction-sent UI sound.",
+      "picked": true,
+      "file": "transactions/tx-sent.mp3",
+      "duration_ms": 480,
+      "accepted_at": "2026-08-31T00:11:55Z",
+      "accepted_from": {
+        "slot": "tx-sent",
+        "url": "/files/.picker/tx-sent/cand-1788135109-32.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    },
+    "tx-received": {
+      "prompt": "A held muted fifth on low strings that never resolves. Very quiet, waiting, no pulse, no arpeggio, no tick. Short pending-wait UI tone.",
+      "picked": true,
+      "file": "transactions/tx-received.mp3",
+      "duration_ms": 480,
+      "accepted_at": "2026-08-31T00:12:32Z",
+      "accepted_from": {
+        "slot": "tx-pending",
+        "url": "/files/.picker/tx-pending/cand-1788135129-36.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": [
+        {
+          "url": "/files/.picker/tx-received/history-1788135152-38.mp3",
+          "replaced_at": "2026-08-31T00:12:32Z"
+        }
+      ]
+    },
+    "tx-confirmed": {
+      "prompt": "A sealed envelope landing on a desk. One soft slap of heavy paper, warmer and closer than a send. No melody. Short payment-received UI sound.",
+      "picked": true,
+      "file": "transactions/tx-confirmed.mp3",
+      "duration_ms": 480,
+      "accepted_at": "2026-08-31T00:12:45Z",
+      "accepted_from": {
+        "slot": "tx-received",
+        "url": "/files/.picker/tx-received/cand-1788135120-35.mp3",
+        "kind": "generated"
+      },
+      "edits": null,
+      "assignment_history": []
+    }
+  },
+  "typescript_constants": "// Auto-generated UI Audio Theme Constants\n\nexport const UI_SOUNDS = {\n  ITEM_HOVER: \"./navigation/item-hover.mp3\",\n  NAV_ITEM_HOVER: \"./navigation/nav-item-hover.mp3\",\n  NAV_TAB_SWITCH: \"./navigation/nav-tab-switch.mp3\",\n  NAV_BACK: \"./navigation/nav-back.mp3\",\n  NAV_FORWARD: \"./navigation/nav-forward.mp3\",\n  BUTTON_CLICK_PRIMARY: \"./buttons/button-click-primary.mp3\",\n  BUTTON_CLICK_SECONDARY: \"./buttons/button-click-secondary.mp3\",\n  BUTTON_CLICK_DESTRUCTIVE: \"./buttons/button-click-destructive.mp3\",\n  NAV_MENU_OPEN: \"./navigation/nav-menu-open.mp3\",\n  NAV_MENU_CLOSE: \"./navigation/nav-menu-close.mp3\",\n  NOTIFICATION_SUCCESS: \"./feedback/notification-success.mp3\",\n  NOTIFICATION_ERROR: \"./feedback/notification-error.mp3\",\n  NOTIFICATION_WARNING: \"./feedback/notification-warning.mp3\",\n  NOTIFICATION_INFO: \"./feedback/notification-info.mp3\",\n  NOTIFICATION_BADGE: \"./feedback/notification-badge.mp3\",\n  TOGGLE_ON: \"./states/toggle-on.mp3\",\n  TOGGLE_OFF: \"./states/toggle-off.mp3\",\n  CHECKBOX_CHECK: \"./states/checkbox-check.mp3\",\n  CHECKBOX_UNCHECK: \"./states/checkbox-uncheck.mp3\",\n  LOADING_COMPLETE: \"./states/loading-complete.mp3\",\n  MODAL_OPEN: \"./modals/modal-open.mp3\",\n  MODAL_CLOSE: \"./modals/modal-close.mp3\",\n  DROPDOWN_OPEN: \"./modals/dropdown-open.mp3\",\n  DROPDOWN_CLOSE: \"./modals/dropdown-close.mp3\",\n  TX_SENT: \"./transactions/tx-sent.mp3\",\n  TX_RECEIVED: \"./transactions/tx-received.mp3\",\n  TX_CONFIRMED: \"./transactions/tx-confirmed.mp3\",\n} as const;\n\nexport type UISoundKey = keyof typeof UI_SOUNDS;"
+}

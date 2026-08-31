@@ -1,6 +1,7 @@
 import type { WalletInterface } from "@bsv/sdk";
 
 import type { DraftsWallet } from "@/lib/drafts";
+import { playUiSound } from "@/lib/ui-sound";
 
 /**
  * Browser BRC-100 client. `WalletClient("auto")` races the desktop bridges and
@@ -139,10 +140,17 @@ export async function connectBrowserWallet(): Promise<DraftsWallet> {
     return connectInFlight;
   }
   connectInFlight = (async () => {
-    const wallet = await openClient();
-    markSubstrateAvailable();
-    await wallet.waitForAuthentication({});
-    return adopt(wallet);
+    try {
+      const wallet = await openClient();
+      markSubstrateAvailable();
+      await wallet.waitForAuthentication({});
+      const adopted = adopt(wallet);
+      playUiSound("notification-success");
+      return adopted;
+    } catch (error) {
+      playUiSound("notification-error");
+      throw error;
+    }
   })().finally(() => {
     connectInFlight = null;
   });
