@@ -6,7 +6,7 @@
  *
  * Translated to TypeScript for bitplan. The rules are unchanged: the same
  * blocked tags, the same event-handler / meta-refresh / unsafe-URL checks and
- * the same 512 KB default size cap. bitplan encrypts what it publishes, but the
+ * a 5 MB default size cap. bitplan encrypts what it publishes, but the
  * plaintext is still an HTML document a viewer will eventually render, so the
  * policy is applied before anything is inscribed.
  */
@@ -53,8 +53,8 @@ const ALLOWED_SCRIPT_TYPES = new Set([
 // stack (~2000+ levels).
 const MAX_DEPTH = 512
 
-/** Default maximum document size, in bytes (512 KB), inherited from postplan. */
-export const DEFAULT_MAX_BYTES = 512 * 1024
+/** Default maximum document size, in bytes (5 MB). */
+export const DEFAULT_MAX_BYTES = 5 * 1024 * 1024
 
 interface PolicyAttr {
 	name: string

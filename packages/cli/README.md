@@ -216,7 +216,7 @@ encryption or publishing rather than assuming consent.
 **HTML policy** (ported from [postplan](https://www.npmjs.com/package/postplan),
 MIT): no `<form>`, `<iframe>`, `<object>`, `<embed>`, `<applet>`, `<base>` or
 `<link>`; no external script sources; no inline event handlers; no `srcdoc`; no
-`javascript:` / `vbscript:` / `file:` URLs; no meta refresh; 512 KB cap.
+`javascript:` / `vbscript:` / `file:` URLs; no meta refresh; 5 MB cap.
 
 **Secret scanner:** private key blocks, cloud and SaaS token shapes, JWTs,
 database URLs carrying credentials, long secrets behind `key=` / `token=` /

@@ -5,7 +5,8 @@ import { toOrdinalOutpoint } from "@/lib/outpoint";
 const BITPLAN_CONTENT_TYPE = "application/x-bitplan";
 const DEFAULT_ORDFS_GATEWAY = "https://api.1sat.app";
 const DIGITS = /^\d+$/;
-const MAX_ENVELOPE_BYTES = 640 * 1024;
+// 5 MB plan plus envelope framing, wrapped keys, and base64 slack.
+const MAX_ENVELOPE_BYTES = 5 * 1024 * 1024 + 256 * 1024;
 const SEQUENCE = /^(?:-2|-1|0|[1-9]\d*)$/;
 const TRAILING_SLASHES = /\/+$/;
 const SAFE_RESPONSE_HEADERS = {

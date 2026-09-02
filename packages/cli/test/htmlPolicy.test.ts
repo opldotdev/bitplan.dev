@@ -144,15 +144,15 @@ describe('html policy — meta refresh', () => {
 })
 
 describe('html policy — limits', () => {
-	test('the default cap is 512 KB', () => {
-		expect(DEFAULT_MAX_BYTES).toBe(512 * 1024)
+	test('the default cap is 5 MB', () => {
+		expect(DEFAULT_MAX_BYTES).toBe(5 * 1024 * 1024)
 	})
 
 	test('an oversized document is rejected', () => {
 		const big = `<title>t</title>${'x'.repeat(DEFAULT_MAX_BYTES)}`
 		const result = validateHtml(big)
 		expect(result.ok).toBe(false)
-		expect(result.errors.join(' ')).toMatch(/maximum is 524288 bytes/)
+		expect(result.errors.join(' ')).toMatch(/maximum is 5242880 bytes/)
 	})
 
 	test('the cap is configurable', () => {

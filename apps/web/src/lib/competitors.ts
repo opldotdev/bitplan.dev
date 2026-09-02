@@ -46,8 +46,8 @@ export const BITPLAN_PROFILE = {
   ],
   weaknesses: [
     "You need a BRC-100 wallet on your machine with a small amount of BSV. Publishing a 500 KB plan costs under a cent, but it is not free.",
-    "One self-contained HTML file per plan, 512 KB maximum, no folders, no separate assets.",
-    "The viewer renders plans in a sandbox with scripts disabled. Interactivity is CSS-only.",
+    "One self-contained HTML file per plan, 5 MB maximum, no folders yet.",
+    "The viewer runs plan scripts in a sandbox with no network access. A plan cannot phone home.",
     "Readers need a wallet too. There is no password link or email invite yet.",
     "Nothing can be deleted or expired. Ciphertext is on a public chain forever.",
     "No custom domains, no analytics, no hosted forms.",
@@ -117,7 +117,7 @@ export const COMPETITORS: Competitor[] = [
         them: "Public sites may be indexed. Gated sites return noindex.",
       },
       {
-        bitplan: "One HTML file, 512 KB, scripts disabled in the viewer.",
+        bitplan: "One HTML file, 5 MB, scripts run with no network access.",
         label: "Content",
         them: "Any static files, folders, SPA routing, up to 5 GB per site.",
       },
@@ -201,12 +201,12 @@ export const COMPETITORS: Competitor[] = [
         them: "No noindex or robots rules documented.",
       },
       {
-        bitplan: "Rejected at upload, blocked in the viewer sandbox.",
+        bitplan: "External scripts rejected at upload; inline scripts run with no network.",
         label: "Scripts",
         them: "Rejected at upload, blocked with script-src 'none'.",
       },
       {
-        bitplan: "512 KB. Inherited from postplan.",
+        bitplan: "5 MB.",
         label: "Size limit",
         them: "512 KB.",
       },
@@ -290,7 +290,7 @@ export const COMPETITORS: Competitor[] = [
         them: "noindex added July 2026 after public artifacts were indexed.",
       },
       {
-        bitplan: "Disabled in the viewer sandbox.",
+        bitplan: "Inline scripts run in a sandbox with no network access.",
         label: "Scripts",
         them: "Allowed. Artifacts can call Claude and keep 20 MB of state on paid plans.",
       },
@@ -377,7 +377,7 @@ export const COMPETITORS: Competitor[] = [
         them: "You own it. OpenAI gets an irrevocable licence to host it, and you are the data controller.",
       },
       {
-        bitplan: "Static HTML, scripts disabled.",
+        bitplan: "Static HTML with sandboxed scripts, no backend.",
         label: "Scripts and backend",
         them: "Full apps: database, storage, WebSockets, custom domains.",
       },

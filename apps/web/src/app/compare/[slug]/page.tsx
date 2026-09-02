@@ -118,9 +118,9 @@ export default async function CompareCompetitorPage({
           BitPlan takes the same self-contained HTML file these tools do. Save
           the page, then run <code>npx bitplan auth</code> once and{" "}
           <code>npx bitplan upload ./plan.html</code>. External scripts and
-          forms are rejected at upload, and the viewer disables scripts, so
-          interactive pages need a CSS-only pass first. Documents over 512 KB
-          need to be split.
+          forms are rejected at upload, and the viewer runs inline scripts
+          with no network access, so pages that call out to an API need a
+          static pass first. Documents over 5 MB need to be split.
         </p>
 
         <h2>Sources</h2>

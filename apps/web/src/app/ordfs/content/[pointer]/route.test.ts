@@ -82,7 +82,7 @@ describe("OrdFS content route", () => {
     fetchMock.mockResolvedValueOnce(
       new Response(envelope(), {
         headers: {
-          "content-length": String(641 * 1024),
+          "content-length": String(6 * 1024 * 1024),
           "content-type": BITPLAN_CONTENT_TYPE,
         },
       })
