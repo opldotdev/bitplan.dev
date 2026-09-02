@@ -61,6 +61,7 @@ describe('cli surface', () => {
 			'team',
 			'version',
 			'upload',
+			'inscribe',
 			'list',
 			'fetch',
 		])
@@ -129,6 +130,24 @@ describe('cli surface', () => {
 				'--json',
 				'--allow-finding',
 				'--wallet-url',
+				'--hosted',
+				'--site-url',
+			]),
+		)
+	})
+
+	test('inscribe takes a hosted reference and the documented flags', () => {
+		const inscribe = commandNamed(program, 'inscribe')
+		expect(inscribe.registeredArguments.map((a) => a.name())).toEqual([
+			'h_id|file',
+		])
+		expect(flagsOf(inscribe)).toEqual(
+			expect.arrayContaining([
+				'--all-versions',
+				'--yes',
+				'--json',
+				'--wallet-url',
+				'--site-url',
 			]),
 		)
 	})
@@ -157,7 +176,9 @@ describe('cli surface', () => {
 		expect(fetch.registeredArguments.map((a) => a.name())).toEqual([
 			'origin|url',
 		])
-		expect(flagsOf(fetch)).toEqual(expect.arrayContaining(['--meta', '--json']))
+		expect(flagsOf(fetch)).toEqual(
+			expect.arrayContaining(['--meta', '--json', '--site-url']),
+		)
 	})
 
 	test('--allow-finding is repeatable', () => {

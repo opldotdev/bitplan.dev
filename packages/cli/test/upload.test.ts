@@ -46,6 +46,9 @@ if (!CHILD_RUN) {
 		sharedWith: string[]
 	}
 
+	const HOSTED = `h_${'A'.repeat(20)}`
+	const HOSTED_SECRET = 'ab'.repeat(32)
+
 	interface Calls {
 		connectWallet: Array<string | undefined>
 		findCoin: string[]
@@ -54,6 +57,18 @@ if (!CHILD_RUN) {
 		relays: Array<{ beef: Uint8Array; txid: string }>
 		seals: SealCall[]
 		saves: Array<{ file: string; record: DraftRecord }>
+		hostedCreates: Array<{
+			siteUrl: string
+			secretHex: string
+			envelope: Uint8Array
+		}>
+		hostedAppends: Array<{
+			siteUrl: string
+			id: string
+			secretHex: string
+			envelope: Uint8Array
+			baseVersion: number | null
+		}>
 	}
 
 	const wallet = {} as WalletInterface
@@ -202,6 +217,37 @@ if (!CHILD_RUN) {
 		},
 	}))
 
+	mock.module('../src/hosted.js', () => ({
+		isHostedId: (value: string) => /^h_[A-Za-z0-9_-]{20}$/.test(value),
+		newHostedSecret: () => HOSTED_SECRET,
+		hostedViewerUrl: (id: string) => `https://bitplan.dev/d/${id}`,
+		resolveSiteUrl: (override?: string) => override ?? 'https://bitplan.dev',
+		createHostedDraft: async (
+			siteUrl: string,
+			secretHex: string,
+			envelope: Uint8Array,
+		) => {
+			calls.hostedCreates.push({ siteUrl, secretHex, envelope })
+			return { id: HOSTED, version: 1 }
+		},
+		appendHostedVersion: async (
+			siteUrl: string,
+			id: string,
+			secretHex: string,
+			envelope: Uint8Array,
+			baseVersion: number | null,
+		) => {
+			calls.hostedAppends.push({
+				siteUrl,
+				id,
+				secretHex,
+				envelope,
+				baseVersion,
+			})
+			return { version: (baseVersion ?? 0) + 1 }
+		},
+	}))
+
 	mock.module('../src/relay.js', () => ({
 		relayBeef: async (beef: Uint8Array, txid: string) => {
 			calls.relays.push({ beef, txid })
@@ -223,6 +269,8 @@ if (!CHILD_RUN) {
 			relays: [],
 			seals: [],
 			saves: [],
+			hostedCreates: [],
+			hostedAppends: [],
 		}
 		knownByFile = undefined
 		knownByOrigin = undefined
@@ -744,6 +792,92 @@ if (!CHILD_RUN) {
 			expect(console.log).toHaveBeenCalledWith(
 				expect.stringMatching(/^Link: {5}https:\/\/bitplan\.dev\/d\/.*#k=/),
 			)
+		})
+
+		test('--hosted on a chain draft is refused', async () => {
+			knownByFile = existingRecord()
+
+			await expect(
+				uploadCommand(htmlFile, { hosted: true, yes: true }),
+			).rejects.toThrow(
+				'This draft is already on the chain; publish it there or use --new --hosted for a separate hosted copy.',
+			)
+			expect(calls.connectWallet).toEqual([])
+			expect(calls.genesis).toEqual([])
+			expect(calls.hostedCreates).toEqual([])
+		})
+
+		test('--hosted publishes a new hosted draft without a chain transaction', async () => {
+			await uploadCommand(htmlFile, { hosted: true, yes: true })
+
+			expect(calls.findCoin).toEqual([])
+			expect(calls.genesis).toEqual([])
+			expect(calls.version).toEqual([])
+			expect(calls.relays).toEqual([])
+			expect(calls.hostedCreates).toEqual([
+				{
+					siteUrl: 'https://bitplan.dev',
+					secretHex: HOSTED_SECRET,
+					envelope: Uint8Array.of(1, 2, 3),
+				},
+			])
+			expect(calls.saves[0]?.record).toMatchObject({
+				origin: HOSTED,
+				latestOutpoint: HOSTED,
+				latestVersion: 1,
+				hostedSecret: HOSTED_SECRET,
+			})
+			expect(console.log).toHaveBeenCalledWith('Published a hosted draft.')
+			expect(console.log).toHaveBeenCalledWith(
+				`Hosted:   ${HOSTED}  version 1  (not on chain)`,
+			)
+		})
+
+		test('a hosted local record updates without --hosted', async () => {
+			knownByFile = {
+				...existingRecord(),
+				origin: HOSTED,
+				latestOutpoint: HOSTED,
+				hostedSecret: HOSTED_SECRET,
+			}
+
+			await uploadCommand(htmlFile, { yes: true })
+
+			expect(calls.findCoin).toEqual([])
+			expect(calls.genesis).toEqual([])
+			expect(calls.hostedCreates).toEqual([])
+			expect(calls.hostedAppends).toEqual([
+				{
+					siteUrl: 'https://bitplan.dev',
+					id: HOSTED,
+					secretHex: HOSTED_SECRET,
+					envelope: Uint8Array.of(1, 2, 3),
+					baseVersion: 3,
+				},
+			])
+			expect(calls.saves[0]?.record).toMatchObject({
+				origin: HOSTED,
+				latestOutpoint: HOSTED,
+				latestVersion: 4,
+				hostedSecret: HOSTED_SECRET,
+			})
+			expect(console.log).toHaveBeenCalledWith(
+				'Published a new hosted version.',
+			)
+		})
+
+		test('a hosted record without a local secret cannot be updated', async () => {
+			knownByFile = {
+				...existingRecord(),
+				origin: HOSTED,
+				latestOutpoint: HOSTED,
+			}
+
+			await expect(uploadCommand(htmlFile, { yes: true })).rejects.toThrow(
+				'No secret for this hosted draft in the local drafts map; it cannot be updated from this machine.',
+			)
+			expect(calls.hostedAppends).toEqual([])
+			expect(calls.seals).toEqual([])
 		})
 
 		test('--json includes the reader link URL next to viewer', async () => {

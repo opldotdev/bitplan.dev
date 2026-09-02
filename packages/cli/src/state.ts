@@ -14,6 +14,7 @@ import path from 'node:path'
 import { normalizeReaderName } from './addressBook.js'
 import { normalizeIdentityKey } from './envelope.js'
 import { CliError } from './errors.js'
+import { isHostedId } from './hosted.js'
 import { isOutpoint } from './outpoint.js'
 
 export const STATE_DIR_MODE = 0o700
@@ -40,6 +41,8 @@ export interface DraftRecord {
 	shareWithRefs?: string[]
 	/** Reader link secret, 64 hex. Present while the draft has a link reader. */
 	linkKey?: string
+	/** Hosted-draft write secret, 64 hex. Present while the draft is hosted. */
+	hostedSecret?: string
 }
 
 export interface DraftsFile {
@@ -51,6 +54,8 @@ export interface ConfigFile {
 	walletUrl?: string
 	/** ORDFS gateway base URL. */
 	ordfsUrl?: string
+	/** bitplan.dev origin used for hosted drafts. */
+	siteUrl?: string
 	/** Public wallet identities included on every new plan. */
 	shareWith?: string[]
 	/** Local contact/team names included on every new plan. */
@@ -139,6 +144,9 @@ export function readConfig(file: string = configPath()): ConfigFile {
 	if (parsed.ordfsUrl !== undefined && typeof parsed.ordfsUrl !== 'string') {
 		throw invalidState(file, 'ordfsUrl must be a string')
 	}
+	if (parsed.siteUrl !== undefined && typeof parsed.siteUrl !== 'string') {
+		throw invalidState(file, 'siteUrl must be a string')
+	}
 	const shareWith = validateIdentityKeys(parsed.shareWith, file, 'shareWith')
 	const contacts = validateContacts(parsed.contacts, file)
 	const teams = validateTeams(parsed.teams, contacts, file)
@@ -152,6 +160,7 @@ export function readConfig(file: string = configPath()): ConfigFile {
 	return {
 		walletUrl: parsed.walletUrl as string | undefined,
 		ordfsUrl: parsed.ordfsUrl as string | undefined,
+		siteUrl: parsed.siteUrl as string | undefined,
 		shareWith,
 		shareWithRefs,
 		contacts,
@@ -227,7 +236,7 @@ function validateDraftRecord(
 			`record for ${JSON.stringify(filePath)} is not an object`,
 		)
 	}
-	if (typeof value.origin !== 'string' || !isOutpoint(value.origin)) {
+	if (typeof value.origin !== 'string' || !isDraftPointer(value.origin)) {
 		throw invalidState(
 			file,
 			`record for ${JSON.stringify(filePath)} has an invalid origin`,
@@ -235,7 +244,7 @@ function validateDraftRecord(
 	}
 	if (
 		typeof value.latestOutpoint !== 'string' ||
-		!isOutpoint(value.latestOutpoint)
+		!isDraftPointer(value.latestOutpoint)
 	) {
 		throw invalidState(
 			file,
@@ -317,7 +326,24 @@ function validateDraftRecord(
 	} else {
 		delete value.linkKey
 	}
+	if (value.hostedSecret !== undefined) {
+		if (
+			typeof value.hostedSecret === 'string' &&
+			/^[0-9a-f]{64}$/i.test(value.hostedSecret)
+		) {
+			value.hostedSecret = value.hostedSecret.toLowerCase()
+		} else {
+			throw invalidState(
+				file,
+				`record for ${JSON.stringify(filePath)} has an invalid hostedSecret`,
+			)
+		}
+	}
 	return value as unknown as DraftRecord
+}
+
+function isDraftPointer(value: string): boolean {
+	return isOutpoint(value) || isHostedId(value)
 }
 
 function validateIdentityKeys(

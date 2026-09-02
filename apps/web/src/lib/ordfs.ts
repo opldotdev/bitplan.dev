@@ -1,5 +1,7 @@
 import { parseEnvelope } from "@/lib/envelope";
+import { isHostedId } from "@/lib/hosted-id";
 import { toOrdinalOutpoint } from "@/lib/outpoint";
+import { SITE_URL } from "@/lib/site";
 
 const TRAILING_SLASHES = /\/+$/;
 
@@ -15,7 +17,7 @@ export const ORDFS_GATEWAY = configuredOrdfsGateway();
 export const BITPLAN_CONTENT_TYPE = "application/x-bitplan";
 
 function configuredOrdfsGateway(): string {
-  const configured = process.env.NEXT_PUBLIC_ORDFS_GATEWAY_URL?.trim();
+  const configured = process.env.NEXT_PUBLIC_ORDFS_GATEWAY_URL;
   if (!configured) {
     return "https://api.1sat.app";
   }
@@ -57,7 +59,7 @@ function mediaType(value: string): string {
 }
 
 export function ordfsContentUrl(origin: string, seq: number): string {
-  const pointer = toOrdinalOutpoint(origin);
+  const pointer = isHostedId(origin) ? origin : toOrdinalOutpoint(origin);
   return `${ORDFS_PROXY}/content/${pointer}:${seq}`;
 }
 
@@ -83,7 +85,9 @@ export async function fetchOrdfsMeta(
   origin: string,
   seq: number
 ): Promise<OrdfsMeta | null> {
-  const url = ordfsGatewayContentUrl(origin, seq);
+  const url = isHostedId(origin)
+    ? `${SITE_URL}${ordfsContentUrl(origin, seq)}`
+    : ordfsGatewayContentUrl(origin, seq);
 
   let response: Response;
   try {

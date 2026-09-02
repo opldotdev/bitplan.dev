@@ -49,6 +49,20 @@ describe("outpoint normalization", () => {
     expect(normalizeOrigin(`${TXID}_0`)).toBe(`${TXID}_0`);
     expect(normalizeOrigin("bad")).toBeNull();
   });
+
+  test("normalizeOrigin returns a valid hosted id unchanged", () => {
+    const id = `h_${"A".repeat(20)}`;
+    expect(normalizeOrigin(id)).toBe(id);
+    expect(isOutpoint(id)).toBe(false);
+    expect(() => toOrdinalOutpoint(id)).toThrow(NOT_OUTPOINT);
+  });
+
+  test("normalizeOrigin rejects malformed hosted ids", () => {
+    expect(normalizeOrigin(`h_${"A".repeat(19)}`)).toBeNull();
+    expect(normalizeOrigin(`h_${"A".repeat(21)}`)).toBeNull();
+    expect(normalizeOrigin(`h_${"A".repeat(19)}.`)).toBeNull();
+    expect(normalizeOrigin("h_not an id!!!!!!")).toBeNull();
+  });
 });
 
 describe("version query normalization", () => {

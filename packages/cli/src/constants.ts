@@ -37,6 +37,9 @@ export const DEFAULT_WALLET_URL = 'http://127.0.0.1:3321'
 /** Public viewer for a published draft. */
 export const VIEWER_BASE_URL = 'https://bitplan.dev/d'
 
+/** Hosted-draft HTTP API. Override the site origin with config.siteUrl or --site-url. */
+export const HOSTED_API_URL = 'https://bitplan.dev/api/hosted'
+
 /** 1sat content gateway used to read published envelopes back. */
 export const DEFAULT_ORDFS_URL = 'https://api.1sat.app'
 

@@ -1,11 +1,14 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { frameEnvelope } from "./envelope";
 import {
   BITPLAN_CONTENT_TYPE,
   fetchOrdfsContent,
+  fetchOrdfsMeta,
   type OrdfsContentResult,
+  ordfsContentUrl,
 } from "./ordfs";
+import { SITE_URL } from "./site";
 
 const TXID = "a".repeat(64);
 const ORIGIN = `${TXID}_0`;
@@ -102,6 +105,37 @@ describe("fetchOrdfsContent", () => {
       reason: "content-type",
       state: "invalid-content",
     });
+  });
+
+  test("builds the proxy path for hosted ids", () => {
+    const id = `h_${"b".repeat(20)}`;
+    expect(ordfsContentUrl(id, -1)).toBe(`/ordfs/content/${id}:-1`);
+  });
+
+  test("HEADs the content proxy for hosted ids, not the gateway", async () => {
+    const id = `h_${"c".repeat(20)}`;
+    const fetchMock = mock((url: string, init?: RequestInit) => {
+      expect(url).toBe(`${SITE_URL}/ordfs/content/${id}:-1`);
+      expect(init?.method).toBe("HEAD");
+      return Promise.resolve(
+        new Response(null, {
+          headers: {
+            "content-length": "120",
+            "content-type": BITPLAN_CONTENT_TYPE,
+            "x-ord-seq": "0",
+            "x-origin": id,
+            "x-outpoint": id,
+          },
+          status: 200,
+        })
+      );
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const meta = await fetchOrdfsMeta(id, -1);
+    expect(meta?.byteLength).toBe(120);
+    expect(meta?.origin).toBe(id);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   test("rejects malformed envelopes with the correct media type", async () => {

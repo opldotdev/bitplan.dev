@@ -2,6 +2,7 @@ import type { WalletInterface } from '@bsv/sdk'
 import { isBitplanContentType } from '../constants.js'
 import { openEnvelope } from '../envelope.js'
 import { CliError } from '../errors.js'
+import { isHostedId } from '../hosted.js'
 import { fetchLatest, type OrdfsContent } from '../ordfs.js'
 import type { BitplanCoin } from '../ordinals.js'
 import { listBitplanCoins } from '../ordinals.js'
@@ -28,6 +29,8 @@ export interface ListedDraft {
 	file: string | null
 	/** True when the on-chain envelope could not be opened. */
 	unreadable?: boolean
+	/** True when this row is a hosted draft, not a chain coin. */
+	hosted?: boolean
 }
 
 interface RecoveredMetadata {
@@ -55,11 +58,13 @@ export async function listCommand(options: ListOptions): Promise<void> {
 		byOrigin.set(record.origin, { file, record })
 	}
 
-	const { drafts, recoveryErrors } = await listedDraftsForCoins(
+	const hosted = listedHostedDrafts(byOrigin)
+	const { drafts: chainDrafts, recoveryErrors } = await listedDraftsForCoins(
 		wallet,
 		coins,
 		byOrigin,
 	)
+	const drafts = [...hosted, ...chainDrafts]
 
 	if (recoveryErrors.length > 0) {
 		console.error(
@@ -88,6 +93,28 @@ export async function listCommand(options: ListOptions): Promise<void> {
 	console.log(
 		options.verbose ? formatDraftsVerbose(drafts) : formatDraftsTable(drafts),
 	)
+}
+
+/** Local hosted drafts. These rows do not need a wallet or ORDFS. */
+export function listedHostedDrafts(
+	byOrigin: ReadonlyMap<string, { file: string; record: DraftRecord }>,
+): ListedDraft[] {
+	const drafts: ListedDraft[] = []
+	for (const [origin, local] of byOrigin) {
+		if (!isHostedId(origin)) continue
+		drafts.push({
+			origin: local.record.origin,
+			outpoint: local.record.latestOutpoint,
+			id: local.record.origin,
+			title: local.record.title ?? null,
+			description: local.record.description ?? null,
+			version: local.record.latestVersion,
+			updatedAt: local.record.updatedAt ?? null,
+			file: local.file,
+			hosted: true,
+		})
+	}
+	return drafts
 }
 
 /** Map wallet coins to list rows, recovering encrypted metadata when needed. */
@@ -224,9 +251,11 @@ export function formatDraftsTable(
 	const headers = ['Title', 'Ver', 'Origin', 'Outpoint', 'Updated']
 
 	const rows = drafts.map((draft) => {
-		const title = draft.unreadable
-			? '(unreadable: old envelope format)'
-			: (draft.title ?? 'Untitled (no local record)')
+		const title = draft.hosted
+			? `${draft.title ?? 'Untitled'} (hosted, not on chain)`
+			: draft.unreadable
+				? '(unreadable: old envelope format)'
+				: (draft.title ?? 'Untitled (no local record)')
 		const ver = draft.version === null ? '-' : `v${draft.version}`
 		return [
 			title,
@@ -247,9 +276,11 @@ export function formatDraftsVerbose(drafts: readonly ListedDraft[]): string {
 			const fields: ReadonlyArray<readonly [string, string]> = [
 				[
 					'Title',
-					draft.unreadable
-						? '(unreadable: old envelope format)'
-						: (draft.title ?? 'Untitled'),
+					draft.hosted
+						? `${draft.title ?? 'Untitled'} (hosted, not on chain)`
+						: draft.unreadable
+							? '(unreadable: old envelope format)'
+							: (draft.title ?? 'Untitled'),
 				],
 				['Description', draft.description ?? '-'],
 				['Version', draft.version === null ? '-' : `v${draft.version}`],

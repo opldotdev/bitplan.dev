@@ -4,6 +4,10 @@
 
 ### Added
 
+- `upload --hosted` stores the sealed envelope on bitplan.dev instead of the
+  chain. `bitplan inscribe` puts a hosted draft on the chain. `fetch` and
+  `list` work for hosted ids, and `--site-url` overrides the bitplan.dev
+  origin on `upload`, `inscribe`, and `fetch`.
 - `upload --link` adds a reader link anyone can open. The same link works on
   later versions until `--private`. `bitplan fetch` can open a plan from that
   URL without a wallet.

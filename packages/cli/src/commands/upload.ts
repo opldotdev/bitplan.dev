@@ -26,6 +26,14 @@ import {
 } from '../envelope.js'
 import { CliError } from '../errors.js'
 import { collectGitMetadata } from '../git.js'
+import {
+	appendHostedVersion,
+	createHostedDraft,
+	hostedViewerUrl,
+	isHostedId,
+	newHostedSecret,
+	resolveSiteUrl,
+} from '../hosted.js'
 import { validateHtml } from '../htmlPolicy.js'
 import { linkIdentityKey, linkUrl, newLinkSecret } from '../link.js'
 import { fetchLatest } from '../ordfs.js'
@@ -53,6 +61,7 @@ import { connectWallet, identityKey } from '../wallet.js'
 export interface UploadOptions {
 	draft?: string
 	new?: boolean
+	hosted?: boolean
 	description?: string
 	yes?: boolean
 	allowFinding?: string[]
@@ -61,6 +70,7 @@ export interface UploadOptions {
 	link?: boolean
 	walletUrl?: string
 	ordfsUrl?: string
+	siteUrl?: string
 	relay?: boolean
 	json?: boolean
 }
@@ -90,12 +100,17 @@ export async function uploadCommand(
 	const known = findDraftByFile(resolvedFile)
 	let explicitOrigin: string | null = null
 	if (options.draft) {
-		try {
-			explicitOrigin = toOrdinalOutpoint(options.draft)
-		} catch {
-			throw new CliError(
-				`--draft must be an outpoint in txid_vout form; got "${options.draft}".`,
-			)
+		const draft = options.draft.trim()
+		if (isHostedId(draft)) {
+			explicitOrigin = draft
+		} else {
+			try {
+				explicitOrigin = toOrdinalOutpoint(draft)
+			} catch {
+				throw new CliError(
+					`--draft must be an outpoint in txid_vout form; got "${options.draft}".`,
+				)
+			}
 		}
 	}
 	const targetOrigin = options.new
@@ -106,6 +121,14 @@ export async function uploadCommand(
 			? known
 			: findDraftByOrigin(targetOrigin)?.record
 		: undefined
+	if (options.hosted && targetOrigin && !isHostedId(targetOrigin)) {
+		throw new CliError(
+			'This draft is already on the chain; publish it there or use --new --hosted for a separate hosted copy.',
+		)
+	}
+	const hosted = Boolean(
+		options.hosted || (targetOrigin !== null && isHostedId(targetOrigin)),
+	)
 	const defaultRawReaders = targetOrigin ? [] : (config.shareWith ?? [])
 	const defaultNamedRefs = targetOrigin ? [] : (config.shareWithRefs ?? [])
 	let namedRefs = options.private
@@ -151,7 +174,27 @@ export async function uploadCommand(
 	let nextVersion: number | null
 	let previousRecipients: string[] = []
 	let fixedReaders = defaultRawReaders
-	if (targetOrigin) {
+	if (hosted && targetOrigin) {
+		const local = targetLocal
+		if (!local?.hostedSecret) {
+			throw new CliError(
+				'No secret for this hosted draft in the local drafts map; it cannot be updated from this machine.',
+			)
+		}
+		keyID = local.keyID
+		nextVersion = local.latestVersion === null ? null : local.latestVersion + 1
+		previousRecipients = local.sharedWith ?? []
+		fixedReaders = local.sharedWithRaw ?? previousRecipients
+		namedRefs = options.private
+			? []
+			: [
+					...new Set([
+						...(local.shareWithRefs ?? []),
+						...requestedReaders.namedRefs,
+					]),
+				]
+		resolvedNamedReaders = resolveNamedReaders(namedRefs, config)
+	} else if (targetOrigin) {
 		coin = await findCoinByOrigin(wallet, targetOrigin)
 		const local = targetLocal
 		if (local && local.latestOutpoint === coin.outpoint) {
@@ -249,6 +292,7 @@ export async function uploadCommand(
 		removedReaders,
 		config,
 		linkIdentity: labeledLinkIdentity,
+		hosted,
 		skip: options.yes === true,
 		quiet: options.json === true,
 	})
@@ -289,16 +333,61 @@ export async function uploadCommand(
 		ownerIdentityKey,
 	)
 
-	const published = coin
-		? await publishVersion(wallet, coin, envelope)
-		: await publishGenesis(wallet, envelope)
+	let hostedSecret: string | undefined
+	let published: {
+		origin: string
+		outpoint: string
+		txid?: string
+		beef?: Uint8Array
+	}
+	if (hosted) {
+		const site = resolveSiteUrl(options.siteUrl ?? config.siteUrl)
+		if (targetOrigin) {
+			const secret = targetLocal?.hostedSecret
+			if (!secret) {
+				throw new CliError(
+					'No secret for this hosted draft in the local drafts map; it cannot be updated from this machine.',
+				)
+			}
+			const result = await appendHostedVersion(
+				site,
+				targetOrigin,
+				secret,
+				envelope,
+				targetLocal?.latestVersion ?? null,
+			)
+			hostedSecret = secret
+			nextVersion = result.version
+			published = { origin: targetOrigin, outpoint: targetOrigin }
+		} else {
+			hostedSecret = newHostedSecret()
+			const result = await createHostedDraft(site, hostedSecret, envelope)
+			nextVersion = result.version
+			published = { origin: result.id, outpoint: result.id }
+		}
+	} else {
+		published = coin
+			? await publishVersion(wallet, coin, envelope)
+			: await publishGenesis(wallet, envelope)
+	}
 
 	if (!options.json) {
-		console.log(coin ? 'Published a new version.' : 'Published a new draft.')
-		console.log(`Origin:   ${published.origin}`)
-		console.log(`Outpoint: ${published.outpoint}`)
-		console.log(`Version:  ${nextVersion ?? 'unknown (no local history)'}`)
-		console.log(formatAccess(sharedWith, linkIdentity))
+		if (hosted) {
+			console.log(
+				targetOrigin
+					? 'Published a new hosted version.'
+					: 'Published a hosted draft.',
+			)
+			console.log(
+				`Hosted:   ${published.origin}  version ${nextVersion}  (not on chain)`,
+			)
+		} else {
+			console.log(coin ? 'Published a new version.' : 'Published a new draft.')
+			console.log(`Origin:   ${published.origin}`)
+			console.log(`Outpoint: ${published.outpoint}`)
+			console.log(`Version:  ${nextVersion ?? 'unknown (no local history)'}`)
+			console.log(formatAccess(sharedWith, linkIdentity))
+		}
 	}
 	const record: DraftRecord = {
 		origin: published.origin,
@@ -312,6 +401,7 @@ export async function uploadCommand(
 		sharedWithRaw: fixedReaders,
 		shareWithRefs: namedRefs.length > 0 ? namedRefs : undefined,
 		linkKey,
+		...(hosted && hostedSecret ? { hostedSecret } : {}),
 	}
 	let stateSaved = true
 	try {
@@ -331,8 +421,8 @@ export async function uploadCommand(
 		| { state: 'skipped' | 'unavailable' | 'failed'; error?: string } = {
 		state: 'skipped',
 	}
-	if (options.relay !== false) {
-		if (published.beef) {
+	if (!hosted && options.relay !== false) {
+		if (published.beef && published.txid) {
 			try {
 				relay = await relayBeef(published.beef, published.txid)
 				if (!options.json) {
@@ -358,7 +448,9 @@ export async function uploadCommand(
 			)
 		}
 	}
-	const viewer = viewerUrl(published.origin)
+	const viewer = hosted
+		? hostedViewerUrl(published.origin)
+		: viewerUrl(published.origin)
 	const link = linkIdentity && linkKey ? linkUrl(viewer, linkKey) : null
 	if (options.json) {
 		if (options.link && adoptedWithoutLocalRecord) {
@@ -370,10 +462,11 @@ export async function uploadCommand(
 			JSON.stringify(
 				{
 					published: true,
-					kind: coin ? 'version' : 'draft',
+					kind: hosted ? 'hosted' : coin ? 'version' : 'draft',
 					origin: published.origin,
 					outpoint: published.outpoint,
 					version: nextVersion,
+					...(hosted ? { hosted: true } : {}),
 					access: {
 						mode: sharedWith.length === 0 ? 'wallet-only' : 'shared',
 						readers: sharedWith,
@@ -390,6 +483,9 @@ export async function uploadCommand(
 		)
 	} else {
 		console.log(`Viewer:   ${viewer}`)
+		if (hosted) {
+			console.log(`Inscribe: bitplan inscribe ${published.origin}`)
+		}
 		if (options.link && adoptedWithoutLocalRecord) {
 			console.log(
 				'Note: this draft had no local link secret; earlier links stop working on this version.',
@@ -570,6 +666,7 @@ interface ConfirmInput {
 	removedReaders: string[]
 	config: ConfigFile
 	linkIdentity?: string
+	hosted?: boolean
 	skip: boolean
 	quiet: boolean
 }
@@ -583,9 +680,13 @@ async function confirmPublish(input: ConfirmInput): Promise<void> {
 	console.log(
 		`Size:     ${input.envelopeBytes.toLocaleString('en-US')} bytes on chain (encrypted)`,
 	)
-	console.log(
-		`Fee:      ~${estimateFeeSats(input.envelopeBytes).toLocaleString('en-US')} sats at 1 sat/KB`,
-	)
+	if (input.hosted) {
+		console.log('Hosted by bitplan.dev (no transaction)')
+	} else {
+		console.log(
+			`Fee:      ~${estimateFeeSats(input.envelopeBytes).toLocaleString('en-US')} sats at 1 sat/KB`,
+		)
+	}
 	if (input.origin) {
 		console.log(`Origin:   ${input.origin}`)
 		console.log(`Version:  ${input.version ?? 'unknown (no local history)'}`)

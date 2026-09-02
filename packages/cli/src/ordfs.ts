@@ -18,6 +18,7 @@
 
 import { DEFAULT_ORDFS_URL } from './constants.js'
 import { CliError } from './errors.js'
+import { hostedContentUrl, isHostedId, resolveSiteUrl } from './hosted.js'
 import { toOrdinalOutpoint } from './outpoint.js'
 import { readConfig } from './state.js'
 import { errorMessage } from './wallet.js'
@@ -46,11 +47,15 @@ export function resolveOrdfsUrl(override?: string): string {
  */
 export async function fetchLatest(
 	origin: string,
-	options: { baseUrl?: string; seq?: number } = {},
+	options: { baseUrl?: string; seq?: number; siteUrl?: string } = {},
 ): Promise<OrdfsContent> {
+	const seq = options.seq ?? -1
+	if (isHostedId(origin)) {
+		return fetchHostedContent(origin, seq, options.siteUrl)
+	}
+
 	const base = resolveOrdfsUrl(options.baseUrl)
 	const pointer = toOrdinalOutpoint(origin)
-	const seq = options.seq ?? -1
 	const url = `${base}/content/${pointer}:${seq}`
 
 	let response: Response
@@ -116,11 +121,68 @@ export function originFromReference(reference: string): string {
 }
 
 function normalizeOrigin(value: string, reference: string): string {
+	if (isHostedId(value)) return value
 	try {
 		return toOrdinalOutpoint(value)
 	} catch {
 		throw new CliError(
-			`Not an outpoint: ${reference}. Expected txid_vout (or a https://bitplan.dev/d/... URL).`,
+			`Not an outpoint: ${reference}. Expected txid_vout, a hosted id, or a https://bitplan.dev/d/... URL.`,
 		)
+	}
+}
+
+async function fetchHostedContent(
+	id: string,
+	seq: number,
+	siteUrl: string | undefined,
+): Promise<OrdfsContent> {
+	const site = resolveSiteUrl(siteUrl ?? readConfig().siteUrl)
+	const url = hostedContentUrl(site, id, seq)
+
+	let response: Response
+	try {
+		response = await fetch(url)
+	} catch (error) {
+		throw new CliError(
+			`Could not reach hosted content at ${site}: ${errorMessage(error)}`,
+		)
+	}
+
+	if (response.status === 410) {
+		let chainOrigin = 'the chain origin'
+		try {
+			const body = (await response.json()) as { origin?: unknown }
+			if (typeof body.origin === 'string' && body.origin.length > 0) {
+				chainOrigin = body.origin
+			}
+		} catch {
+			// Keep the fallback if the body is not the documented JSON.
+		}
+		throw new CliError(
+			`This hosted draft is on the chain now at ${chainOrigin}. Use that origin.`,
+		)
+	}
+	if (response.status === 404) {
+		throw new CliError(`No hosted draft for ${id}.`)
+	}
+	if (!response.ok) {
+		throw new CliError(
+			`Hosted content returned ${response.status} ${response.statusText} for ${id}.`,
+		)
+	}
+
+	const buffer = await response.arrayBuffer()
+	const sequenceHeader = response.headers.get('x-ord-seq')
+	const parsedSequence = sequenceHeader
+		? Number.parseInt(sequenceHeader, 10)
+		: Number.NaN
+
+	return {
+		bytes: new Uint8Array(buffer),
+		contentType:
+			response.headers.get('content-type') ?? 'application/octet-stream',
+		outpoint: response.headers.get('x-outpoint') ?? id,
+		origin: response.headers.get('x-origin') ?? id,
+		sequence: Number.isFinite(parsedSequence) ? parsedSequence : null,
 	}
 }

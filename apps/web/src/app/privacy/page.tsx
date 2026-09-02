@@ -30,6 +30,11 @@ export default function PrivacyPage() {
           public on the chain. A reader link secret stays in your browser&apos;s
           address bar; bitplan.dev never receives it.
         </p>
+        <p>
+          Hosted drafts are ciphertext stored by bitplan.dev, with the reader
+          list in the public envelope header. We can delete a hosted draft on a
+          valid request. We cannot read them.
+        </p>
       </div>
     </main>
   );

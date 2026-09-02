@@ -134,6 +134,26 @@ relay status, and viewer URL. `--json` still requires `--yes`; it never treats a
 machine-readable response as permission to publish. Fetch JSON includes both
 the decrypted HTML and its metadata, so `--meta` is not needed.
 
+## Hosted drafts
+
+`bitplan upload plan.html --hosted` seals the same envelope, then stores it on
+bitplan.dev instead of inscribing it. There is no transaction and no BSV. A
+wallet is still required for the keys. Re-uploading the same file writes a new
+hosted version. `bitplan inscribe <h_id|file>` puts the latest hosted version
+on the chain; `--all-versions` replays the whole history. After inscribe, the
+hosted viewer URL redirects to the chain origin.
+
+```sh
+npx bitplan upload ./plan.html --hosted
+npx bitplan inscribe h_xxxxxxxxxxxxxxxxxxxx
+npx bitplan fetch h_xxxxxxxxxxxxxxxxxxxx
+npx bitplan fetch https://bitplan.dev/d/h_xxxxxxxxxxxxxxxxxxxx
+```
+
+`bitplan list` includes hosted drafts marked `(hosted, not on chain)`. Pass
+`--site-url` on `upload`, `inscribe`, and `fetch` to point at a different
+bitplan.dev origin.
+
 The CLI stores optional config and file-to-origin mappings in `~/.bitplan`.
 
 Pass `--wallet-url` to point at a different BRC-100 endpoint; `upload` and
@@ -154,6 +174,8 @@ Viewer:   https://bitplan.dev/d/<txid>_0
 bitplan upload <file>
   --draft <origin>         Update a specific draft
   --new                    Always create a new draft
+  --hosted                 Store the encrypted draft on bitplan.dev instead of the chain
+  --site-url <url>         bitplan.dev origin for hosted drafts
   --description <text>     Set a short description
   --share-with <reader>    Add a key, contact, or team (repeatable)
   --private                Make the new version wallet-only
@@ -162,6 +184,12 @@ bitplan upload <file>
   -y, --yes                Skip the confirmation prompt
   --json                   Print one JSON result (requires --yes)
   --allow-finding <id>     Waive one secret-scanner finding (repeatable)
+
+bitplan inscribe <h_id|file>
+  --all-versions           Inscribe every hosted version, not only the latest
+  --site-url <url>
+  -y, --yes
+  --json
 
 bitplan list
   --json
@@ -172,6 +200,7 @@ bitplan fetch <origin|url>
   --meta
   --json                   Print the HTML and metadata as JSON
   --version <n>
+  --site-url <url>
 
 bitplan config
   --share-with <reader>    Default key, contact, or team (repeatable)
@@ -252,10 +281,13 @@ The scan runs on the plaintext even though the output is encrypted.
   and teams. Contacts contain public identity keys only.
 - `drafts.json`: which local file maps to which draft: origin, keyID, latest
   outpoint, latest version, and any local contact/team references used for its
-  access list.
+  access list. Hosted drafts also store the write secret so this machine can
+  update them.
 
-Neither file holds key material. Losing `drafts.json` costs convenience only:
-origins are on chain, and each draft's keyID is in its envelope header.
+Neither file holds identity private keys. Losing `drafts.json` costs
+convenience only for chain drafts: origins are on chain, and each draft's
+keyID is in its envelope header. A hosted draft cannot be updated from this
+machine without its secret.
 
 ## License
 

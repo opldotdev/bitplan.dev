@@ -4,8 +4,11 @@
  *   - `txid.vout`  — BRC-100 wallet outputs
  *   - `txid_vout`  — ordinals indexers, ORDFS keys, and viewer URLs
  *
- * The viewer stores and displays the ordinal (`_`) form.
+ * The viewer stores and displays the ordinal (`_`) form. Hosted draft ids
+ * (`h_…`) are not outpoints; `normalizeOrigin` still accepts them.
  */
+
+import { isHostedId } from "@/lib/hosted-id";
 
 const TXID_HEX = /^[0-9a-f]{64}$/i;
 
@@ -41,10 +44,14 @@ export function isOutpoint(value: string): boolean {
   }
 }
 
-/** Normalize a viewer path segment, or `null` if it is not an outpoint. */
+/** Normalize a viewer path segment, or `null` if it is not an origin. */
 export function normalizeOrigin(value: string): string | null {
+  const decoded = decodeURIComponent(value);
+  if (isHostedId(decoded)) {
+    return decoded;
+  }
   try {
-    return toOrdinalOutpoint(decodeURIComponent(value));
+    return toOrdinalOutpoint(decoded);
   } catch {
     return null;
   }

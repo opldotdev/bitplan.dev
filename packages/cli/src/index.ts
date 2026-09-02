@@ -12,6 +12,7 @@ import {
 import { authCommand } from './commands/auth.js'
 import { configCommand } from './commands/config.js'
 import { fetchCommand } from './commands/fetch.js'
+import { inscribeCommand } from './commands/inscribe.js'
 import { listCommand } from './commands/list.js'
 import { uploadCommand } from './commands/upload.js'
 import { whoamiCommand } from './commands/whoami.js'
@@ -132,6 +133,10 @@ export function buildProgram(): Command {
 		.argument('<file>', 'HTML file path')
 		.option('--draft <origin>', 'Update a specific draft origin')
 		.option('--new', 'Always create a new draft')
+		.option(
+			'--hosted',
+			'Store the encrypted draft on bitplan.dev instead of the chain',
+		)
 		.option('--description <text>', 'Set a short description for the draft')
 		.option(
 			'--share-with <reader>',
@@ -157,11 +162,26 @@ export function buildProgram(): Command {
 		)
 		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
 		.option('--ordfs-url <url>', 'ORDFS gateway base URL')
+		.option('--site-url <url>', 'bitplan.dev origin for hosted drafts')
 		.option(
 			'--no-relay',
 			'Do not notify 1Sat for ORDFS capture after publishing',
 		)
 		.action(uploadCommand)
+
+	program
+		.command('inscribe')
+		.description('Put a hosted draft on the chain.')
+		.argument('<h_id|file>', 'Hosted draft id, local file, or viewer URL')
+		.option(
+			'--all-versions',
+			'Inscribe every hosted version in order, not only the latest',
+		)
+		.option('-y, --yes', 'Skip the confirmation prompt')
+		.option('--json', 'Print the inscribe result as JSON (requires --yes)')
+		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
+		.option('--site-url <url>', 'bitplan.dev origin for hosted drafts')
+		.action(inscribeCommand)
 
 	program
 		.command('list')
@@ -181,6 +201,7 @@ export function buildProgram(): Command {
 		.option('--version <n>', 'Fetch a specific version (default: latest)')
 		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
 		.option('--ordfs-url <url>', 'ORDFS gateway base URL')
+		.option('--site-url <url>', 'bitplan.dev origin for hosted drafts')
 		.action(fetchCommand)
 
 	return program

@@ -21,7 +21,11 @@ const FLAGS = [
   {
     command: "upload <file>",
     flags:
-      "--draft <origin>, --new, --description <text>, --share-with <identity-key|contact|team>, --private, --link, --no-relay, -y, --json, --allow-finding <id>",
+      "--draft <origin>, --new, --description <text>, --share-with <identity-key|contact|team>, --private, --link, --hosted, --no-relay, -y, --json, --allow-finding <id>",
+  },
+  {
+    command: "inscribe <h_id|file>",
+    flags: "--all-versions, --wallet-url <url>, --site-url <url>, -y, --json",
   },
   {
     command: "list",
@@ -100,6 +104,11 @@ export default function CommandsPage() {
       <p>
         <code>--link</code>: Add a reader link anyone can open; kept on later
         versions until --private.
+      </p>
+      <p>
+        <code>--hosted</code> stores the sealed envelope on bitplan.dev instead
+        of the chain. <code>bitplan inscribe &lt;h_id|file&gt;</code> publishes
+        it on chain; <code>--all-versions</code> replays the whole history.
       </p>
       <p>
         <code>--share-with</code> accepts a public identity key, contact, or

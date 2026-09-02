@@ -118,6 +118,37 @@ describe('state store', () => {
 		expect(() => readDrafts(draftsFile)).toThrow(/sharedWith/)
 	})
 
+	test('round-trips a hosted draft id and secret', () => {
+		const hosted = {
+			...RECORD,
+			origin: `h_${'A'.repeat(20)}`,
+			latestOutpoint: `h_${'A'.repeat(20)}`,
+			hostedSecret: 'ab'.repeat(32),
+		}
+		saveDraftRecord('/plans/hosted.html', hosted, draftsFile)
+		expect(findDraftByFile('/plans/hosted.html', draftsFile)).toEqual(hosted)
+		expect(findDraftByOrigin(hosted.origin, draftsFile)?.filePath).toBe(
+			'/plans/hosted.html',
+		)
+	})
+
+	test('rejects an invalid hostedSecret', () => {
+		fs.writeFileSync(
+			draftsFile,
+			JSON.stringify({
+				files: {
+					'/plans/hosted.html': {
+						...RECORD,
+						origin: `h_${'A'.repeat(20)}`,
+						latestOutpoint: `h_${'A'.repeat(20)}`,
+						hostedSecret: 'not-64-hex',
+					},
+				},
+			}),
+		)
+		expect(() => readDrafts(draftsFile)).toThrow(/hostedSecret/)
+	})
+
 	test('finds a draft by origin, whichever file wrote it', () => {
 		saveDraftRecord('/plans/one.html', RECORD, draftsFile)
 		const found = findDraftByOrigin(RECORD.origin, draftsFile)

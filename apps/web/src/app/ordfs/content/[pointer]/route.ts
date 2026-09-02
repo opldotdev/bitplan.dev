@@ -1,5 +1,11 @@
 import { jsonApiError } from "@/lib/api-error";
 import { parseEnvelope } from "@/lib/envelope";
+import {
+  HostedUnavailableError,
+  readHostedRecord,
+  readHostedVersion,
+} from "@/lib/hosted";
+import { isHostedId } from "@/lib/hosted-id";
 import { toOrdinalOutpoint } from "@/lib/outpoint";
 
 const BITPLAN_CONTENT_TYPE = "application/x-bitplan";
@@ -39,6 +45,13 @@ async function proxyContent(method: "GET" | "HEAD", context: RouteContext) {
       "Pointer must be txid_vout:seq.",
       "Example: /ordfs/content/<txid>_0:-1"
     );
+  }
+
+  const separator = pointer.lastIndexOf(":");
+  const origin = pointer.slice(0, separator);
+  const sequence = Number(pointer.slice(separator + 1));
+  if (isHostedId(origin)) {
+    return hostedContent(method, origin, sequence);
   }
 
   let upstream: Response;
@@ -128,6 +141,86 @@ async function proxyContent(method: "GET" | "HEAD", context: RouteContext) {
   });
 }
 
+async function hostedContent(
+  method: "GET" | "HEAD",
+  id: string,
+  seq: number
+): Promise<Response> {
+  let record: Awaited<ReturnType<typeof readHostedRecord>>;
+  try {
+    record = await readHostedRecord(id);
+  } catch (error) {
+    if (error instanceof HostedUnavailableError) {
+      return jsonApiError(
+        503,
+        "storage-unavailable",
+        "Hosted draft storage is unavailable.",
+        "Retry shortly."
+      );
+    }
+    throw error;
+  }
+  if (!record) {
+    return jsonApiError(
+      404,
+      "not-found",
+      "No BitPlan inscription at that pointer.",
+      "Confirm the origin outpoint and sequence."
+    );
+  }
+  if (record.origin) {
+    return Response.json({ origin: record.origin }, { status: 410 });
+  }
+
+  let hosted: Awaited<ReturnType<typeof readHostedVersion>>;
+  try {
+    hosted = await readHostedVersion(id, seq);
+  } catch (error) {
+    if (error instanceof HostedUnavailableError) {
+      return jsonApiError(
+        503,
+        "storage-unavailable",
+        "Hosted draft storage is unavailable.",
+        "Retry shortly."
+      );
+    }
+    throw error;
+  }
+  if (!hosted) {
+    return jsonApiError(
+      404,
+      "not-found",
+      "No BitPlan inscription at that pointer.",
+      "Confirm the origin outpoint and sequence."
+    );
+  }
+
+  const headers = new Headers(SAFE_RESPONSE_HEADERS);
+  headers.set("x-ord-seq", String(hosted.version - 1));
+  headers.set("x-outpoint", id);
+  headers.set("x-origin", id);
+  headers.set("content-length", String(hosted.bytes.byteLength));
+  if (method === "HEAD") {
+    return new Response(null, { headers, status: 200 });
+  }
+
+  try {
+    parseEnvelope(hosted.bytes);
+  } catch {
+    return jsonApiError(
+      502,
+      "invalid-envelope",
+      "Bytes at that pointer are not a BitPlan envelope.",
+      "Confirm the origin is a bitplan draft."
+    );
+  }
+
+  return new Response(Uint8Array.from(hosted.bytes).buffer, {
+    headers,
+    status: 200,
+  });
+}
+
 function parsePointer(value: string): string | null {
   const separator = value.lastIndexOf(":");
   if (separator < 1) {
@@ -141,15 +234,19 @@ function parsePointer(value: string): string | null {
   if (!Number.isSafeInteger(sequence)) {
     return null;
   }
+  const origin = value.slice(0, separator);
+  if (isHostedId(origin)) {
+    return `${origin}:${sequence}`;
+  }
   try {
-    return `${toOrdinalOutpoint(value.slice(0, separator))}:${sequence}`;
+    return `${toOrdinalOutpoint(origin)}:${sequence}`;
   } catch {
     return null;
   }
 }
 
 function ordfsGateway(): string {
-  const configured = process.env.NEXT_PUBLIC_ORDFS_GATEWAY_URL?.trim();
+  const configured = process.env.NEXT_PUBLIC_ORDFS_GATEWAY_URL;
   if (!configured) {
     return DEFAULT_ORDFS_GATEWAY;
   }

@@ -169,6 +169,20 @@ describe('formatDraftsTable', () => {
 		expect(table).not.toContain('2026-08-29T16:00:00.000Z')
 	})
 
+	test('hosted drafts are labeled in the human list', () => {
+		const hosted: ListedDraft = {
+			...DRAFT,
+			origin: `h_${'A'.repeat(20)}`,
+			outpoint: `h_${'A'.repeat(20)}`,
+			hosted: true,
+		}
+		expect(formatDraftsTable([hosted], { now: NOW })).toContain(
+			'(hosted, not on chain)',
+		)
+		expect(formatDraftsVerbose([hosted])).toContain('(hosted, not on chain)')
+		expect(JSON.stringify([hosted])).toContain('"hosted":true')
+	})
+
 	test('untitled drafts and missing versions still make a row', () => {
 		const table = formatDraftsTable(
 			[

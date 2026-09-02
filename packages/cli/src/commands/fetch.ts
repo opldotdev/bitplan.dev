@@ -12,6 +12,7 @@ export interface FetchOptions {
 	version?: string
 	walletUrl?: string
 	ordfsUrl?: string
+	siteUrl?: string
 }
 
 /**
@@ -43,6 +44,7 @@ export async function fetchCommand(
 
 	const content = await fetchLatest(origin, {
 		baseUrl: options.ordfsUrl,
+		siteUrl: options.siteUrl,
 		seq,
 	})
 

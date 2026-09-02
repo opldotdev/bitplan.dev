@@ -28,6 +28,7 @@ import { type DraftsWallet, walletOwnsDraft } from "@/lib/drafts";
 import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
 import { EnvelopeAccessError, openEnvelope } from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
+import { isHostedId } from "@/lib/hosted-id";
 import { linkWallet, parseLinkFragment } from "@/lib/link-reader";
 import {
   fetchOrdfsContent,
@@ -253,7 +254,7 @@ async function reopenDraft(
   if (!opened.plaintext) {
     return { canPublish: false, issue: opened.issue, plaintext: null };
   }
-  if (!hasListOutputs(wallet)) {
+  if (!hasListOutputs(wallet) || isHostedId(draft.origin)) {
     return { canPublish: false, issue: null, plaintext: opened.plaintext };
   }
   const canPublish = await canPublishDraft(wallet, draft);
@@ -289,6 +290,9 @@ async function canPublishDraft(
   wallet: DraftsWallet,
   draft: LoadedDraft
 ): Promise<boolean> {
+  if (isHostedId(draft.origin)) {
+    return false;
+  }
   try {
     return await walletOwnsDraft(wallet, draft.origin, draft.latestOutpoint);
   } catch {
@@ -548,12 +552,21 @@ export function DraftViewer() {
   );
 }
 
-function ViewerHeader() {
+function ViewerHeader({ origin }: { origin?: string }) {
   return (
     <header className="mx-auto flex w-full max-w-[42rem] items-center justify-between px-6 py-6">
       <Wordmark />
+      {origin && isHostedId(origin) ? <HostedLabel /> : null}
       <ThemeToggle />
     </header>
+  );
+}
+
+function HostedLabel() {
+  return (
+    <p className="text-muted-foreground text-xs">
+      Hosted by bitplan.dev, not on chain
+    </p>
   );
 }
 
@@ -613,7 +626,7 @@ function DraftProblemView({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <ViewerHeader />
+      <ViewerHeader origin={problem.origin} />
       <main className="mx-auto flex w-full max-w-[42rem] flex-1 flex-col justify-center px-6 py-10">
         <Card>
           <CardHeader>
@@ -671,7 +684,7 @@ function EncryptedView({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <ViewerHeader />
+      <ViewerHeader origin={origin} />
       <main className="mx-auto flex w-full max-w-[42rem] flex-1 flex-col justify-center px-6 py-10">
         <Card>
           <CardHeader className="items-center text-center">
@@ -723,8 +736,9 @@ function EncryptedView({
                 </p>
               ) : null}
               <p className="text-center text-muted-foreground text-sm">
-                Only an authorized wallet can read it. bitplan.dev stores no
-                draft or plaintext server-side.
+                {isHostedId(origin)
+                  ? "Only an authorized wallet or reader link can open it. bitplan.dev stores the encrypted draft and cannot read it."
+                  : "Only an authorized wallet can read it. bitplan.dev stores no draft or plaintext server-side."}
               </p>
             </div>
           </CardContent>
@@ -758,6 +772,7 @@ function DecryptedView({
     <div className="flex min-h-dvh flex-col">
       <header className="flex shrink-0 items-center gap-3 border-border border-b px-4 py-2">
         <Wordmark />
+        {isHostedId(origin) ? <HostedLabel /> : null}
         <div className="flex flex-wrap gap-1">
           {versions.map((version) => (
             <VersionPill

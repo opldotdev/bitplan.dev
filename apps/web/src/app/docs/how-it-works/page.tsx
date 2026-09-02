@@ -180,6 +180,17 @@ export default function HowItWorksPage() {
           readers, but no transaction can revoke access to an older inscription.
         </p>
       </section>
+      <section id="hosted-drafts">
+        <h2>Hosted drafts</h2>
+        <p>
+          A hosted draft uses the same envelope as an on-chain draft.
+          bitplan.dev stores that ciphertext instead of writing it to the chain.
+          You still need a wallet for the keys, but you do not need BSV.{" "}
+          <code>bitplan inscribe</code> puts the draft on chain, and the hosted
+          link redirects to that origin forever. bitplan.dev sees only
+          ciphertext.
+        </p>
+      </section>
       <section id="reader-links">
         <h2>Reader links</h2>
         <p>
