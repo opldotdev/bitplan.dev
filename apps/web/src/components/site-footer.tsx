@@ -10,6 +10,9 @@ export function SiteFooter() {
         <Link className="hover:text-foreground" href="/about">
           About
         </Link>
+        <Link className="hover:text-foreground" href="/compare">
+          Compare
+        </Link>
         <Link className="hover:text-foreground" href="/privacy">
           Privacy
         </Link>

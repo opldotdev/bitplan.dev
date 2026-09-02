@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { COMPETITORS } from "@/lib/competitors";
 import { SITE_URL } from "@/lib/site";
 
 const PUBLIC_PATHS = [
@@ -11,6 +12,8 @@ const PUBLIC_PATHS = [
   "/docs/commands",
   "/docs/envelope",
   "/sponsors",
+  "/compare",
+  ...COMPETITORS.map((competitor) => `/compare/${competitor.slug}`),
   "/about",
   "/privacy",
   "/contact",
