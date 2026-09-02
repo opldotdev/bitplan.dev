@@ -3,25 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BitPlan: agent keys, link readers, hosted drafts</title>
-  <meta name="description" content="Design for agents that use the human's wallet, headless agent identities on Secure Enclave, reader links without a wallet, and hosted drafts that can be inscribed later.">
+  <title>BitPlan: one envelope, links, hosted drafts</title>
+  <meta name="description" content="Plain-English plan for one bitplan envelope, reader links without a wallet, hosted drafts that can be inscribed later, and what a plan is allowed to do in the browser.">
   <style>
     :root {
       color-scheme: light dark;
       --bg: #fbfaf7; --fg: #1a1a1a; --muted: #5f5b53; --line: #ddd8cf;
-      --card: #ffffff; --accent: #b5471f; --soft: #f1ede4; --ok: #2c6e49; --warn: #8a5a00;
+      --card: #ffffff; --accent: #b5471f; --soft: #f1ede4;
       font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       line-height: 1.6;
     }
     @media (prefers-color-scheme: dark) {
-      :root { --bg: #121110; --fg: #ece8df; --muted: #a39d92; --line: #2c2a26; --card: #1b1a17; --accent: #e8825a; --soft: #1f1d19; --ok: #7fc59a; --warn: #e0b45a; }
+      :root { --bg: #121110; --fg: #ece8df; --muted: #a39d92; --line: #2c2a26; --card: #1b1a17; --accent: #e8825a; --soft: #1f1d19; }
     }
-    body { margin: 0 auto; max-width: 880px; padding: 48px 24px 96px; background: var(--bg); color: var(--fg); }
+    body { margin: 0 auto; max-width: 820px; padding: 48px 24px 96px; background: var(--bg); color: var(--fg); }
     h1, h2, h3 { line-height: 1.2; letter-spacing: -0.02em; }
-    h1 { font-size: clamp(2rem, 6vw, 3.6rem); margin: 0 0 .5rem; letter-spacing: -0.04em; }
+    h1 { font-size: clamp(2rem, 6vw, 3.4rem); margin: 0 0 .5rem; letter-spacing: -0.04em; }
     h2 { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); }
     h3 { margin: 1.6rem 0 .4rem; }
-    p, li { max-width: 72ch; }
+    p, li { max-width: 68ch; }
     .eyebrow { font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
     .lede { font-size: 1.15rem; color: var(--muted); }
     code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
@@ -33,28 +33,12 @@
     th { font-weight: 600; }
     thead th { border-bottom: 2px solid var(--line); }
     .wrap { overflow-x: auto; }
-    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin: 1rem 0; }
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
-    .card h4 { margin: 0 0 .3rem; font-size: 1rem; }
-    .card p { margin: 0; font-size: .92rem; color: var(--muted); }
-    .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 1rem 0; }
-    .flow .step { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: .92rem; position: relative; }
-    .flow .step b { display: block; margin-bottom: .2rem; }
-    .flow .step + .step::before { content: "→"; position: absolute; left: -12px; top: 12px; color: var(--muted); }
-    .tag { display: inline-block; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: .15em .5em; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-right: .4em; }
-    .tag.now { color: var(--accent); border-color: var(--accent); }
+    .step { border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 16px 18px; margin: 1rem 0; }
+    .step h3 { margin: 0 0 .4rem; }
+    .step .meta { font-size: .85rem; color: var(--muted); margin: 0 0 .6rem; }
+    .step p:last-child { margin-bottom: 0; }
     .box { border-left: 4px solid var(--accent); background: var(--soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 1rem 0; }
-    .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 1rem 0; }
-    @media (max-width: 640px) { .keys { grid-template-columns: 1fr; } }
-    .key { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: var(--card); }
-    .key h4 { margin: 0 0 .5rem; }
-    .key ul { margin: 0; padding-left: 1.1rem; font-size: .92rem; }
     .muted { color: var(--muted); }
-    .dod { font-size: .9rem; color: var(--muted); margin: .2rem 0 0; }
-    .changes { font-size: .92rem; }
-    .changes li { margin: .25rem 0; }
-
-    /* Questionnaire */
     .q { border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 14px 16px; margin: 1rem 0; }
     .q h3 { margin: 0 0 .3rem; }
     .q .why { margin: 0 0 .6rem; font-size: .92rem; color: var(--muted); }
@@ -70,233 +54,175 @@
     .response pre { margin-top: 12px; user-select: all; -webkit-user-select: all; white-space: pre-wrap; }
     .response .hint { font-size: .88rem; color: var(--muted); margin: 6px 0 0; }
     .ans { display: none; }
-    body:has(#q1-human:checked) .ans-q1-human { display: inline; }
-    body:has(#q1-agent:checked) .ans-q1-agent { display: inline; }
+    body:has(#q1-yes:checked) .ans-q1-yes { display: inline; }
+    body:has(#q1-keep:checked) .ans-q1-keep { display: inline; }
     body:has(#q1-unsure:checked) .ans-q1-unsure { display: inline; }
-    body:has(#q2-device:checked) .ans-q2-device { display: inline; }
-    body:has(#q2-session:checked) .ans-q2-session { display: inline; }
+    body:has(#q2-yes:checked) .ans-q2-yes { display: inline; }
+    body:has(#q2-no:checked) .ans-q2-no { display: inline; }
     body:has(#q2-unsure:checked) .ans-q2-unsure { display: inline; }
-    body:has(#q3-v3:checked) .ans-q3-v3 { display: inline; }
-    body:has(#q3-v2ext:checked) .ans-q3-v2ext { display: inline; }
-    body:has(#q3-none:checked) .ans-q3-none { display: inline; }
+    body:has(#q3-token:checked) .ans-q3-token { display: inline; }
+    body:has(#q3-wallet:checked) .ans-q3-wallet { display: inline; }
+    body:has(#q3-no:checked) .ans-q3-no { display: inline; }
     body:has(#q3-unsure:checked) .ans-q3-unsure { display: inline; }
-    body:has(#q4-wallet:checked) .ans-q4-wallet { display: inline; }
-    body:has(#q4-nowallet:checked) .ans-q4-nowallet { display: inline; }
+    body:has(#q4-all:checked) .ans-q4-all { display: inline; }
+    body:has(#q4-latest:checked) .ans-q4-latest { display: inline; }
     body:has(#q4-unsure:checked) .ans-q4-unsure { display: inline; }
-    body:has(#q5-latest:checked) .ans-q5-latest { display: inline; }
-    body:has(#q5-replay:checked) .ans-q5-replay { display: inline; }
+    body:has(#q5-on:checked) .ans-q5-on { display: inline; }
+    body:has(#q5-off:checked) .ans-q5-off { display: inline; }
     body:has(#q5-unsure:checked) .ans-q5-unsure { display: inline; }
+    body:has(#q6-2mb:checked) .ans-q6-2mb { display: inline; }
     body:has(#q6-keep:checked) .ans-q6-keep { display: inline; }
-    body:has(#q6-allow:checked) .ans-q6-allow { display: inline; }
     body:has(#q6-unsure:checked) .ans-q6-unsure { display: inline; }
-    body:has(#q7-skill:checked) .ans-q7-skill { display: inline; }
+    body:has(#q7-envelope:checked) .ans-q7-envelope { display: inline; }
+    body:has(#q7-links:checked) .ans-q7-links { display: inline; }
     body:has(#q7-hosted:checked) .ans-q7-hosted { display: inline; }
-    body:has(#q7-link:checked) .ans-q7-link { display: inline; }
+    body:has(#q7-skill:checked) .ans-q7-skill { display: inline; }
     body:has(#q7-unsure:checked) .ans-q7-unsure { display: inline; }
   </style>
 </head>
 <body>
-  <p class="eyebrow">BitPlan · design and sequence · draft 3 · 2026-09-02</p>
-  <h1>Agent keys, link readers, hosted drafts</h1>
-  <p class="lede">Agents use the human's wallet. Headless agents get their own. Readers get a link. Plans can start on our server and end on the chain. Concrete steps first.</p>
+  <p class="eyebrow">BitPlan · draft 4 · 2026-09-02</p>
+  <h1>One envelope, links, hosted drafts</h1>
+  <p class="lede">Four small steps that let anyone use BitPlan, with or without Bitcoin, and a clear answer to what a plan is allowed to do in the browser. Everything the previous drafts added that we do not need is gone.</p>
 
-  <h3>What changed since draft 2</h3>
-  <ul class="changes">
-    <li>Agents no longer get their own identity by default. A person driving an agent uses that person's wallet. Separate agent identities are for headless, orchestrated runs only.</li>
-    <li>Delegation by coin transfer is dropped as an agent mechanism. Transfer stays as a handoff to another human.</li>
-    <li>BRC-116 is explained where it is used.</li>
-    <li>Hosted drafts are a likely go and gain a no-wallet mode option. The unstable-origin consequence of inscribing later is spelled out.</li>
-    <li>The agent daemon builds on the existing <code>1sat serve</code> and <code>@1sat/wallet-node</code> rather than a new program.</li>
-    <li>The skill package is modelled on here.now's, which has been polished over 114 commits.</li>
-    <li>Sequence reordered: the three steps that need no wallet work come first.</li>
+  <h2>Where we landed</h2>
+  <ul>
+    <li><b>Agents use your wallet.</b> When you are driving an agent, it publishes as you. No second key, nothing to fund, nothing to lose. A separate agent identity is only for jobs that run with nobody present, and that is a later item.</li>
+    <li><b>One envelope.</b> There were two encrypted formats, one for private plans and one for shared plans. A private plan is just a shared plan with one reader, so the private format goes away. It is called the bitplan envelope. No version numbers in its name.</li>
+    <li><b>Links need no new format.</b> A reader link is a throwaway key. Its public half is a normal reader entry in the envelope. Its private half rides in the link. The bytes on chain look exactly like a plan shared with one more person.</li>
+    <li><b>Hosted drafts are a go.</b> The same encrypted envelope stored by bitplan.dev instead of the chain, so people with no Bitcoin can use BitPlan. Moving a hosted draft to the chain is called <code>inscribe</code>.</li>
+    <li><b>Handing a plan to another person</b> already works with <code>1sat ordinals send</code>. No BitPlan command needed.</li>
+    <li><b>Cut for now:</b> Secure Enclave policies, a headless wallet daemon, signed version lists, a wallet-signed account system, a new viewer route, plugin manifests for four editors. Each has a Linear issue if it comes back.</li>
   </ul>
 
-  <div class="grid">
-    <div class="card"><h4>Keep</h4><p>External BRC-100 wallet, no keys in BitPlan, no cleartext mode, one origin per plan, coin holder publishes, reader keys decrypt.</p></div>
-    <div class="card"><h4>Add</h4><p>A skill package, a link slot in the envelope, hosted drafts with <code>inscribe</code>, a vault policy for headless agents, and transfer to another person.</p></div>
-    <div class="card"><h4>Do not add</h4><p>Any path that copies a seed into an agent. Any server that can read a plan. A second identity for a person who is already at the keyboard.</p></div>
+  <h2>The four steps</h2>
+
+  <div class="step">
+    <h3>1. One envelope</h3>
+    <p class="meta">CLI and viewer · about two days · no wallet changes</p>
+    <p>Stop writing the private format. Every new plan is the shared layout with the publisher as the only reader. Delete the private read path too. The three private plans that exist were never shared and can be republished. The version byte on the wire stays what it is, because changing it is work that buys nothing. Docs say "the bitplan envelope" and nothing else.</p>
+    <p><b>Done when:</b> the CLI has one encrypt path, the viewer has one decrypt path, and the envelope spec page describes one format.</p>
   </div>
 
-  <h2>1. Whose identity does an agent use?</h2>
-  <div class="keys">
-    <div class="key"><h4>Person at the keyboard</h4><ul>
-      <li>The agent calls the person's wallet: BSV Desktop or 1Sat Wallet on this machine, unlocked once with Touch ID or a password.</li>
-      <li>Plans are encrypted to the person's identity. Sharing means adding people, never adding an agent key.</li>
-      <li>The wallet's saved permissions for the <code>bitplan.dev</code> originator decide how often it prompts. Auto-lock is the safety knob.</li>
-      <li>Nothing to enroll, nothing to fund, nothing extra to lose.</li>
-    </ul></div>
-    <div class="key"><h4>Headless or orchestrated run</h4><ul>
-      <li>No person is present, so the run gets its own identity: a <code>@1sat/wallet-node</code> account behind <code>1sat serve</code>, root key vault-protected with the <code>device</code> policy on macOS.</li>
-      <li>Treated like a team member: plans are shared to it with <code>--share-with</code>, and it holds only the coins for plans it created.</li>
-      <li>Own tiny balance. Never the person's identity.</li>
-    </ul></div>
+  <div class="step">
+    <h3>2. Links for readers</h3>
+    <p class="meta">CLI and viewer · about two days · no envelope changes</p>
+    <p>Today a reader needs a wallet. Every competitor can hand someone a link. With <code>bitplan upload plan.html --link</code> the CLI makes a throwaway key pair, adds its public half as a reader, and prints a URL whose fragment holds the private half. The fragment never leaves the browser. The viewer sees the fragment, rebuilds the key, and decrypts the way any reader's wallet would, using the decrypt code already in the installed SDK.</p>
+    <p>Anyone with the link can read. The CLI says so when it prints one. To cut off a leaked link, publish the next version with <code>--private</code>. The link secret is random and unrelated to any wallet key, so a leaked link exposes the plan and nothing else. Links also work inside browsers that block wallets, such as the one in the Claude desktop app.</p>
+    <p><b>Done when:</b> a plan opens in a private browser window from the link alone, the same link opens the next version, and one test opens a CLI-written link envelope in the web implementation.</p>
   </div>
-  <p>This removes the enrol, fund, delegate, and reclaim ceremony from the normal path. It also removes the failure mode where plans end up in an agent's wallet and get lost. The envelope does not change in either case.</p>
 
-  <h3>Transfer to another person</h3>
-  <p><code>bitplan transfer &lt;origin&gt; --to &lt;contact&gt;</code> sends the 1-sat plan coin to another identity without reinscribing. Origin and type tags stay, per BRC-147. Ownership of future versions changes hands. The previous owner keeps read access to every version already published, because those envelopes already hold their reader slot. This is a handoff, not a delegation, and it is a clear one.</p>
+  <div class="step">
+    <h3>3. Hosted drafts and inscribe</h3>
+    <p class="meta">Web and CLI · about a week · needs step 2 for the no-wallet case</p>
+    <p><code>bitplan upload plan.html --hosted</code> stores the encrypted envelope on bitplan.dev and prints a link. Updating it is the same command again. The server holds ciphertext and a per-draft secret the CLI keeps in its local drafts map, the same idea postplan uses. No accounts, no sign-in, no wallet needed to publish or read when combined with a reader link. When a wallet is present, the plan is also encrypted to it, so it can be inscribed later.</p>
+    <p><code>bitplan inscribe h_xxxx</code> puts the draft on the chain. Hosted versions are not transactions, so the on-chain origin does not exist until this moment. The hosted link must redirect to the chain forever after, and inscribe should offer to replay every hosted version so history and version numbers match what people saw.</p>
+    <p>What this reuses: the storage helper already used for sponsor images, and the content proxy the viewer already reads from, which learns to serve <code>h_</code> ids. The viewer does not change except for a badge that says "not on chain".</p>
+    <p><b>Done when:</b> a machine with no wallet and no BSV publishes a plan and shares a link that opens; the same plan is inscribed later and the old link still resolves.</p>
+  </div>
 
-  <h3>Why the per-use prompt is a wallet setting, and what BRC-116 is</h3>
-  <p><b>BRC-116, "Wallet Permissions and Counterparty Trust"</b>, is the normative spec for how a BRC-100 wallet handles application permissions: how an app is identified by its originator domain, how grants are requested, persisted as encrypted permission tokens, renewed, and revoked, and how security levels 0, 1, and 2 decide whether a prompt is per app or per counterparty. It is why BSV Desktop can remember that <code>bitplan.dev</code> may use the <code>[2, "bitplan"]</code> protocol and stop asking.</p>
-  <p>It also carries a security note: the wallet, browser, and operating system are expected to confirm that an originator is authentic. BSV Desktop 2.8.3 and the 1Sat desktop wallet read a caller-supplied <code>Originator</code> header for native callers, so any local process can claim <code>bitplan.dev</code> and inherit its saved grants. That is the upstream issue drafted in <code>docs/bsv-desktop-origin-authentication-issue-draft.md</code>. Until wallets authenticate native callers, saved grants on the person's wallet are convenient but not a security boundary. Auto-lock is.</p>
+  <div class="step">
+    <h3>4. Skill package</h3>
+    <p class="meta">New repo · one day · no code changes</p>
+    <p>One <code>SKILL.md</code> installable with <code>npx skills add opldotdev/bitplan-skill</code>, laid out like the 1sat CLI skill. It lists the phrases an agent hears ("publish this plan", "share this with X", "put this on chain"), tells the agent to read <code>bitplan.dev/llms.txt</code> first and trust live CLI output over the skill text, wraps the CLI's <code>--json</code> mode, and spells out three rules: a wallet must be unlocked, a plan an agent reads enters its context, and no tool ever returns key material. Other editors get their manifests when someone asks.</p>
+  </div>
 
-  <h2>2. The Secure Enclave question, for headless agents</h2>
-  <ol>
-    <li><b>The Enclave never signs for Bitcoin.</b> It holds P-256 keys only. The secp256k1 identity key is decrypted into process memory before it signs or derives a shared secret. The Enclave protects the key at rest and binds it to this device. A copied vault directory is useless elsewhere.</li>
-    <li><b>Touch ID is currently a software gate.</b> <code>@1sat/wallet-mac</code> creates the key with <code>SecureEnclave.P256.KeyAgreement.PrivateKey()</code> and no <code>SecAccessControl</code> flags. The prompt is an <code>LAContext</code> check in the Swift helper. So "no fingerprint for headless agents" is a policy switch, and "fingerprint really required for owners" needs hardware flags that are not set yet.</li>
-    <li><b>Presence belongs at unseal, not per use.</b> The desktop wallet already works that way: one Touch ID at unlock, then the root key stays in the Bun process. A headless agent is the same shape with the unlock step made optional.</li>
-  </ol>
+  <h2>Three questions answered</h2>
+
+  <h3>What is the 512 KB limit?</h3>
+  <p>A number we copied from postplan. It is not a Bitcoin limit. Publishing costs about one satoshi per kilobyte, so a 5 MB plan would cost a few thousand satoshis, still cents. The real ceilings are the content proxy, which refuses envelopes over 640 KB, and how large a single transaction the relay accepts, which we have not tested past this size. Raising the limit means changing two constants and publishing one big test plan.</p>
+
+  <h3>Why are scripts off, and what do others do?</h3>
   <div class="wrap"><table>
-    <thead><tr><th>Policy</th><th>Enclave key flags</th><th>Prompt</th><th>Use</th></thead>
+    <thead><tr><th></th><th>Scripts</th><th>Network from the page</th></tr></thead>
     <tbody>
-      <tr><td><code>biometry</code></td><td><code>privateKeyUsage</code> + <code>biometryCurrentSet</code>, accessible when unlocked, this device only</td><td>Touch ID on every unseal, enforced by hardware.</td><td>Owner root keys. Funds.</td></tr>
-      <tr><td><code>session</code></td><td><code>privateKeyUsage</code>, accessible when unlocked, this device only</td><td>Touch ID once when the daemon starts, then none. Software policy.</td><td>Headless agents someone starts by hand.</td></tr>
-      <tr><td><code>device</code></td><td>Same as <code>session</code></td><td>None while the Mac session is unlocked.</td><td>Orchestrated agents that must survive reboots.</td></tr>
+      <tr><th>here.now</th><td>Yes, full websites</td><td>Yes, including proxied API calls</td></tr>
+      <tr><th>Claude Artifacts</th><td>Yes, can even call Claude</td><td>Yes</td></tr>
+      <tr><th>ChatGPT Sites</th><td>Yes, full apps with a database</td><td>Yes</td></tr>
+      <tr><th>postplan</th><td>No</td><td>No</td></tr>
+      <tr><th>BitPlan today</th><td>No</td><td>Images from any host, which is a leak</td></tr>
     </tbody>
   </table></div>
-  <div class="box"><b>What <code>device</code> does not protect against.</b> Any process running as the logged-in user can ask the helper to unwrap the key. The protection is scope: the headless identity holds cents and its own plans, and is never the person's identity.</div>
-
-  <h2>3. Readers without a wallet: the link slot</h2>
-  <p>Every product on the compare page can hand a reader a link. We cannot. Today's viewer also cannot reach a wallet from inside some embedded browsers at all, including the one in the Claude desktop app, which blocks every request to localhost. A link slot decrypts from the URL fragment inside the page, with no wallet call, so it works there too.</p>
-  <pre><code>{
-  "v": 3,
-  "key": {
-    "mode": "brc2-multi",
-    "protocolID": [2, "bitplan"],
-    "keyID": "&lt;per-draft UUID&gt;",
-    "payloadLength": 1282,
-    "senderIdentityKey": "&lt;compressed public key&gt;",
-    "slots": [
-      { "kind": "identity", "identityKey": "&lt;sender&gt;", "offset": 1282, "length": 80 },
-      { "kind": "link", "kdf": "hkdf-sha256", "offset": 1362, "length": 60 }
-    ]
-  }
-}
-
-wrapKey  = HKDF-SHA256(ikm = fragmentSecret, salt = keyID, info = "bitplan-link-v1", 32 bytes)
-slotBody = SymmetricKey(wrapKey).encrypt(documentKey)
-URL      = https://bitplan.dev/d/&lt;origin&gt;#k=&lt;base64url(fragmentSecret)&gt;</code></pre>
+  <p>We are the odd one out with postplan, and for the same reason: a plan is a file someone else wrote, rendered inside our site. The worry is a poison plan. Someone shares a plan with you, you open it, and it does something to you.</p>
+  <p>What a poison plan could actually do, and what stops it:</p>
   <ul>
-    <li>Envelope version byte <code>0x03</code>. Readers reject unknown versions, which is what we want for a slot they cannot parse. v1 and v2 readers are untouched.</li>
-    <li>The 32-byte secret comes from the OS CSPRNG, is printed once, and is stored in <code>~/.bitplan/drafts.json</code> so the next version keeps the same link. <code>--private</code> drops it. Rotating a leaked link is one publish.</li>
-    <li>The viewer reads <code>location.hash</code>, derives the wrap key in the browser, and never puts the secret in a request, cookie, or storage. The header hash binding covers the new slot.</li>
-    <li>A link reader is anyone with the link. The CLI says so when it prints one. Identity slots remain the choice for named readers.</li>
+    <li><b>Phone home.</b> Report that you opened it, when, from where, and anything you typed into it. Stopped by denying the page all network access. Today an image tag can already do this, because we allow images from any host. That needs fixing whether scripts stay off or not.</li>
+    <li><b>Fake a wallet prompt.</b> Draw a convincing "enter your seed" box. Nothing technical stops a picture of a box. The defence is that the real wallet never asks inside the plan, and the viewer says so around the frame.</li>
+    <li><b>Reach the wallet or the site.</b> Stopped already. The plan runs in a frame with no identity of its own, so it cannot see bitplan.dev cookies, storage, or the wallet connection.</li>
+    <li><b>Open windows or navigate you away.</b> Stopped already by the frame's sandbox.</li>
+  </ul>
+  <p>So the choice is not "scripts or safety". It is whether to allow scripts with the network shut. A page that can compute but cannot talk gives plans copy buttons, choices that build a reply, live tables, and small tools, and a poison plan still has nowhere to send anything. The way to do it is one policy line injected into every rendered plan and a matching rule at upload: no external images, no external anything. Two things to test first: that copy to clipboard works from inside a sandboxed frame, and that the injected policy holds in Safari as well as Chrome.</p>
+
+  <h3>Do reader links expose key material?</h3>
+  <p>No. The link secret is a fresh random key made for that plan. It is not derived from any wallet, and nothing about a wallet can be derived from it. A link holder gets the plan and nothing else.</p>
+
+  <h2>Later, with issues already filed</h2>
+  <ul>
+    <li><b>Headless agents</b> that run with nobody present get their own wallet identity. The Secure Enclave part is small: the key already has no hardware lock, so "no fingerprint" is skipping one call. OPL-4324 and OPL-4325.</li>
+    <li><b>Billing</b> for hosted drafts, only if they see use. OPL-4330.</li>
+    <li><b>Clearer errors</b> when a publish is interrupted or two publishes race. OPL-4333.</li>
   </ul>
 
-  <h2>4. Hosted drafts and <code>inscribe</code></h2>
-  <p>Same envelope, stored by bitplan.dev instead of the chain, moved to the chain with <code>bitplan inscribe</code>. This opens BitPlan to people with no BSV, which is most people, so it is a likely go.</p>
-  <pre><code>bitplan upload plan.html --hosted       # ciphertext stored by bitplan.dev, id h_xxxx
-bitplan upload plan.html                # same file again: new hosted version
-bitplan inscribe h_xxxx                 # goes on chain; h_xxxx redirects to /d/&lt;origin&gt;</code></pre>
-  <ul>
-    <li>Writes are BRC-100 signed requests. The identity key is the account. No email, no password.</li>
-    <li>Blobs are content-addressed by SHA-256 of the envelope. Each version hash is signed by the publisher and verified by the viewer, so the server cannot substitute a version.</li>
-    <li><code>If-Match</code> on the current version hash gives the conflict safety the chain gives for free.</li>
-    <li>A hosted draft leaks less than a chain draft: the reader list in the header is visible only to our server.</li>
-  </ul>
-  <div class="box"><b>The origin is not stable until inscribe.</b> Hosted versions are not transactions. There are no inputs, so there is no txid and no outpoint until <code>inscribe</code> runs, and the origin minted then cannot be predicted from the hosted id. Consequences: the hosted URL must keep working as a redirect forever, anything that recorded <code>h_xxxx</code> (a PR description, a drafts map, a share) must resolve through us, and the version numbers people saw while hosted must line up with what lands on chain. Question 5 below decides whether inscribe writes only the latest version or replays every hosted version as a reinscription chain so history lands too.</div>
-
-  <h3>No-wallet mode</h3>
-  <p>Hosted plus the link slot makes a mode with no wallet at all possible: the CLI generates the document key and the link secret locally, wraps the key with the link slot only, and authenticates to the server with a publisher token it stores in <code>~/.bitplan</code>. Nothing on the machine holds a Bitcoin key. Anyone can run <code>npx bitplan upload plan.html</code> and get a private link in one command, exactly like postplan and here.now, except the server sees ciphertext. When a wallet appears later, the next version adds an identity slot and the draft can be inscribed. Question 4 asks whether to build this.</p>
-
-  <h2>5. Agent skill package</h2>
-  <p>here.now's skill is the model. What they got right after 114 commits, and what we copy:</p>
-  <ul>
-    <li>Frontmatter <code>description</code> that lists the trigger phrases an agent will hear: "publish this", "share this plan", "make this private", "who can read this". Ours add "put this on chain", "give X access", "read the plan".</li>
-    <li>A skill version line and a "read the current docs first" rule pointing at a machine-readable source. We already serve <code>/llms.txt</code> and <code>/openapi.json</code>; the skill points there and says to trust live CLI output over local text.</li>
-    <li>One layout published to several hosts: <code>skills/bitplan/SKILL.md</code>, a Hermes path, <code>.codex-plugin</code> and <code>.cursor-plugin</code> manifests, plus a well-known endpoint at <code>https://bitplan.dev/.well-known/skills/bitplan</code>.</li>
-    <li>Helper scripts as thin wrappers over the public interface, with an explicit "if the scripts are missing, call the interface directly" section. Ours wrap <code>npx bitplan ... --json</code>.</li>
-    <li>Stale-base guidance written for the agent: what a conflict looks like and what to offer the user. Ours is the spent-coin error.</li>
-    <li>What we add that they do not need: the wallet requirement, the plaintext boundary once an agent reads a plan, and the rule that no tool returns or accepts key material.</li>
-  </ul>
-
-  <h2>6. Sequence</h2>
-  <p>Ordered by how little each step depends on anything else. The first three need no wallet changes.</p>
-
-  <h3><span class="tag now">Step 1</span> Skill package <span class="muted">· bitplan repo · one day</span></h3>
-  <p>Repository <code>opldotdev/bitplan-skill</code> laid out like here.now's, installable with <code>npx skills add opldotdev/bitplan-skill --skill bitplan -g</code>, with the well-known endpoint served by bitplan.dev.</p>
-  <p class="dod">Done when: a fresh Claude Code, Codex, or Cursor session with the skill installed can list, read, and publish a plan through the CLI with the wallet unlocked, and correctly refuses to return key material.</p>
-
-  <h3><span class="tag now">Step 2</span> Link slot <span class="muted">· bitplan CLI and viewer · three days</span></h3>
-  <p>Envelope v3, <code>--link</code> on upload, fragment handling in the viewer, compat test opening CLI-produced v3 envelopes in the web implementation.</p>
-  <p class="dod">Done when: a plan opens in a private window and in the Claude desktop embedded browser from the link alone, the same URL opens the next version, and <code>--private</code> makes it stop working.</p>
-
-  <h3><span class="tag now">Step 3</span> Hosted drafts and inscribe <span class="muted">· web and CLI · a week</span></h3>
-  <p>Signed-request auth, content-addressed blobs, signed version list, <code>/h/&lt;id&gt;</code> route with a visible "not on chain" badge, <code>inscribe</code>, permanent redirect after inscribe. No-wallet mode if question 4 says yes. Free tier, no billing.</p>
-  <p class="dod">Done when: a machine with no wallet and no BSV publishes a plan and shares a link that opens; the same plan is inscribed later and the old link still resolves.</p>
-
-  <h3><span class="tag">Step 4</span> Vault access policy <span class="muted">· 1sat-sdk · about a day</span></h3>
-  <p><code>access: 'biometry' | 'session' | 'device'</code> on <code>protectSecret</code>. Hardware flags for <code>biometry</code>. Skip the <code>LAContext</code> check for <code>device</code>.</p>
-
-  <h3><span class="tag">Step 5</span> Headless wallet mode in <code>1sat serve</code> <span class="muted">· 1sat-sdk · two to three days</span></h3>
-  <p><code>1sat serve</code> already wraps the same <code>createNodeWallet</code> instance the CLI uses and exposes storage RPC. Add a mode that serves the BRC-100 JSON API the way BSV Desktop does on 3321, on a second loopback port, with the originator fixed to the calling tool and only wallet methods exposed. Root key vault-protected with the policy from step 4.</p>
-  <p class="dod">Done when: <code>bitplan auth --wallet-url http://127.0.0.1:3322</code> succeeds with nobody at the keyboard and the daemon survives logout and login.</p>
-
-  <h3><span class="tag">Step 6</span> Transfer to another person <span class="muted">· bitplan CLI · one day</span></h3>
-  <p><code>bitplan transfer &lt;origin&gt; --to &lt;contact&gt;</code>. Coin moves, origin stays, previous owner keeps read access to existing versions.</p>
-
-  <h3><span class="tag">Step 7</span> Billing and terms</h3>
-  <p>Only if hosted drafts see use. Card via Stripe or BSV via the sponsor payment path, about $5 a month. Needs an entity, terms, and a privacy policy covering stored ciphertext.</p>
-
-  <h2>7. Decisions needed</h2>
-  <p>Pick one answer per question. Each option says what happens if you choose it. The response block at the end updates as you choose; copy it and paste it back to the agent.</p>
+  <h2>Decisions</h2>
+  <p>Pick one answer per question. Each option says what it means. The block at the end fills in as you choose. Copy it and paste it back to the agent.</p>
 
   <div class="q">
-    <h3>Identity for an agent with a person at the keyboard</h3>
-    <p class="why">Decides whether normal use ever needs a second key.</p>
-    <label class="opt"><input type="radio" name="q1" id="q1-human"><span><b>The person's wallet <span class="rec">Recommended</span></b><small>No extra keys, no enrolment, nothing to fund. Prompts are governed by the wallet's saved permissions and auto-lock. Plans never end up in an agent's wallet.</small></span></label>
-    <label class="opt"><input type="radio" name="q1" id="q1-agent"><span><b>Always a separate agent identity</b><small>Every share needs two keys per person. Plans the agent created live in its wallet and can be lost. Full isolation of the person's key from anything the agent does.</small></span></label>
-    <label class="opt"><input type="radio" name="q1" id="q1-unsure"><span><b>Unsure</b><small>Default to the person's wallet. Separate identities remain available for headless runs.</small></span></label>
+    <h3>1. Retire the private envelope</h3>
+    <p class="why">One format instead of two.</p>
+    <label class="opt"><input type="radio" name="q1" id="q1-yes"><span><b>Yes, delete it <span class="rec">Recommended</span></b><small>Less code, one spec. The three existing private plans stop opening in the viewer until republished. About 100 bytes more per plan.</small></span></label>
+    <label class="opt"><input type="radio" name="q1" id="q1-keep"><span><b>Stop writing it, keep reading it</b><small>Old plans keep opening. Two read paths stay in the code forever.</small></span></label>
+    <label class="opt"><input type="radio" name="q1" id="q1-unsure"><span><b>Unsure</b><small>Default to delete.</small></span></label>
   </div>
 
   <div class="q">
-    <h3>Vault policy for headless agent keys</h3>
-    <p class="why">Only applies to orchestrated runs with no person present.</p>
-    <label class="opt"><input type="radio" name="q2" id="q2-device"><span><b>Device, no prompt <span class="rec">Recommended</span></b><small>Survives reboots and restarts unattended. Any same-user process can use the key while the Mac is unlocked. Scope is the protection.</small></span></label>
-    <label class="opt"><input type="radio" name="q2" id="q2-session"><span><b>Session, one Touch ID at daemon start</b><small>You know when an agent came up. A reboot or crash stops it until someone touches the sensor.</small></span></label>
-    <label class="opt"><input type="radio" name="q2" id="q2-unsure"><span><b>Unsure</b><small>Build both, default to device, decide after a week of use.</small></span></label>
+    <h3>2. Reader links</h3>
+    <p class="why">A throwaway key in the link. No envelope change.</p>
+    <label class="opt"><input type="radio" name="q2" id="q2-yes"><span><b>Build it <span class="rec">Recommended</span></b><small>Readers need no wallet. Anyone with the link can read until the next version drops it.</small></span></label>
+    <label class="opt"><input type="radio" name="q2" id="q2-no"><span><b>Do not build it</b><small>Readers keep needing a wallet. Hosted drafts then require a wallet on both ends.</small></span></label>
+    <label class="opt"><input type="radio" name="q2" id="q2-unsure"><span><b>Unsure</b><small>Default to build.</small></span></label>
   </div>
 
   <div class="q">
-    <h3>Reader links without a wallet</h3>
-    <p class="why">Anyone with the link can read. The fragment secret never reaches a server.</p>
-    <label class="opt"><input type="radio" name="q3" id="q3-v3"><span><b>Envelope v3 with a link slot <span class="rec">Recommended</span></b><small>Old readers fail closed on the new version byte. One more version to support. Named readers stay on identity slots.</small></span></label>
-    <label class="opt"><input type="radio" name="q3" id="q3-v2ext"><span><b>Extend v2 with an optional slot kind</b><small>No version bump, but old readers may misparse a slot with no identity key instead of rejecting it.</small></span></label>
-    <label class="opt"><input type="radio" name="q3" id="q3-none"><span><b>No link slot</b><small>Readers keep needing a wallet. No-wallet mode becomes impossible. The largest gap on the compare page stays open.</small></span></label>
-    <label class="opt"><input type="radio" name="q3" id="q3-unsure"><span><b>Unsure</b><small>Default to v3.</small></span></label>
+    <h3>3. Hosted drafts</h3>
+    <p class="why">Who can publish a hosted draft, and how the server knows it is them.</p>
+    <label class="opt"><input type="radio" name="q3" id="q3-token"><span><b>Per-draft secret, no wallet required <span class="rec">Recommended</span></b><small>Anyone with Node can publish a private link in one command. Lose the secret and you cannot update that draft, though the link still reads. No accounts to build.</small></span></label>
+    <label class="opt"><input type="radio" name="q3" id="q3-wallet"><span><b>Wallet required, no BSV required</b><small>Every write is signed by a wallet identity. Simpler trust story, but people still install and unlock a wallet, which is most of today's friction.</small></span></label>
+    <label class="opt"><input type="radio" name="q3" id="q3-no"><span><b>No hosted drafts</b><small>Chain only. People without BSV stay out.</small></span></label>
+    <label class="opt"><input type="radio" name="q3" id="q3-unsure"><span><b>Unsure</b><small>Default to the per-draft secret.</small></span></label>
   </div>
 
   <div class="q">
-    <h3>Hosted drafts: wallet required, or no-wallet mode too</h3>
-    <p class="why">Hosted drafts are a likely go. This decides how far they open the door.</p>
-    <label class="opt"><input type="radio" name="q4" id="q4-nowallet"><span><b>Build no-wallet mode <span class="rec">Recommended</span></b><small>Anyone can publish a private link in one command with nothing installed but Node. Publisher auth is a local token, not a signature, until a wallet is added. A lost token means a lost ability to update, though the link still reads. Depends on the link slot.</small></span></label>
-    <label class="opt"><input type="radio" name="q4" id="q4-wallet"><span><b>Wallet required, no BSV required</b><small>Simpler server, every write is signed. Users still install and unlock a wallet, which is most of today's friction.</small></span></label>
-    <label class="opt"><input type="radio" name="q4" id="q4-unsure"><span><b>Unsure</b><small>Build wallet-required first, add no-wallet mode once the link slot exists.</small></span></label>
+    <h3>4. What inscribe writes to the chain</h3>
+    <p class="why">Hosted versions have no transactions, so history exists only on our server until this runs.</p>
+    <label class="opt"><input type="radio" name="q4" id="q4-all"><span><b>Every hosted version <span class="rec">Recommended</span></b><small>Full history lands on chain and version numbers match. One transaction per version, cents each.</small></span></label>
+    <label class="opt"><input type="radio" name="q4" id="q4-latest"><span><b>Latest only</b><small>One transaction. The on-chain plan starts at version 1 while the hosted history said version 7.</small></span></label>
+    <label class="opt"><input type="radio" name="q4" id="q4-unsure"><span><b>Unsure</b><small>Default to every version, with a flag for latest only.</small></span></label>
   </div>
 
   <div class="q">
-    <h3>What inscribe writes to the chain</h3>
-    <p class="why">Hosted versions have no transactions, so history exists only on our server until inscribe.</p>
-    <label class="opt"><input type="radio" name="q5" id="q5-replay"><span><b>Replay every hosted version as a reinscription chain <span class="rec">Recommended</span></b><small>Full history lands on chain and version numbers match what people saw. Costs one transaction per version, about a cent each. Slower for long histories.</small></span></label>
-    <label class="opt"><input type="radio" name="q5" id="q5-latest"><span><b>Latest version only</b><small>One transaction. Earlier versions stay hosted only, and the on-chain plan starts at version 1 while the hosted history said version 7.</small></span></label>
-    <label class="opt"><input type="radio" name="q5" id="q5-unsure"><span><b>Unsure</b><small>Default to replay, with a flag for latest-only.</small></span></label>
+    <h3>5. Scripts inside plans</h3>
+    <p class="why">Rich plans versus poison plans. Either way, external images get blocked.</p>
+    <label class="opt"><input type="radio" name="q5" id="q5-on"><span><b>Scripts on, network off <span class="rec">Recommended</span></b><small>Copy buttons, choices, live tables, small tools. A poison plan can compute but cannot send anything anywhere. Needs the two tests named above before it ships.</small></span></label>
+    <label class="opt"><input type="radio" name="q5" id="q5-off"><span><b>Keep scripts off</b><small>Plans stay CSS-only. Questionnaires copy by select and paste. Smallest surface, same as postplan.</small></span></label>
+    <label class="opt"><input type="radio" name="q5" id="q5-unsure"><span><b>Unsure</b><small>Block external images now. Decide scripts after the two tests.</small></span></label>
   </div>
 
   <div class="q">
-    <h3>Scripts inside the plan viewer</h3>
-    <p class="why">The viewer iframe has sandbox with no allow-scripts. Buttons like the copy button below only work when the raw file is opened directly.</p>
-    <label class="opt"><input type="radio" name="q6" id="q6-keep"><span><b>Keep scripts off <span class="rec">Recommended</span></b><small>Plans stay CSS-only. Questionnaires copy by select-and-paste.</small></span></label>
-    <label class="opt"><input type="radio" name="q6" id="q6-allow"><span><b>Allow scripts in the sandbox</b><small>Copy buttons work. The iframe keeps an opaque origin and the page CSP still blocks network, but every plan author gets a script runtime and the review surface grows.</small></span></label>
-    <label class="opt"><input type="radio" name="q6" id="q6-unsure"><span><b>Unsure</b><small>Keep scripts off and revisit when a plan really needs one.</small></span></label>
+    <h3>6. Size limit</h3>
+    <p class="why">512 KB is postplan's number, not Bitcoin's.</p>
+    <label class="opt"><input type="radio" name="q6" id="q6-2mb"><span><b>Raise to 2 MB <span class="rec">Recommended</span></b><small>Room for images and fonts inlined in the plan. Two constants and one big test publish to confirm the relay accepts it.</small></span></label>
+    <label class="opt"><input type="radio" name="q6" id="q6-keep"><span><b>Keep 512 KB</b><small>Nothing to test. Plans stay text-sized.</small></span></label>
+    <label class="opt"><input type="radio" name="q6" id="q6-unsure"><span><b>Unsure</b><small>Keep 512 KB until a real plan hits it.</small></span></label>
   </div>
 
   <div class="q">
-    <h3>First thing to build</h3>
-    <p class="why">All three need no wallet changes. Pick the one to start this week.</p>
-    <label class="opt"><input type="radio" name="q7" id="q7-skill"><span><b>Skill package <span class="rec">Recommended</span></b><small>One day, immediately useful with the current CLI, and it is how here.now got adopted. Does not change what users can do yet.</small></span></label>
-    <label class="opt"><input type="radio" name="q7" id="q7-link"><span><b>Link slot</b><small>Three days. Fixes reading in embedded browsers and unblocks no-wallet mode. Touches the envelope, so it needs the compat test suite.</small></span></label>
-    <label class="opt"><input type="radio" name="q7" id="q7-hosted"><span><b>Hosted drafts</b><small>A week. Biggest reach, but without the link slot it still needs a wallet on both ends.</small></span></label>
-    <label class="opt"><input type="radio" name="q7" id="q7-unsure"><span><b>Unsure</b><small>Skill package first, link slot second, hosted third.</small></span></label>
+    <h3>7. Start with</h3>
+    <p class="why">All four steps need no wallet work. Pick the one for this week.</p>
+    <label class="opt"><input type="radio" name="q7" id="q7-envelope"><span><b>One envelope <span class="rec">Recommended</span></b><small>Deletion first. Everything after it touches less code.</small></span></label>
+    <label class="opt"><input type="radio" name="q7" id="q7-links"><span><b>Reader links</b><small>The most visible gap closes first. Slightly more code to touch while two formats still exist.</small></span></label>
+    <label class="opt"><input type="radio" name="q7" id="q7-hosted"><span><b>Hosted drafts</b><small>Biggest reach, longest step, and without links it still needs a wallet on both ends.</small></span></label>
+    <label class="opt"><input type="radio" name="q7" id="q7-skill"><span><b>Skill package</b><small>One day and useful today, but it changes nothing users can do yet.</small></span></label>
+    <label class="opt"><input type="radio" name="q7" id="q7-unsure"><span><b>Unsure</b><small>Envelope, links, hosted, skill, in that order.</small></span></label>
   </div>
 
   <div class="q">
@@ -309,18 +235,18 @@ bitplan inscribe h_xxxx                 # goes on chain; h_xxxx redirects to /d/
     <button class="btn" type="button" id="copy">Copy my decisions</button>
     <p class="hint">If the button does nothing, scripts are off in this viewer. Click inside the block below to select it all, then copy.</p>
     <pre id="out">=== BITPLAN RESPONSE ===
-Plan: Agent keys, link readers, hosted drafts (draft 3)
+Plan: One envelope, links, hosted drafts (draft 4)
 Origin: 556c3a37caa7fd26945864692b417c2ef60b2a5cb0da7a5428cb7a07d64779af_0
-Identity for an agent with a person at the keyboard: <span class="ans ans-q1-human">The person's wallet</span><span class="ans ans-q1-agent">Always a separate agent identity</span><span class="ans ans-q1-unsure">Unsure</span>
-Vault policy for headless agent keys: <span class="ans ans-q2-device">Device, no prompt</span><span class="ans ans-q2-session">Session, one Touch ID at daemon start</span><span class="ans ans-q2-unsure">Unsure</span>
-Reader links without a wallet: <span class="ans ans-q3-v3">Envelope v3 with a link slot</span><span class="ans ans-q3-v2ext">Extend v2 with an optional slot kind</span><span class="ans ans-q3-none">No link slot</span><span class="ans ans-q3-unsure">Unsure</span>
-Hosted drafts: <span class="ans ans-q4-nowallet">Build no-wallet mode</span><span class="ans ans-q4-wallet">Wallet required, no BSV required</span><span class="ans ans-q4-unsure">Unsure</span>
-What inscribe writes: <span class="ans ans-q5-replay">Replay every hosted version</span><span class="ans ans-q5-latest">Latest version only</span><span class="ans ans-q5-unsure">Unsure</span>
-Scripts inside the plan viewer: <span class="ans ans-q6-keep">Keep scripts off</span><span class="ans ans-q6-allow">Allow scripts in the sandbox</span><span class="ans ans-q6-unsure">Unsure</span>
-First thing to build: <span class="ans ans-q7-skill">Skill package</span><span class="ans ans-q7-link">Link slot</span><span class="ans ans-q7-hosted">Hosted drafts</span><span class="ans ans-q7-unsure">Unsure</span></pre>
+1. Retire the private envelope: <span class="ans ans-q1-yes">Yes, delete it</span><span class="ans ans-q1-keep">Stop writing it, keep reading it</span><span class="ans ans-q1-unsure">Unsure</span>
+2. Reader links: <span class="ans ans-q2-yes">Build it</span><span class="ans ans-q2-no">Do not build it</span><span class="ans ans-q2-unsure">Unsure</span>
+3. Hosted drafts: <span class="ans ans-q3-token">Per-draft secret, no wallet required</span><span class="ans ans-q3-wallet">Wallet required, no BSV required</span><span class="ans ans-q3-no">No hosted drafts</span><span class="ans ans-q3-unsure">Unsure</span>
+4. Inscribe writes: <span class="ans ans-q4-all">Every hosted version</span><span class="ans ans-q4-latest">Latest only</span><span class="ans ans-q4-unsure">Unsure</span>
+5. Scripts inside plans: <span class="ans ans-q5-on">Scripts on, network off</span><span class="ans ans-q5-off">Keep scripts off</span><span class="ans ans-q5-unsure">Unsure</span>
+6. Size limit: <span class="ans ans-q6-2mb">Raise to 2 MB</span><span class="ans ans-q6-keep">Keep 512 KB</span><span class="ans ans-q6-unsure">Unsure</span>
+7. Start with: <span class="ans ans-q7-envelope">One envelope</span><span class="ans ans-q7-links">Reader links</span><span class="ans ans-q7-hosted">Hosted drafts</span><span class="ans ans-q7-skill">Skill package</span><span class="ans ans-q7-unsure">Unsure</span></pre>
   </div>
 
-  <p class="muted" style="margin-top:3rem">This plan describes work that has not been built. Steps 1 to 3 need no wallet changes and open BitPlan to people without BSV. Steps 4 and 5 serve headless agents. Steps 6 and 7 depend on demand.</p>
+  <p class="muted" style="margin-top:3rem">This plan describes work that has not been built. It replaces drafts 1 to 3 at the same origin.</p>
   <script>
     (function () {
       var btn = document.getElementById('copy');
