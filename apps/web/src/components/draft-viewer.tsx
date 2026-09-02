@@ -43,11 +43,13 @@ import {
 import {
   connectBrowserWallet,
   getConnectedWallet,
+  isWalletAvailable,
   reconnectAuthenticatedWallet,
 } from "@/lib/wallet";
 
 type WalletIssue =
   | "connect-failed"
+  | "wallet-unreachable"
   | "decrypt-refused"
   | "identity-unavailable"
   | "not-authorized";
@@ -240,6 +242,8 @@ function walletIssueMessage(issue: WalletIssue): string {
   switch (issue) {
     case "connect-failed":
       return "Could not connect to or authorize a BRC-100 wallet.";
+    case "wallet-unreachable":
+      return "No wallet answered. This browser may block pages from reaching wallets on this machine, which the embedded browser in some desktop apps does. Open this link in a regular browser with your BRC-100 wallet running.";
     case "not-authorized":
       return "This wallet identity is not authorized for this version.";
     case "identity-unavailable":
@@ -383,7 +387,12 @@ export function DraftViewer() {
     } catch {
       setView((current) =>
         current.requestKey === requestKey && current.phase === "encrypted"
-          ? { ...current, walletIssue: "connect-failed" }
+          ? {
+              ...current,
+              walletIssue: isWalletAvailable()
+                ? "connect-failed"
+                : "wallet-unreachable",
+            }
           : current
       );
       setBusy(false);
@@ -573,11 +582,13 @@ function EncryptedView({
   const versionLabel = isLatest
     ? `v${currentVersion} · latest`
     : `v${currentVersion} of ${latestVersion}`;
-  const needsConnect = walletIssue === null || walletIssue === "connect-failed";
+  const connectFailed =
+    walletIssue === "connect-failed" || walletIssue === "wallet-unreachable";
+  const needsConnect = walletIssue === null || connectFailed;
   let connectLabel = "Connect wallet";
   if (busy) {
     connectLabel = "Connecting…";
-  } else if (walletIssue === "connect-failed") {
+  } else if (connectFailed) {
     connectLabel = "Try again";
   }
 
