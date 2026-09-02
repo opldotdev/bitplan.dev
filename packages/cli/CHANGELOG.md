@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.15
 
 ### Added
 
@@ -14,6 +14,7 @@
 
 ### Changed
 
+- The plan size limit is 5 MB.
 - Every envelope the CLI writes or reads is the bitplan envelope (wire version
   `0x02`, header `v: 2`, key mode `brc2-multi`). A plan with no invited readers
   has one slot, the publisher's.
