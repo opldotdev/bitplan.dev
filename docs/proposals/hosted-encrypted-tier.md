@@ -84,11 +84,11 @@ the promise of the on-chain tier is never blurred.
 ```
 bitplan upload ./plan.html --hosted
 bitplan upload ./plan.html            # same file again, new hosted version
-bitplan promote h_abc123              # inscribe latest envelope, keep id as alias
+bitplan inscribe h_abc123             # inscribe latest envelope, keep id as alias
 ```
 
 `~/.bitplan/drafts.json` already maps file path to origin. Add hosted ids to
-the same map with a `kind` field. `promote` reads the latest hosted envelope,
+the same map with a `kind` field. `inscribe` reads the latest hosted envelope,
 inscribes it exactly as `upload` does today, and records the origin. The
 server keeps `h_abc123` as a redirect to `/d/<origin>`. Every plan can start
 hosted and end up permanent. That is the migration story and it makes the
@@ -116,7 +116,7 @@ Proposal, to be argued with:
 | Tier | Price | Included |
 | --- | --- | --- |
 | Free | $0 | 5 hosted drafts, 10 versions each, 30-day retention on inactive drafts |
-| Plus | $5 a month or the BSV equivalent | Unlimited drafts and versions, no expiry, promote to chain included |
+| Plus | $5 a month or the BSV equivalent | Unlimited drafts and versions, no expiry, inscribe on chain included |
 | On chain | Network fee only | Unchanged |
 
 Payment options:
@@ -158,7 +158,7 @@ Worth doing, in this order:
    both tiers and is the biggest gap against every product on the compare
    page.
 2. Hosted storage with signed request auth, content-addressed blobs, signed
-   version lists, and `promote`. Free tier only at first, no billing.
+   version lists, and `inscribe`. Free tier only at first, no billing.
 3. Billing, terms, and privacy policy, once there is demand from step 2.
 
 Steps 1 and 2 are a few days each. Step 3 is mostly not engineering.
@@ -172,9 +172,8 @@ Steps 1 and 2 are a few days each. Step 3 is mostly not engineering.
   adopted by agent frameworks.
 - here.now: version history you can browse and restore. The viewer should
   list versions at an origin and open any of them.
-- postplan: `--description` on upload and shown in `list`. Cheap, useful.
-- postplan: `--new` to fork a draft instead of versioning it. Ours is
-  implicit today.
+- postplan: `--description` and `--new`. Correction: both already exist on
+  `bitplan upload`. Nothing to do.
 - ChatGPT Sites: private by default with an explicit widen-access step. We
   are already there. Their editor role is worth thinking about as a second
   coin holder, which is a sharing model the chain can express directly.

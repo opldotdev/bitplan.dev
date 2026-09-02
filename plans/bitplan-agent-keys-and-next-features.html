@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BitPlan: agent keys, link readers, hosted drafts</title>
+  <meta name="description" content="Design for unattended agent wallets on Secure Enclave, reader links without a wallet, and hosted drafts that can be inscribed later.">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #fbfaf7; --fg: #1a1a1a; --muted: #5f5b53; --line: #ddd8cf;
+      --card: #ffffff; --accent: #b5471f; --soft: #f1ede4; --ok: #2c6e49; --warn: #8a5a00;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #121110; --fg: #ece8df; --muted: #a39d92; --line: #2c2a26; --card: #1b1a17; --accent: #e8825a; --soft: #1f1d19; --ok: #7fc59a; --warn: #e0b45a; }
+    }
+    body { margin: 0 auto; max-width: 880px; padding: 48px 24px 96px; background: var(--bg); color: var(--fg); }
+    h1, h2, h3 { line-height: 1.2; letter-spacing: -0.02em; }
+    h1 { font-size: clamp(2rem, 6vw, 3.6rem); margin: 0 0 .5rem; letter-spacing: -0.04em; }
+    h2 { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+    h3 { margin: 1.6rem 0 .4rem; }
+    p, li { max-width: 72ch; }
+    .eyebrow { font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+    .lede { font-size: 1.15rem; color: var(--muted); }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+    code { background: var(--soft); padding: .1em .35em; border-radius: 4px; }
+    pre { background: var(--soft); padding: 14px 16px; border-radius: 8px; overflow-x: auto; border: 1px solid var(--line); }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .95rem; }
+    th, td { text-align: left; vertical-align: top; padding: .55rem .6rem; border-bottom: 1px solid var(--line); }
+    th { font-weight: 600; }
+    thead th { border-bottom: 2px solid var(--line); }
+    .wrap { overflow-x: auto; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin: 1rem 0; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+    .card h4 { margin: 0 0 .3rem; font-size: 1rem; }
+    .card p { margin: 0; font-size: .92rem; color: var(--muted); }
+    .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 1rem 0; }
+    .flow .step { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: .92rem; position: relative; }
+    .flow .step b { display: block; margin-bottom: .2rem; }
+    .flow .step + .step::before { content: "→"; position: absolute; left: -12px; top: 12px; color: var(--muted); }
+    .tag { display: inline-block; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: .15em .5em; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-right: .4em; }
+    .tag.ok { color: var(--ok); border-color: var(--ok); }
+    .tag.warn { color: var(--warn); border-color: var(--warn); }
+    .tag.now { color: var(--accent); border-color: var(--accent); }
+    .box { border-left: 4px solid var(--accent); background: var(--soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 1rem 0; }
+    details { border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; margin: .6rem 0; background: var(--card); }
+    summary { cursor: pointer; font-weight: 600; }
+    .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 1rem 0; }
+    @media (max-width: 640px) { .keys { grid-template-columns: 1fr; } }
+    .key { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: var(--card); }
+    .key h4 { margin: 0 0 .5rem; }
+    .key ul { margin: 0; padding-left: 1.1rem; font-size: .92rem; }
+    .muted { color: var(--muted); }
+    .dod { font-size: .9rem; color: var(--muted); margin: .2rem 0 0; }
+  </style>
+</head>
+<body>
+  <p class="eyebrow">BitPlan · design and sequence · 2026-09-02</p>
+  <h1>Agent keys, link readers, hosted drafts</h1>
+  <p class="lede">One design that lets a coding agent encrypt and publish without a person at the fingerprint reader, lets a reader open a plan without a wallet, and lets a plan start on our server and end on the chain. Concrete steps first.</p>
+
+  <div class="grid">
+    <div class="card"><h4>Keep</h4><p>External BRC-100 wallet, no keys in BitPlan, no cleartext mode, one origin per plan, coin holder publishes, reader keys decrypt.</p></div>
+    <div class="card"><h4>Add</h4><p>An agent identity with its own headless wallet, a vault access policy that needs no biometry, a link slot in the envelope, and a hosted draft that can be inscribed.</p></div>
+    <div class="card"><h4>Do not add</h4><p>Any path that copies the owner's seed into an agent. Any server that can read a plan. Any new verb we do not need.</p></div>
+  </div>
+
+  <h2>1. The Secure Enclave question</h2>
+  <p>The worry: keys should sit behind the Secure Enclave, but an agent runs while nobody is at the machine, so a Touch ID prompt per operation makes autonomy impossible.</p>
+  <p>Three facts settle this.</p>
+  <ol>
+    <li><b>The Enclave never signs for Bitcoin.</b> It only holds P-256 keys. Our secp256k1 identity key is always decrypted into process memory before it signs or derives a shared secret. The Enclave protects the key <em>at rest</em> and binds it to <em>this device</em>. That is the whole benefit, and it is a real one: a copied vault directory is useless on another machine.</li>
+    <li><b>Touch ID is currently a software gate, not a hardware one.</b> In <code>@1sat/wallet-mac</code> the key is created with <code>SecureEnclave.P256.KeyAgreement.PrivateKey()</code> and no <code>SecAccessControl</code> flags. The prompt comes from an <code>LAContext</code> check in the Swift helper before it touches the key. So "no fingerprint for agents" is a policy switch in code we own, and "fingerprint really required for owners" needs hardware flags we have not set yet.</li>
+    <li><b>Presence belongs at unseal, not per use.</b> The desktop wallet already works this way: one Touch ID at unlock, then the root key stays in the Bun process and serves BRC-100 calls. An agent wallet is the same shape with the unlock step made optional.</li>
+  </ol>
+
+  <h3>Vault access policies</h3>
+  <div class="wrap"><table>
+    <thead><tr><th>Policy</th><th>Enclave key flags</th><th>Prompt</th><th>Use</th></thead>
+    <tbody>
+      <tr><td><code>biometry</code></td><td><code>privateKeyUsage</code> + <code>biometryCurrentSet</code>, accessible when unlocked, this device only</td><td>Touch ID on every unseal, enforced by hardware. Enrolling a new finger invalidates the key.</td><td>Owner root keys. Funds.</td></tr>
+      <tr><td><code>device</code></td><td><code>privateKeyUsage</code> only, accessible when unlocked, this device only</td><td>None while the Mac session is unlocked.</td><td>Agent keys. Small allowance. Plan coins the owner delegated.</td></tr>
+      <tr><td><code>session</code></td><td>Same as <code>device</code></td><td>Touch ID once when the daemon starts, then none. A software policy on top of <code>device</code>.</td><td>Optional middle ground for people who want to know when an agent came up.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The policy is chosen per secret when it is protected and stored in the vault entry metadata. It cannot be loosened afterwards; loosening means creating a new key.</p>
+  <div class="box"><b>What <code>device</code> does not protect against.</b> Any process running as the logged-in user can ask the helper to unwrap an agent key. That is the trade for autonomy. The mitigation is not a prompt, it is scope: the agent key holds cents, holds only the plan coins it was delegated, and is never the owner's identity. If that scope is not acceptable for a given plan, do not delegate it.</div>
+
+  <h2>2. Two identities, one envelope</h2>
+  <div class="keys">
+    <div class="key"><h4>Owner identity</h4><ul>
+      <li>1Sat Wallet on desktop or phone. Touch ID or password at unlock.</li>
+      <li>Holds funds and, by default, every plan coin.</li>
+      <li>Always a reader slot in every envelope the agent publishes. The CLI refuses to publish otherwise.</li>
+      <li>Never exported. Never shared with an agent.</li>
+    </ul></div>
+    <div class="key"><h4>Agent identity</h4><ul>
+      <li>A separate headless BRC-100 wallet: <code>@1sat/wallet-node</code> plus <code>@1sat/vault</code> with the <code>device</code> policy on macOS.</li>
+      <li>Own identity key, own deposit address, own small balance.</li>
+      <li>Reads plans shared with it. Publishes only plans whose coin the owner delegated to it.</li>
+      <li>Serves BRC-100 on a second loopback port, or over the stdio bridge from the 1Sat CLI wallet plan.</li>
+    </ul></div>
+  </div>
+  <p>Nothing in the envelope changes for this. A shared envelope already wraps one document key per reader identity. The agent is one more reader. Publishing authority is already "whoever holds the coin". Delegation is a coin transfer.</p>
+
+  <h3>Delegation and revocation</h3>
+  <div class="flow">
+    <div class="step"><b>Enroll</b>Owner runs <code>bitplan contacts add agent &lt;key&gt;</code> and funds the agent address from the phone. One QR.</div>
+    <div class="step"><b>Share</b><code>bitplan upload plan.html --share-with agent</code>. Agent can now read.</div>
+    <div class="step"><b>Delegate</b><code>bitplan delegate &lt;origin&gt; --to agent</code>. Owner wallet sends the 1-sat plan coin to the agent identity. No reinscription, origin and type tags stay.</div>
+    <div class="step"><b>Work</b>Agent runs <code>bitplan upload plan.html</code> unattended. Its wallet encrypts, signs, pays, reinscribes. Owner slot is mandatory.</div>
+    <div class="step"><b>Reclaim</b><code>bitplan reclaim &lt;origin&gt;</code> tells the agent wallet to send the coin back. Or the owner forks to a new origin if the machine is gone.</div>
+  </div>
+  <p class="muted">Honest limit: if the agent machine is lost or compromised while it holds a plan coin, the owner cannot take that origin back. The owner can still read every version, and a fork costs one publish. Plans are cheap by design, so this is the accepted failure mode. Do not delegate coins for plans where the origin itself is the valuable thing.</p>
+
+  <h3>Why not owner-wallet auto-approval instead</h3>
+  <p>The alternative is to keep the coin in the owner wallet and let a paired agent reuse a saved permission to spend bitplan coins under a cap. That is the better long-term shape and it is what BRC-116 describes. It is blocked today: BSV Desktop and 1Sat Wallet accept a caller-supplied <code>Originator</code> header, so any local process can inherit a saved grant. Until wallets authenticate native callers, a separate agent identity with its own tiny balance is the honest design. When authenticated originators land, delegation can become a wallet grant instead of a coin transfer, and nothing in BitPlan's envelope or CLI surface has to change.</p>
+
+  <h2>3. Readers without a wallet: the link slot</h2>
+  <p>Every product on the compare page can hand a reader a link. We cannot. This is the largest usability gap and it needs no server.</p>
+  <p>Add a slot kind to the shared envelope whose wrap key comes from a secret carried in the URL fragment. Browsers never send the fragment to the server, so bitplan.dev, the chain, and ORDFS all see ciphertext only.</p>
+  <pre><code>{
+  "v": 3,
+  "key": {
+    "mode": "brc2-multi",
+    "protocolID": [2, "bitplan"],
+    "keyID": "&lt;per-draft UUID&gt;",
+    "payloadLength": 1282,
+    "senderIdentityKey": "&lt;compressed public key&gt;",
+    "slots": [
+      { "kind": "identity", "identityKey": "&lt;sender&gt;", "offset": 1282, "length": 80 },
+      { "kind": "link", "kdf": "hkdf-sha256", "offset": 1362, "length": 60 }
+    ]
+  }
+}
+
+wrapKey  = HKDF-SHA256(ikm = fragmentSecret, salt = keyID, info = "bitplan-link-v1", 32 bytes)
+slotBody = SymmetricKey(wrapKey).encrypt(documentKey)
+URL      = https://bitplan.dev/d/&lt;origin&gt;#k=&lt;base64url(fragmentSecret)&gt;</code></pre>
+  <ul>
+    <li>Bump the envelope version byte to <code>0x03</code>. Readers reject unknown versions today, which is exactly the behaviour we want for a slot they cannot parse. Existing v1 and v2 readers are untouched.</li>
+    <li>The fragment secret is 32 random bytes from the OS CSPRNG, generated by the CLI, printed once, and stored in <code>~/.bitplan/drafts.json</code> beside the origin so <code>bitplan upload</code> can keep the same link on the next version.</li>
+    <li><code>bitplan upload plan.html --link</code> adds the slot. <code>--private</code> already drops shared readers on the next version and will drop the link slot too. Rotating a leaked link is one publish.</li>
+    <li>The viewer reads <code>location.hash</code>, derives the wrap key in the browser, and never puts the secret in a request, a cookie, or storage. The header hash binding already covers the new slot, so a tampered slot list is rejected.</li>
+    <li>A link reader is anyone with the link. Say that plainly in the CLI output. Identity slots remain the choice for named readers.</li>
+  </ul>
+
+  <h2>4. Hosted drafts and <code>inscribe</code></h2>
+  <p>Same envelope, same wallet keys, different storage. The verb for moving a hosted draft to the chain is <code>inscribe</code>. "Promote" implied a hierarchy we do not want to explain. Inscribe is what actually happens.</p>
+  <pre><code>bitplan upload plan.html --hosted       # ciphertext stored by bitplan.dev, id h_xxxx
+bitplan upload plan.html                # same file again: new hosted version
+bitplan inscribe h_xxxx                 # latest envelope goes on chain; h_xxxx redirects to /d/&lt;origin&gt;</code></pre>
+  <ul>
+    <li>Writes are BRC-100 signed requests. The identity key is the account. No email, no password, no session.</li>
+    <li>Blobs are content-addressed by SHA-256 of the envelope. Each version hash is signed by the publisher, and the viewer verifies it, so the server cannot substitute a version.</li>
+    <li><code>If-Match</code> on the current version hash gives the same conflict safety the chain gives for free.</li>
+    <li>A hosted draft leaks less than a chain draft: the reader list in the header is visible only to our server. Say so on the pricing page.</li>
+    <li>Free tier first, no billing. Billing, terms, and a privacy policy are step five and mostly not engineering.</li>
+  </ul>
+
+  <h2>5. Sequence</h2>
+  <p>Ordered by how little they depend on anything else. Each step ships on its own and is useful on its own.</p>
+
+  <h3><span class="tag now">Step 1</span> Vault access policy <span class="muted">· 1sat-sdk · about a day</span></h3>
+  <p>Add <code>access: 'biometry' | 'device' | 'session'</code> to <code>protectSecret</code> in <code>@1sat/vault</code>. In <code>wallet-mac</code>, create <code>biometry</code> keys with real <code>SecAccessControl</code> flags and skip the <code>LAContext</code> check for <code>device</code>. Record the policy in the vault entry.</p>
+  <p class="dod">Done when: a <code>device</code> secret unwraps in a headless process with no prompt, a <code>biometry</code> secret refuses to unwrap without Touch ID even if the helper's software check is bypassed, and the vault CLI shows the policy of every entry.</p>
+
+  <h3><span class="tag now">Step 2</span> Agent wallet daemon <span class="muted">· 1sat-sdk · two to three days</span></h3>
+  <p><code>1sat agent start</code> creates or opens a <code>wallet-node</code> account whose root key is vault-protected with the <code>device</code> policy, prints its identity key and a deposit QR once, and serves BRC-100 on a second loopback port. Reuse the stdio bridge from the 1Sat CLI wallet plan if it exists by then. Originator is fixed to the calling tool, and only wallet methods are exposed.</p>
+  <p class="dod">Done when: <code>bitplan auth --wallet-url http://127.0.0.1:3322</code> succeeds with nobody at the keyboard, and the daemon survives a logout and login without a prompt.</p>
+
+  <h3><span class="tag now">Step 3</span> Delegate and reclaim <span class="muted">· bitplan CLI · two days</span></h3>
+  <p><code>bitplan delegate &lt;origin&gt; --to &lt;contact&gt;</code> transfers the plan coin without reinscribing. <code>bitplan reclaim &lt;origin&gt;</code> asks the wallet that holds it to send it back to the owner identity recorded in the draft map. The CLI adds the owner identity as a mandatory reader slot whenever the publishing wallet is not the owner, using an <code>owner</code> field in <code>drafts.json</code> and the address book.</p>
+  <p class="dod">Done when: an owner delegates a plan, an agent publishes two versions unattended, the owner reads both from the phone, and reclaim returns the coin.</p>
+
+  <h3><span class="tag">Step 4</span> Link slot <span class="muted">· bitplan CLI and viewer · three days</span></h3>
+  <p>Envelope v3 with the <code>link</code> slot kind, <code>--link</code> on upload, fragment handling in the viewer, and a compatibility test that opens CLI-produced v3 envelopes in the web implementation.</p>
+  <p class="dod">Done when: a plan opens in a private browser window from the link alone, the same URL still opens the next version, and <code>--private</code> makes it stop working.</p>
+
+  <h3><span class="tag">Step 5</span> Agent skill package <span class="muted">· half a day</span></h3>
+  <p>Publish a skill that <code>npx skills add opldotdev/bitplan</code> installs, wrapping the CLI's JSON mode. This is how here.now got adopted inside agent frameworks. Ours already has the JSON surface; it only lacks the package.</p>
+
+  <h3><span class="tag">Step 6</span> Hosted drafts and <code>inscribe</code> <span class="muted">· web and CLI · a week</span></h3>
+  <p>Signed-request auth, content-addressed blob storage, signed version lists, the <code>/h/&lt;id&gt;</code> viewer route with a visible "not on chain" badge, and <code>inscribe</code>. Free tier, no billing.</p>
+
+  <h3><span class="tag">Step 7</span> Billing and terms</h3>
+  <p>Only if step 6 sees use. Card via Stripe, or BSV via the sponsor payment path. Needs an entity, terms, and a privacy policy that covers stored ciphertext.</p>
+
+  <h2>6. Corrections to earlier notes</h2>
+  <ul>
+    <li><code>--description</code> and <code>--new</code> already exist on <code>bitplan upload</code>. They were listed as gaps in the hosted tier memo. They are not.</li>
+    <li>Concurrent-publish safety is already real: the second reinscription fails because the coin is spent. The only work is a clearer CLI error and a line in the docs.</li>
+  </ul>
+
+  <h2>7. Decisions needed</h2>
+  <details open><summary>Default vault policy for agent keys</summary><p>Recommended: <code>device</code>. <code>session</code> is available for people who want one prompt at daemon start. Neither is a hardware guarantee against a same-user process; scope is the guarantee.</p></details>
+  <details open><summary>Delegation by coin transfer now, wallet grant later</summary><p>Recommended: yes. It works with today's wallets and needs no envelope change. Revisit when 1Sat Wallet authenticates native originators.</p></details>
+  <details open><summary>Envelope v3 for the link slot</summary><p>Recommended: yes. A version bump is the safe way to make old readers fail closed on a slot they do not understand.</p></details>
+  <details open><summary>Verb for moving a hosted draft on chain</summary><p><code>inscribe</code>. Drop <code>promote</code>.</p></details>
+  <details><summary>Should the agent daemon be a 1Sat CLI feature or a BitPlan feature</summary><p>Recommended: 1Sat CLI. BitPlan stays a BRC-100 client. The daemon is useful to every 1Sat app, not only BitPlan.</p></details>
+
+  <p class="muted" style="margin-top:3rem">This plan describes work that has not been built. Steps 1 to 3 are the concrete path to an unattended agent. Steps 4 and 5 close the gaps the compare page exposed. Steps 6 and 7 are optional and depend on demand.</p>
+</body>
+</html>
