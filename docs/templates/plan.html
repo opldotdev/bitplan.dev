@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PLAN TITLE</title>
+  <meta name="description" content="One sentence a stranger understands.">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #fbfaf7; --fg: #1a1a1a; --muted: #5f5b53; --line: #ddd8cf;
+      --card: #ffffff; --accent: #b5471f; --soft: #f1ede4;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #121110; --fg: #ece8df; --muted: #a39d92; --line: #2c2a26; --card: #1b1a17; --accent: #e8825a; --soft: #1f1d19; }
+    }
+    body { margin: 0 auto; max-width: 820px; padding: 48px 24px 96px; background: var(--bg); color: var(--fg); }
+    h1, h2, h3 { line-height: 1.2; letter-spacing: -0.02em; }
+    h1 { font-size: clamp(2rem, 6vw, 3.4rem); margin: 0 0 .5rem; letter-spacing: -0.04em; }
+    h2 { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+    h3 { margin: 1.6rem 0 .4rem; }
+    p, li { max-width: 68ch; }
+    .eyebrow { font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+    .lede { font-size: 1.15rem; color: var(--muted); }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+    code { background: var(--soft); padding: .1em .35em; border-radius: 4px; }
+    pre { background: var(--soft); padding: 14px 16px; border-radius: 8px; overflow-x: auto; border: 1px solid var(--line); }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .95rem; }
+    th, td { text-align: left; vertical-align: top; padding: .55rem .6rem; border-bottom: 1px solid var(--line); }
+    thead th { border-bottom: 2px solid var(--line); }
+    .wrap { overflow-x: auto; }
+    .step, .q { border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 16px 18px; margin: 1rem 0; }
+    .step h3, .q h3 { margin: 0 0 .4rem; }
+    .meta, .why { font-size: .88rem; color: var(--muted); margin: 0 0 .6rem; }
+    .box { border-left: 4px solid var(--accent); background: var(--soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 1rem 0; }
+    .muted { color: var(--muted); }
+
+    /* Decisions. Each option is a radio inside a label. */
+    .opt { display: grid; grid-template-columns: 1.4rem 1fr; gap: 8px; align-items: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; cursor: pointer; }
+    .opt:has(input:checked) { border-color: var(--accent); background: var(--soft); }
+    .opt input { margin-top: .3rem; }
+    .opt b { display: block; }
+    .opt small { display: block; color: var(--muted); font-size: .88rem; }
+    .rec { color: var(--accent); font-weight: 700; }
+    .notes { width: 100%; min-height: 80px; margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font: inherit; font-size: .92rem; resize: vertical; box-sizing: border-box; }
+
+    /* Response block. Fills in from the radios with CSS alone, so it works with scripts off. */
+    .response { margin-top: 1.5rem; }
+    .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; border: 0; font: inherit; }
+    .response pre { margin-top: 12px; user-select: all; -webkit-user-select: all; white-space: pre-wrap; }
+    .hint { font-size: .88rem; color: var(--muted); margin: 6px 0 0; }
+    .ans { display: none; }
+    /* One rule per option: body:has(#q1-a:checked) .ans-q1-a { display: inline; } */
+    body:has(#q1-a:checked) .ans-q1-a { display: inline; }
+    body:has(#q1-b:checked) .ans-q1-b { display: inline; }
+    body:has(#q1-unsure:checked) .ans-q1-unsure { display: inline; }
+    body:has(#q2-a:checked) .ans-q2-a { display: inline; }
+    body:has(#q2-b:checked) .ans-q2-b { display: inline; }
+    body:has(#q2-unsure:checked) .ans-q2-unsure { display: inline; }
+  </style>
+</head>
+<body>
+  <p class="eyebrow">PRODUCT · draft 1 · 2026-01-01</p>
+  <h1>PLAN TITLE</h1>
+  <p class="lede">What this plan proposes, in one or two sentences a stranger understands.</p>
+
+  <h2>What changed since the last draft</h2>
+  <ul>
+    <li>Delete this section on draft 1. On later drafts, one line per change, and say why.</li>
+  </ul>
+
+  <h2>Where we landed</h2>
+  <ul>
+    <li><b>Decision already made.</b> One sentence on what it means in practice.</li>
+  </ul>
+
+  <h2>The steps</h2>
+  <div class="step">
+    <h3>1. Step name</h3>
+    <p class="meta">Where the work happens · rough size · what it depends on</p>
+    <p>What gets built and why, in plain words. Name what it deliberately does not do.</p>
+    <p><b>Done when:</b> a concrete check someone can run.</p>
+  </div>
+
+  <h2>Questions answered</h2>
+  <h3>A question the reader asked</h3>
+  <p>Answer it directly. Explain a protocol or acronym the first time it appears.</p>
+
+  <h2>Later</h2>
+  <ul>
+    <li><b>Deferred item</b> and the issue that tracks it.</li>
+  </ul>
+
+  <h2>Decisions</h2>
+  <p>Pick one answer per question. Each option says what it means. The block at the end fills in as you choose. Copy it and paste it back to the agent.</p>
+
+  <div class="q">
+    <h3>1. Short question</h3>
+    <p class="why">One line on why this matters.</p>
+    <label class="opt"><input type="radio" name="q1" id="q1-a"><span><b>Option A <span class="rec">Recommended</span></b><small>What happens if you choose this.</small></span></label>
+    <label class="opt"><input type="radio" name="q1" id="q1-b"><span><b>Option B</b><small>What happens if you choose this.</small></span></label>
+    <label class="opt"><input type="radio" name="q1" id="q1-unsure"><span><b>Unsure</b><small>What the agent will do by default.</small></span></label>
+  </div>
+
+  <div class="q">
+    <h3>2. Short question</h3>
+    <p class="why">One line on why this matters.</p>
+    <label class="opt"><input type="radio" name="q2" id="q2-a"><span><b>Option A <span class="rec">Recommended</span></b><small>What happens if you choose this.</small></span></label>
+    <label class="opt"><input type="radio" name="q2" id="q2-b"><span><b>Option B</b><small>What happens if you choose this.</small></span></label>
+    <label class="opt"><input type="radio" name="q2" id="q2-unsure"><span><b>Unsure</b><small>What the agent will do by default.</small></span></label>
+  </div>
+
+  <div class="q">
+    <h3>Anything else</h3>
+    <p class="why">Constraints, questions, or changes the implementing agent should know.</p>
+    <textarea class="notes" id="notes" placeholder="Optional"></textarea>
+  </div>
+
+  <div class="response">
+    <button class="btn" type="button" id="copy">Copy my decisions</button>
+    <p class="hint" id="hint">If the button does nothing, click inside the block below to select it all, then copy.</p>
+    <pre id="out">=== BITPLAN RESPONSE ===
+Plan: PLAN TITLE (draft 1)
+Origin: ORIGIN OUTPOINT OR "unpublished"
+1. Short question: <span class="ans ans-q1-a">Option A</span><span class="ans ans-q1-b">Option B</span><span class="ans ans-q1-unsure">Unsure</span>
+2. Short question: <span class="ans ans-q2-a">Option A</span><span class="ans ans-q2-b">Option B</span><span class="ans ans-q2-unsure">Unsure</span></pre>
+  </div>
+
+  <p class="muted" style="margin-top:3rem">This plan describes work that has not been built.</p>
+
+  <script>
+    // Copy with three fallbacks. The viewer runs plans with scripts on and
+    // network off; older viewers run them with scripts off, in which case the
+    // CSS-filled block above is still selectable by hand.
+    (function () {
+      var btn = document.getElementById('copy');
+      var out = document.getElementById('out');
+      var notes = document.getElementById('notes');
+      var hint = document.getElementById('hint');
+      if (!btn || !out) return;
+
+      function text() {
+        var t = out.innerText.replace(/\n{2,}/g, '\n').trim();
+        var n = notes && notes.value.trim();
+        return n ? t + '\nNotes: ' + n : t;
+      }
+      function say(label, ms) {
+        btn.textContent = label;
+        setTimeout(function () { btn.textContent = 'Copy my decisions'; }, ms || 1500);
+      }
+      function selectBlock() {
+        var range = document.createRange();
+        range.selectNodeContents(out);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return sel;
+      }
+      function legacyCopy(value) {
+        var ta = document.createElement('textarea');
+        ta.value = value;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        return ok;
+      }
+
+      btn.addEventListener('click', function () {
+        var value = text();
+        var done = function () { say('Copied'); };
+        var fallback = function () {
+          if (legacyCopy(value)) { done(); return; }
+          selectBlock();
+          hint.textContent = 'Clipboard is blocked here. The block is selected: press Ctrl+C or Cmd+C.';
+          say('Selected, press copy', 2500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(value).then(done, fallback);
+        } else {
+          fallback();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

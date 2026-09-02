@@ -82,9 +82,15 @@
   </style>
 </head>
 <body>
-  <p class="eyebrow">BitPlan · draft 5 · 2026-09-02</p>
+  <p class="eyebrow">BitPlan · draft 6 · 2026-09-02</p>
   <h1>One envelope, links, folders, hosted drafts</h1>
   <p class="lede">Five small steps that let anyone use BitPlan, with or without Bitcoin, let a plan be a whole folder, and settle what a plan is allowed to do in the browser.</p>
+
+  <h2>What changed since draft 5</h2>
+  <ul>
+    <li>The copy button now works inside the viewer. The viewer runs plans with scripts on and network off, and the button falls back through three copy methods. This plan is built from the new template in <code>docs/templates/plan.html</code>.</li>
+    <li>Inscribe writes only the latest draft by default. Full history is a flag.</li>
+  </ul>
 
   <h2>Where we landed</h2>
   <ul>
@@ -128,7 +134,7 @@
     <h3>4. Hosted drafts and inscribe</h3>
     <p class="meta">Web and CLI · about a week · needs step 2 for the no-wallet case</p>
     <p><code>bitplan upload plan.html --hosted</code> stores the encrypted envelope on bitplan.dev and prints a link. Updating it is the same command again. The server holds ciphertext and a per-draft secret the CLI keeps in its local drafts map, the same idea postplan uses. No accounts, no sign-in, no wallet needed to publish or read when combined with a reader link. When a wallet is present, the plan is also encrypted to it, so it can be inscribed later.</p>
-    <p><code>bitplan inscribe h_xxxx</code> puts the draft on the chain. Hosted versions are not transactions, so the on-chain origin does not exist until this moment. The hosted link must redirect to the chain forever after, and inscribe should offer to replay every hosted version so history and version numbers match what people saw.</p>
+    <p><code>bitplan inscribe h_xxxx</code> puts the draft on the chain. Hosted versions are not transactions, so the on-chain origin does not exist until this moment. The hosted link must redirect to the chain forever after. By default inscribe writes only the latest draft, which is cheapest and what most people want; a flag replays every hosted version so history and version numbers match what people saw.</p>
     <p>What this reuses: the storage helper already used for sponsor images, and the content proxy the viewer already reads from, which learns to serve <code>h_</code> ids. The viewer does not change except for a badge that says "not on chain".</p>
     <p>Cost lives here. A hosted single-file plan is kilobytes. A hosted folder with images is megabytes, and the same bytes again on every version until ORDFS directories exist. Free covers a handful of plans at the 5 MB limit; folders, more plans, and long histories are the paid tier. Numbers are in the pricing memo, not here.</p>
     <p><b>Done when:</b> a machine with no wallet and no BSV publishes a plan and shares a link that opens; the same plan is inscribed later and the old link still resolves.</p>
@@ -209,9 +215,9 @@
   <div class="q">
     <h3>4. What inscribe writes to the chain</h3>
     <p class="why">Hosted versions have no transactions, so history exists only on our server until this runs.</p>
-    <label class="opt"><input type="radio" name="q4" id="q4-all"><span><b>Every hosted version <span class="rec">Recommended</span></b><small>Full history lands on chain and version numbers match. One transaction per version, cents each.</small></span></label>
-    <label class="opt"><input type="radio" name="q4" id="q4-latest"><span><b>Latest only</b><small>One transaction. The on-chain plan starts at version 1 while the hosted history said version 7.</small></span></label>
-    <label class="opt"><input type="radio" name="q4" id="q4-unsure"><span><b>Unsure</b><small>Default to every version, with a flag for latest only.</small></span></label>
+    <label class="opt"><input type="radio" name="q4" id="q4-latest"><span><b>Latest version only, by default <span class="rec">Recommended</span></b><small>One transaction, cheapest, and most people only want the final draft on chain. The on-chain plan starts at version 1; hosted history stays hosted. A flag writes the whole history instead.</small></span></label>
+    <label class="opt"><input type="radio" name="q4" id="q4-all"><span><b>Every hosted version, by default</b><small>Full history lands on chain and version numbers match. One transaction per version, cents each, and slower. A flag writes latest only instead.</small></span></label>
+    <label class="opt"><input type="radio" name="q4" id="q4-unsure"><span><b>Unsure</b><small>Default to latest only, with a flag for every version.</small></span></label>
   </div>
 
   <div class="q">
@@ -249,37 +255,75 @@
 
   <div class="response">
     <button class="btn" type="button" id="copy">Copy my decisions</button>
-    <p class="hint">If the button does nothing, scripts are off in this viewer. Click inside the block below to select it all, then copy.</p>
+    <p class="hint" id="hint">If the button does nothing, click inside the block below to select it all, then copy.</p>
     <pre id="out">=== BITPLAN RESPONSE ===
-Plan: One envelope, links, folders, hosted drafts (draft 5)
+Plan: One envelope, links, folders, hosted drafts (draft 6)
 Origin: 556c3a37caa7fd26945864692b417c2ef60b2a5cb0da7a5428cb7a07d64779af_0
 1. Retire the private envelope: <span class="ans ans-q1-yes">Yes, delete it</span><span class="ans ans-q1-keep">Stop writing it, keep reading it</span><span class="ans ans-q1-unsure">Unsure</span>
 2. Reader links: <span class="ans ans-q2-yes">Build it</span><span class="ans ans-q2-no">Do not build it</span><span class="ans ans-q2-unsure">Unsure</span>
 3. Hosted drafts: <span class="ans ans-q3-token">Per-draft secret, no wallet required</span><span class="ans ans-q3-wallet">Wallet required, no BSV required</span><span class="ans ans-q3-no">No hosted drafts</span><span class="ans ans-q3-unsure">Unsure</span>
-4. Inscribe writes: <span class="ans ans-q4-all">Every hosted version</span><span class="ans ans-q4-latest">Latest only</span><span class="ans ans-q4-unsure">Unsure</span>
+4. Inscribe writes: <span class="ans ans-q4-latest">Latest only by default</span><span class="ans ans-q4-all">Every version by default</span><span class="ans ans-q4-unsure">Unsure</span>
 5. Scripts inside plans: <span class="ans ans-q5-on">Scripts on, network off</span><span class="ans ans-q5-off">Keep scripts off</span><span class="ans ans-q5-unsure">Unsure</span>
 6. Size limit: <span class="ans ans-q6-2mb">Raise to 5 MB</span><span class="ans ans-q6-keep">Keep 512 KB</span><span class="ans ans-q6-unsure">Unsure</span>
 7. Start with: <span class="ans ans-q7-envelope">One envelope</span><span class="ans ans-q7-links">Reader links</span><span class="ans ans-q7-folder">Folders</span><span class="ans ans-q7-hosted">Hosted drafts</span><span class="ans ans-q7-skill">Skill package</span><span class="ans ans-q7-unsure">Unsure</span></pre>
   </div>
 
-  <p class="muted" style="margin-top:3rem">This plan describes work that has not been built. It replaces drafts 1 to 4 at the same origin.</p>
+  <p class="muted" style="margin-top:3rem">This plan describes work that has not been built. It replaces drafts 1 to 5 at the same origin.</p>
   <script>
+    // Copy with three fallbacks. The viewer runs plans with scripts on and
+    // network off; older viewers run them with scripts off, in which case the
+    // CSS-filled block above is still selectable by hand.
     (function () {
       var btn = document.getElementById('copy');
       var out = document.getElementById('out');
       var notes = document.getElementById('notes');
+      var hint = document.getElementById('hint');
       if (!btn || !out) return;
+
       function text() {
         var t = out.innerText.replace(/\n{2,}/g, '\n').trim();
         var n = notes && notes.value.trim();
         return n ? t + '\nNotes: ' + n : t;
       }
+      function say(label, ms) {
+        btn.textContent = label;
+        setTimeout(function () { btn.textContent = 'Copy my decisions'; }, ms || 1500);
+      }
+      function selectBlock() {
+        var range = document.createRange();
+        range.selectNodeContents(out);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return sel;
+      }
+      function legacyCopy(value) {
+        var ta = document.createElement('textarea');
+        ta.value = value;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        return ok;
+      }
+
       btn.addEventListener('click', function () {
-        var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy my decisions'; }, 1500); };
+        var value = text();
+        var done = function () { say('Copied'); };
+        var fallback = function () {
+          if (legacyCopy(value)) { done(); return; }
+          selectBlock();
+          hint.textContent = 'Clipboard is blocked here. The block is selected: press Ctrl+C or Cmd+C.';
+          say('Selected, press copy', 2500);
+        };
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text()).then(done, function () { window.getSelection().selectAllChildren(out); });
+          navigator.clipboard.writeText(value).then(done, fallback);
         } else {
-          window.getSelection().selectAllChildren(out);
+          fallback();
         }
       });
     })();
