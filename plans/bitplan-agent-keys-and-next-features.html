@@ -55,10 +55,49 @@
     .key ul { margin: 0; padding-left: 1.1rem; font-size: .92rem; }
     .muted { color: var(--muted); }
     .dod { font-size: .9rem; color: var(--muted); margin: .2rem 0 0; }
+
+    /* Questionnaire */
+    .q { border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 14px 16px; margin: 1rem 0; }
+    .q h3 { margin: 0 0 .3rem; }
+    .q .why { margin: 0 0 .6rem; font-size: .92rem; color: var(--muted); }
+    .opt { display: grid; grid-template-columns: 1.4rem 1fr; gap: 8px; align-items: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; cursor: pointer; }
+    .opt:has(input:checked) { border-color: var(--accent); background: var(--soft); }
+    .opt input { margin-top: .3rem; }
+    .opt b { display: block; }
+    .opt small { display: block; color: var(--muted); font-size: .88rem; }
+    .opt .rec { color: var(--accent); font-weight: 700; }
+    .notes { width: 100%; min-height: 80px; margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font: inherit; font-size: .92rem; resize: vertical; box-sizing: border-box; }
+    .response { margin-top: 1.5rem; }
+    .response .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; border: 0; font: inherit; }
+    .response pre { margin-top: 12px; user-select: all; -webkit-user-select: all; white-space: pre-wrap; }
+    .response .hint { font-size: .88rem; color: var(--muted); margin: 6px 0 0; }
+    .ans { display: none; }
+    body:has(#q1-device:checked) .ans-q1-device { display: inline; }
+    body:has(#q1-session:checked) .ans-q1-session { display: inline; }
+    body:has(#q1-biometry:checked) .ans-q1-biometry { display: inline; }
+    body:has(#q1-unsure:checked) .ans-q1-unsure { display: inline; }
+    body:has(#q2-transfer:checked) .ans-q2-transfer { display: inline; }
+    body:has(#q2-grant:checked) .ans-q2-grant { display: inline; }
+    body:has(#q2-both:checked) .ans-q2-both { display: inline; }
+    body:has(#q2-unsure:checked) .ans-q2-unsure { display: inline; }
+    body:has(#q3-v3:checked) .ans-q3-v3 { display: inline; }
+    body:has(#q3-v2ext:checked) .ans-q3-v2ext { display: inline; }
+    body:has(#q3-none:checked) .ans-q3-none { display: inline; }
+    body:has(#q3-unsure:checked) .ans-q3-unsure { display: inline; }
+    body:has(#q4-onesat:checked) .ans-q4-onesat { display: inline; }
+    body:has(#q4-bitplan:checked) .ans-q4-bitplan { display: inline; }
+    body:has(#q4-unsure:checked) .ans-q4-unsure { display: inline; }
+    body:has(#q5-keep:checked) .ans-q5-keep { display: inline; }
+    body:has(#q5-allow:checked) .ans-q5-allow { display: inline; }
+    body:has(#q5-unsure:checked) .ans-q5-unsure { display: inline; }
+    body:has(#q6-after:checked) .ans-q6-after { display: inline; }
+    body:has(#q6-now:checked) .ans-q6-now { display: inline; }
+    body:has(#q6-drop:checked) .ans-q6-drop { display: inline; }
+    body:has(#q6-unsure:checked) .ans-q6-unsure { display: inline; }
   </style>
 </head>
 <body>
-  <p class="eyebrow">BitPlan · design and sequence · 2026-09-02</p>
+  <p class="eyebrow">BitPlan · design and sequence · draft 2 · 2026-09-02</p>
   <h1>Agent keys, link readers, hosted drafts</h1>
   <p class="lede">One design that lets a coding agent encrypt and publish without a person at the fingerprint reader, lets a reader open a plan without a wallet, and lets a plan start on our server and end on the chain. Concrete steps first.</p>
 
@@ -196,12 +235,95 @@ bitplan inscribe h_xxxx                 # latest envelope goes on chain; h_xxxx 
   </ul>
 
   <h2>7. Decisions needed</h2>
-  <details open><summary>Default vault policy for agent keys</summary><p>Recommended: <code>device</code>. <code>session</code> is available for people who want one prompt at daemon start. Neither is a hardware guarantee against a same-user process; scope is the guarantee.</p></details>
-  <details open><summary>Delegation by coin transfer now, wallet grant later</summary><p>Recommended: yes. It works with today's wallets and needs no envelope change. Revisit when 1Sat Wallet authenticates native originators.</p></details>
-  <details open><summary>Envelope v3 for the link slot</summary><p>Recommended: yes. A version bump is the safe way to make old readers fail closed on a slot they do not understand.</p></details>
-  <details open><summary>Verb for moving a hosted draft on chain</summary><p><code>inscribe</code>. Drop <code>promote</code>.</p></details>
-  <details><summary>Should the agent daemon be a 1Sat CLI feature or a BitPlan feature</summary><p>Recommended: 1Sat CLI. BitPlan stays a BRC-100 client. The daemon is useful to every 1Sat app, not only BitPlan.</p></details>
+  <p>Pick one answer per question. Each option says what happens if you choose it. The response block at the end updates as you choose; copy it and paste it back to the agent.</p>
+  <div class="q">
+    <h3>Default vault policy for agent keys</h3>
+    <p class="why">This decides whether an agent can run with nobody at the machine, and what a same-user process can do with the agent key.</p>
+    <label class="opt"><input type="radio" name="q1" id="q1-device"><span><b>Device, no prompt <span class="rec">Recommended</span></b><small>Agent runs unattended. Any process running as the logged-in user can use the agent key while the Mac is unlocked. Scope, not a prompt, is the protection: small balance, delegated coins only.</small></span></label>
+    <label class="opt"><input type="radio" name="q1" id="q1-session"><span><b>Session, one Touch ID at daemon start</b><small>You know when an agent came up. After that it is identical to device. A reboot or crash stops the agent until someone touches the sensor.</small></span></label>
+    <label class="opt"><input type="radio" name="q1" id="q1-biometry"><span><b>Biometry on every use</b><small>No autonomy. Every encrypt, decrypt, and publish waits for a finger. Only makes sense if agents never run unattended.</small></span></label>
+    <label class="opt"><input type="radio" name="q1" id="q1-unsure"><span><b>Unsure</b><small>We build device and session, both, and pick a default after a week of real use.</small></span></label>
+  </div>
+  <div class="q">
+    <h3>How an agent gets publishing rights</h3>
+    <p class="why">Publishing is whoever holds the 1-sat plan coin. The question is where the coin lives while an agent works.</p>
+    <label class="opt"><input type="radio" name="q2" id="q2-transfer"><span><b>Transfer the coin to the agent identity now <span class="rec">Recommended</span></b><small>Works with today's wallets and needs no envelope change. If the agent machine is lost while it holds a coin, that origin is gone and the owner forks the plan. The owner can always read every version.</small></span></label>
+    <label class="opt"><input type="radio" name="q2" id="q2-grant"><span><b>Wait for wallet permission grants</b><small>Coin stays in the owner wallet and a paired agent spends it under a cap. Cleaner, but blocked until 1Sat Wallet authenticates native callers. Unattended publishing waits months.</small></span></label>
+    <label class="opt"><input type="radio" name="q2" id="q2-both"><span><b>Transfer now, grants later</b><small>Ship transfer as the first path and swap to grants when wallets support them. Two code paths to maintain for a while.</small></span></label>
+    <label class="opt"><input type="radio" name="q2" id="q2-unsure"><span><b>Unsure</b><small>Build transfer, since it is the only one that works now, and revisit when the wallet work lands.</small></span></label>
+  </div>
+  <div class="q">
+    <h3>Reader links without a wallet</h3>
+    <p class="why">A link slot lets anyone with the URL read the plan. The fragment secret never reaches a server.</p>
+    <label class="opt"><input type="radio" name="q3" id="q3-v3"><span><b>Envelope v3 with a link slot <span class="rec">Recommended</span></b><small>Old readers fail closed on the new version byte. One more version to support in the CLI and viewer. Named readers stay on identity slots.</small></span></label>
+    <label class="opt"><input type="radio" name="q3" id="q3-v2ext"><span><b>Extend v2 with an optional slot kind</b><small>No version bump, but old readers may misparse a slot with no identity key instead of rejecting it. Riskier for the same feature.</small></span></label>
+    <label class="opt"><input type="radio" name="q3" id="q3-none"><span><b>No link slot</b><small>Readers keep needing a wallet. The largest gap on the compare page stays open.</small></span></label>
+    <label class="opt"><input type="radio" name="q3" id="q3-unsure"><span><b>Unsure</b><small>Default to v3. It is the safe option and the cost is small.</small></span></label>
+  </div>
+  <div class="q">
+    <h3>Where the agent wallet daemon lives</h3>
+    <p class="why">The daemon holds the agent identity and serves BRC-100 on loopback.</p>
+    <label class="opt"><input type="radio" name="q4" id="q4-onesat"><span><b>1Sat CLI <span class="rec">Recommended</span></b><small>Every 1Sat app can use it, and BitPlan stays a pure BRC-100 client. Work happens in the 1sat-sdk repo and the 1Sat Wallet project.</small></span></label>
+    <label class="opt"><input type="radio" name="q4" id="q4-bitplan"><span><b>BitPlan CLI</b><small>Faster for us alone, but BitPlan starts holding keys, which breaks decision D3, and no other app benefits.</small></span></label>
+    <label class="opt"><input type="radio" name="q4" id="q4-unsure"><span><b>Unsure</b><small>Default to 1Sat CLI.</small></span></label>
+  </div>
+  <div class="q">
+    <h3>Scripts inside the plan viewer</h3>
+    <p class="why">Today the viewer iframe has sandbox with no allow-scripts, so buttons like the copy button below only work when the raw file is opened directly.</p>
+    <label class="opt"><input type="radio" name="q5" id="q5-keep"><span><b>Keep scripts off <span class="rec">Recommended</span></b><small>Plans stay CSS-only. Safest. Questionnaires copy by select-and-paste, not by button.</small></span></label>
+    <label class="opt"><input type="radio" name="q5" id="q5-allow"><span><b>Allow scripts in the sandbox</b><small>Copy buttons and small interactions work. The iframe keeps an opaque origin and the page CSP still blocks network, but the review surface grows and every plan author gets a script runtime.</small></span></label>
+    <label class="opt"><input type="radio" name="q5" id="q5-unsure"><span><b>Unsure</b><small>Keep scripts off for now and revisit when a plan really needs one.</small></span></label>
+  </div>
+  <div class="q">
+    <h3>Hosted drafts and inscribe</h3>
+    <p class="why">A server-stored copy of the same encrypted envelope, moved to the chain with bitplan inscribe.</p>
+    <label class="opt"><input type="radio" name="q6" id="q6-after"><span><b>Build after steps 1 to 5 <span class="rec">Recommended</span></b><small>The unattended agent and the link slot ship first. Hosted drafts wait for demand.</small></span></label>
+    <label class="opt"><input type="radio" name="q6" id="q6-now"><span><b>Build now, in parallel</b><small>A second engineer or a workflow can start it now. It needs terms and a privacy policy before it can charge, so it may sit unused.</small></span></label>
+    <label class="opt"><input type="radio" name="q6" id="q6-drop"><span><b>Drop it</b><small>No server, no billing, no brand tension. People without BSV stay out.</small></span></label>
+    <label class="opt"><input type="radio" name="q6" id="q6-unsure"><span><b>Unsure</b><small>Default to after.</small></span></label>
+  </div>
+  <div class="q">
+    <h3>Anything else</h3>
+    <p class="why">Constraints, questions, or changes the implementing agent should know.</p>
+    <textarea class="notes" id="notes" placeholder="Optional"></textarea>
+  </div>
+  <div class="response">
+    <button class="btn" type="button" id="copy">Copy my decisions</button>
+    <p class="hint">If the button does nothing, scripts are off in this viewer. Click inside the block below to select it all, then copy.</p>
+    <pre id="out">=== BITPLAN RESPONSE ===
+Plan: Agent keys, link readers, hosted drafts (draft 2)
+Origin: 556c3a37caa7fd26945864692b417c2ef60b2a5cb0da7a5428cb7a07d64779af_0
+Default vault policy for agent keys: <span class="ans ans-q1-device">Device, no prompt</span><span class="ans ans-q1-session">Session, one Touch ID at daemon start</span><span class="ans ans-q1-biometry">Biometry on every use</span><span class="ans ans-q1-unsure">Unsure</span><span class="ans-none-q1"></span>
+How an agent gets publishing rights: <span class="ans ans-q2-transfer">Transfer the coin to the agent identity now</span><span class="ans ans-q2-grant">Wait for wallet permission grants</span><span class="ans ans-q2-both">Transfer now, grants later</span><span class="ans ans-q2-unsure">Unsure</span><span class="ans-none-q2"></span>
+Reader links without a wallet: <span class="ans ans-q3-v3">Envelope v3 with a link slot</span><span class="ans ans-q3-v2ext">Extend v2 with an optional slot kind</span><span class="ans ans-q3-none">No link slot</span><span class="ans ans-q3-unsure">Unsure</span><span class="ans-none-q3"></span>
+Where the agent wallet daemon lives: <span class="ans ans-q4-onesat">1Sat CLI</span><span class="ans ans-q4-bitplan">BitPlan CLI</span><span class="ans ans-q4-unsure">Unsure</span><span class="ans-none-q4"></span>
+Scripts inside the plan viewer: <span class="ans ans-q5-keep">Keep scripts off</span><span class="ans ans-q5-allow">Allow scripts in the sandbox</span><span class="ans ans-q5-unsure">Unsure</span><span class="ans-none-q5"></span>
+Hosted drafts and inscribe: <span class="ans ans-q6-after">Build after steps 1 to 5</span><span class="ans ans-q6-now">Build now, in parallel</span><span class="ans ans-q6-drop">Drop it</span><span class="ans ans-q6-unsure">Unsure</span><span class="ans-none-q6"></span>
+</pre>
+  </div>
 
   <p class="muted" style="margin-top:3rem">This plan describes work that has not been built. Steps 1 to 3 are the concrete path to an unattended agent. Steps 4 and 5 close the gaps the compare page exposed. Steps 6 and 7 are optional and depend on demand.</p>
+  <script>
+    (function () {
+      var btn = document.getElementById('copy');
+      var out = document.getElementById('out');
+      var notes = document.getElementById('notes');
+      if (!btn || !out) return;
+      function text() {
+        var t = out.innerText.replace(/\n{2,}/g, '\n').trim();
+        var n = notes && notes.value.trim();
+        return n ? t + '\nNotes: ' + n : t;
+      }
+      btn.addEventListener('click', function () {
+        var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy my decisions'; }, 1500); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text()).then(done, function () { window.getSelection().selectAllChildren(out); });
+        } else {
+          window.getSelection().selectAllChildren(out);
+        }
+      });
+    })();
+  </script>
+
 </body>
 </html>
