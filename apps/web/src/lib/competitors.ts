@@ -201,7 +201,8 @@ export const COMPETITORS: Competitor[] = [
         them: "No noindex or robots rules documented.",
       },
       {
-        bitplan: "External scripts rejected at upload; inline scripts run with no network.",
+        bitplan:
+          "External scripts rejected at upload; inline scripts run with no network.",
         label: "Scripts",
         them: "Rejected at upload, blocked with script-src 'none'.",
       },
