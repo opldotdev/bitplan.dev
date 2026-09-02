@@ -157,6 +157,9 @@ Do not use BitPlan as a general file host, a server-side notes app, or a substit
 - Publish: \`npx bitplan upload ./plan.html\`
 - List: \`npx bitplan list\`
 - Fetch: \`npx bitplan fetch <origin>\`
+- Share: \`npx bitplan upload ./plan.html --share-with <identity-key-or-contact>\`
+- Reader link, no wallet needed to read: \`npx bitplan upload ./plan.html --link\`
+- Agent skill: \`npx skills add opldotdev/bitplan.dev --skill bitplan -g\`
 
 ## Site
 
