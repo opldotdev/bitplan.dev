@@ -12,6 +12,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { WalletInterface } from '@bsv/sdk'
 import type { DraftPlaintext } from '../src/envelope.js'
+import { linkIdentityKey, linkUrl } from '../src/link.js'
 import type { BitplanCoin, PublishResult } from '../src/ordinals.js'
 import type { ConfigFile, DraftRecord } from '../src/state.js'
 
@@ -600,6 +601,7 @@ if (!CHILD_RUN) {
 						stateSaved: true,
 						relay: { state: 'accepted', txStatus: 'SEEN_ON_NETWORK' },
 						viewer: `https://bitplan.dev/d/${GENESIS_OUTPOINT}`,
+						link: null,
 					},
 					null,
 					2,
@@ -654,6 +656,121 @@ if (!CHILD_RUN) {
 			await uploadCommand(htmlFile, { new: true, relay: false, yes: true })
 
 			expect(calls.relays).toEqual([])
+		})
+
+		test('--link and --private cannot be used together', async () => {
+			await expect(
+				uploadCommand(htmlFile, { link: true, private: true, yes: true }),
+			).rejects.toThrow('--link and --private cannot be used together.')
+			expect(calls.seals).toEqual([])
+		})
+
+		test('--link mints a reader slot and prints the URL', async () => {
+			await uploadCommand(htmlFile, { new: true, link: true, yes: true })
+
+			const linkKey = calls.saves[0]?.record.linkKey
+			expect(linkKey).toMatch(/^[0-9a-f]{64}$/)
+			expect(calls.seals[0]?.sharedWith).toEqual([
+				linkIdentityKey(linkKey ?? ''),
+			])
+			expect(console.log).toHaveBeenCalledWith(
+				'Access:   This wallet + reader link',
+			)
+			expect(console.log).toHaveBeenCalledWith(
+				`Link:     ${linkUrl(`https://bitplan.dev/d/${GENESIS_OUTPOINT}`, linkKey ?? '')}`,
+			)
+			expect(console.log).toHaveBeenCalledWith(
+				'          Anyone with this link can read this version and later versions that keep it.',
+			)
+			expect(console.log).toHaveBeenCalledWith(
+				'          Publish with --private to stop.',
+			)
+		})
+
+		test('keeps an existing reader link on later versions until --private', async () => {
+			const linkKey = '11'.repeat(32)
+			const identity = linkIdentityKey(linkKey)
+			knownByFile = {
+				...existingRecord(),
+				linkKey,
+				sharedWith: ['existing-reader', identity],
+			}
+
+			await uploadCommand(htmlFile, { yes: true })
+
+			expect(calls.seals[0]?.sharedWith).toEqual(['existing-reader', identity])
+			expect(calls.saves[0]?.record.linkKey).toBe(linkKey)
+			expect(console.log).toHaveBeenCalledWith(
+				'Access:   This wallet + 1 shared identity + reader link',
+			)
+			expect(console.log).toHaveBeenCalledWith(
+				`Link:     ${linkUrl(`https://bitplan.dev/d/${ORIGIN}`, linkKey)}`,
+			)
+		})
+
+		test('--private drops the reader link from the new version', async () => {
+			const linkKey = '11'.repeat(32)
+			const identity = linkIdentityKey(linkKey)
+			knownByFile = {
+				...existingRecord(),
+				linkKey,
+				sharedWith: ['existing-reader', identity],
+			}
+
+			await uploadCommand(htmlFile, { private: true, yes: true })
+
+			expect(calls.seals[0]?.sharedWith).toEqual([])
+			expect(calls.saves[0]?.record.linkKey).toBeUndefined()
+			expect(console.log).toHaveBeenCalledWith(
+				'Removed:  existing-reader, reader link',
+			)
+		})
+
+		test('--link on an adopted draft with no local record mints a fresh link', async () => {
+			ordfsContent = {
+				bytes: Uint8Array.of(1, 2, 3),
+				contentType: 'application/x-bitplan',
+				origin: ORIGIN,
+				outpoint: VERSION_OUTPOINT,
+				sequence: 3,
+			}
+
+			await uploadCommand(htmlFile, { draft: ORIGIN, link: true, yes: true })
+
+			expect(calls.saves[0]?.record.linkKey).toMatch(/^[0-9a-f]{64}$/)
+			expect(console.log).toHaveBeenCalledWith(
+				'Note: this draft had no local link secret; earlier links stop working on this version.',
+			)
+			expect(console.log).toHaveBeenCalledWith(
+				expect.stringMatching(/^Link: {5}https:\/\/bitplan\.dev\/d\/.*#k=/),
+			)
+		})
+
+		test('--json includes the reader link URL next to viewer', async () => {
+			await uploadCommand(htmlFile, {
+				new: true,
+				link: true,
+				json: true,
+				yes: true,
+			})
+
+			expect(console.log).toHaveBeenCalledTimes(1)
+			const printed = String(
+				(
+					console.log as unknown as {
+						mock: { calls: Array<[string]> }
+					}
+				).mock.calls[0]?.[0],
+			)
+			const payload = JSON.parse(printed) as {
+				link: string
+				viewer: string
+				access: { mode: string; readers: string[] }
+			}
+			expect(payload.viewer).toBe(`https://bitplan.dev/d/${GENESIS_OUTPOINT}`)
+			expect(payload.link.startsWith(`${payload.viewer}#k=`)).toBe(true)
+			expect(payload.access.mode).toBe('shared')
+			expect(payload.access.readers).toHaveLength(1)
 		})
 	})
 

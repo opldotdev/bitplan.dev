@@ -38,6 +38,8 @@ export interface DraftRecord {
 	sharedWithRaw?: string[]
 	/** Local contact/team names re-resolved before every publish. */
 	shareWithRefs?: string[]
+	/** Reader link secret, 64 hex. Present while the draft has a link reader. */
+	linkKey?: string
 }
 
 export interface DraftsFile {
@@ -306,6 +308,14 @@ function validateDraftRecord(
 				)
 			}
 		}
+	}
+	if (
+		typeof value.linkKey === 'string' &&
+		/^[0-9a-f]{64}$/i.test(value.linkKey)
+	) {
+		value.linkKey = value.linkKey.toLowerCase()
+	} else {
+		delete value.linkKey
 	}
 	return value as unknown as DraftRecord
 }

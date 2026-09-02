@@ -109,9 +109,10 @@ export default function EnvelopePage() {
         <p>
           A reader asks their wallet for their wrapped copy of the document key,
           then decrypts the plan locally. Identity keys are public; private keys
-          stay in the wallet. The SDK gets the document key and each IV from the
-          operating system&apos;s secure random generator and fails if none is
-          available. Each IV is 32 bytes.
+          stay in the wallet. A reader link is an ordinary slot whose private
+          key travels in the URL fragment. The SDK gets the document key and
+          each IV from the operating system&apos;s secure random generator and
+          fails if none is available. Each IV is 32 bytes.
         </p>
       </section>
       <section id="security">

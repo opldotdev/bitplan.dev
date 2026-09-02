@@ -67,6 +67,7 @@ npx bitplan upload ./plan.html \
   --share-with <identity-key-a> \
   --share-with <identity-key-b>
 npx bitplan upload ./plan.html --private
+npx bitplan upload ./plan.html --link
 ```
 
 `bitplan whoami` prints the connected wallet's identity key. A shared version
@@ -156,6 +157,7 @@ bitplan upload <file>
   --description <text>     Set a short description
   --share-with <reader>    Add a key, contact, or team (repeatable)
   --private                Make the new version wallet-only
+  --link                   Add a reader link anyone can open
   --no-relay               Skip the default 1Sat notification for ORDFS capture
   -y, --yes                Skip the confirmation prompt
   --json                   Print one JSON result (requires --yes)
@@ -190,6 +192,19 @@ bitplan version
 
 In a non-interactive shell, `upload` requires `--yes`; otherwise it stops before
 encryption or publishing rather than assuming consent.
+
+## Reader links
+
+`bitplan upload plan.html --link` adds a reader anyone can use: a throwaway
+secp256k1 key whose public half is an ordinary reader slot and whose private
+half travels in the viewer URL fragment. Later versions keep the same link
+until you publish with `--private`. `bitplan fetch` can open that URL without
+a wallet.
+
+```sh
+npx bitplan upload ./plan.html --link
+npx bitplan fetch 'https://bitplan.dev/d/<origin>#k=...'
+```
 
 ## How it works
 

@@ -143,6 +143,10 @@ export function buildProgram(): Command {
 			'--private',
 			'Remove shared readers from the new version (older versions stay shared)',
 		)
+		.option(
+			'--link',
+			'Add a reader link anyone can open; kept on later versions until --private',
+		)
 		.option('-y, --yes', 'Skip the confirmation prompt')
 		.option('--json', 'Print the publish result as JSON (requires --yes)')
 		.option(

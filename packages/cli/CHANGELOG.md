@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- `upload --link` adds a reader link anyone can open. The same link works on
+  later versions until `--private`. `bitplan fetch` can open a plan from that
+  URL without a wallet.
+
 ### Changed
 
 - Every envelope the CLI writes or reads is the bitplan envelope (wire version

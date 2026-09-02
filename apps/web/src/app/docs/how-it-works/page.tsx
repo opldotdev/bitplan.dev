@@ -180,6 +180,15 @@ export default function HowItWorksPage() {
           readers, but no transaction can revoke access to an older inscription.
         </p>
       </section>
+      <section id="reader-links">
+        <h2>Reader links</h2>
+        <p>
+          A reader link is a throwaway key. Its public half is a normal reader
+          slot. Its private half rides in the URL fragment, which browsers never
+          send to a server. Anyone with the link can read until a version is
+          published with <code>--private</code>.
+        </p>
+      </section>
       <section id="versions">
         <h2>Versions</h2>
         <p>

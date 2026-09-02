@@ -21,7 +21,7 @@ const FLAGS = [
   {
     command: "upload <file>",
     flags:
-      "--draft <origin>, --new, --description <text>, --share-with <identity-key|contact|team>, --private, --no-relay, -y, --json, --allow-finding <id>",
+      "--draft <origin>, --new, --description <text>, --share-with <identity-key|contact|team>, --private, --link, --no-relay, -y, --json, --allow-finding <id>",
   },
   {
     command: "list",
@@ -96,6 +96,10 @@ export default function CommandsPage() {
         identity. <code>--private</code> makes only the new version wallet-only;
         older shared versions cannot be revoked. Shared drafts require CLI
         0.0.6+ or the current website to read.
+      </p>
+      <p>
+        <code>--link</code>: Add a reader link anyone can open; kept on later
+        versions until --private.
       </p>
       <p>
         <code>--share-with</code> accepts a public identity key, contact, or

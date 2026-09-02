@@ -1,6 +1,8 @@
+import type { WalletInterface } from '@bsv/sdk'
 import { isBitplanContentType } from '../constants.js'
 import { openEnvelope, sharedWith } from '../envelope.js'
 import { CliError } from '../errors.js'
+import { linkWallet, parseLinkFragment } from '../link.js'
 import { fetchLatest, originFromReference } from '../ordfs.js'
 import { connectWallet } from '../wallet.js'
 
@@ -50,8 +52,22 @@ export async function fetchCommand(
 		)
 	}
 
-	const { wallet } = await connectWallet(options.walletUrl)
-	const { header, plaintext } = await openEnvelope(wallet, content.bytes)
+	const secret = parseLinkFragment(reference)
+	let opened: Awaited<ReturnType<typeof openEnvelope>>
+	if (secret !== null) {
+		try {
+			opened = await openEnvelope(
+				linkWallet(secret) as WalletInterface,
+				content.bytes,
+			)
+		} catch {
+			throw new CliError('This link does not open this version of the draft.')
+		}
+	} else {
+		const { wallet } = await connectWallet(options.walletUrl)
+		opened = await openEnvelope(wallet, content.bytes)
+	}
+	const { header, plaintext } = opened
 
 	const metadata = {
 		origin: content.origin ?? origin,

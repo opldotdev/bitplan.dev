@@ -27,7 +27,8 @@ export default function PrivacyPage() {
           1Sat indexes public chain data. We cannot un-publish an inscription
           and we cannot un-decrypt a version someone already holds. Shared
           envelopes name reader identity keys in the header; those keys are
-          public on the chain.
+          public on the chain. A reader link secret stays in your browser&apos;s
+          address bar; bitplan.dev never receives it.
         </p>
       </div>
     </main>

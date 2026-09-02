@@ -27,6 +27,7 @@ import {
 import { CliError } from '../errors.js'
 import { collectGitMetadata } from '../git.js'
 import { validateHtml } from '../htmlPolicy.js'
+import { linkIdentityKey, linkUrl, newLinkSecret } from '../link.js'
 import { fetchLatest } from '../ordfs.js'
 import {
 	type BitplanCoin,
@@ -57,6 +58,7 @@ export interface UploadOptions {
 	allowFinding?: string[]
 	shareWith?: string[]
 	private?: boolean
+	link?: boolean
 	walletUrl?: string
 	ordfsUrl?: string
 	relay?: boolean
@@ -205,6 +207,18 @@ export async function uploadCommand(
 	let sharedWith = options.private
 		? []
 		: [...new Set([...fixedReaders, ...resolvedNamedReaders])]
+	if (options.link && options.private) {
+		throw new CliError('--link and --private cannot be used together.')
+	}
+	let linkKey = options.private ? undefined : targetLocal?.linkKey
+	if (options.link && !linkKey) linkKey = newLinkSecret()
+	const linkIdentity = linkKey ? linkIdentityKey(linkKey) : undefined
+	if (linkIdentity) sharedWith = [...new Set([...sharedWith, linkIdentity])]
+	const storedLinkIdentity = targetLocal?.linkKey
+		? linkIdentityKey(targetLocal.linkKey)
+		: undefined
+	const labeledLinkIdentity = linkIdentity ?? storedLinkIdentity
+	const adoptedWithoutLocalRecord = Boolean(targetOrigin && !targetLocal)
 	if (sharedWith.length > MAX_SHARED_RECIPIENTS) {
 		throw new CliError(
 			`A shared draft supports at most ${MAX_SHARED_RECIPIENTS} recipient identities; got ${sharedWith.length}.`,
@@ -234,6 +248,7 @@ export async function uploadCommand(
 		sharedWith,
 		removedReaders,
 		config,
+		linkIdentity: labeledLinkIdentity,
 		skip: options.yes === true,
 		quiet: options.json === true,
 	})
@@ -262,7 +277,7 @@ export async function uploadCommand(
 	}
 	if (!options.json && targetOrigin && addedReaders.length > 0) {
 		console.log(
-			`Added:    ${addedReaders.map((key) => readerLabel(key, config)).join(', ')}`,
+			`Added:    ${addedReaders.map((key) => labeledReader(key, config, labeledLinkIdentity)).join(', ')}`,
 		)
 	}
 
@@ -283,11 +298,7 @@ export async function uploadCommand(
 		console.log(`Origin:   ${published.origin}`)
 		console.log(`Outpoint: ${published.outpoint}`)
 		console.log(`Version:  ${nextVersion ?? 'unknown (no local history)'}`)
-		console.log(
-			sharedWith.length === 0
-				? 'Access:   This wallet only'
-				: `Access:   This wallet + ${sharedWith.length} shared identit${sharedWith.length === 1 ? 'y' : 'ies'}`,
-		)
+		console.log(formatAccess(sharedWith, linkIdentity))
 	}
 	const record: DraftRecord = {
 		origin: published.origin,
@@ -300,6 +311,7 @@ export async function uploadCommand(
 		sharedWith,
 		sharedWithRaw: fixedReaders,
 		shareWithRefs: namedRefs.length > 0 ? namedRefs : undefined,
+		linkKey,
 	}
 	let stateSaved = true
 	try {
@@ -347,7 +359,13 @@ export async function uploadCommand(
 		}
 	}
 	const viewer = viewerUrl(published.origin)
+	const link = linkIdentity && linkKey ? linkUrl(viewer, linkKey) : null
 	if (options.json) {
+		if (options.link && adoptedWithoutLocalRecord) {
+			console.warn(
+				'Note: this draft had no local link secret; earlier links stop working on this version.',
+			)
+		}
 		console.log(
 			JSON.stringify(
 				{
@@ -364,6 +382,7 @@ export async function uploadCommand(
 					stateSaved,
 					relay,
 					viewer,
+					link,
 				},
 				null,
 				2,
@@ -371,6 +390,18 @@ export async function uploadCommand(
 		)
 	} else {
 		console.log(`Viewer:   ${viewer}`)
+		if (options.link && adoptedWithoutLocalRecord) {
+			console.log(
+				'Note: this draft had no local link secret; earlier links stop working on this version.',
+			)
+		}
+		if (link) {
+			console.log(`Link:     ${link}`)
+			console.log(
+				'          Anyone with this link can read this version and later versions that keep it.',
+			)
+			console.log('          Publish with --private to stop.')
+		}
 	}
 }
 
@@ -500,6 +531,34 @@ function scanPlaintext(
 	}
 }
 
+function labeledReader(
+	identityKey: string,
+	config: ConfigFile,
+	linkIdentity: string | undefined,
+): string {
+	if (linkIdentity && identityKey === linkIdentity) return 'reader link'
+	return readerLabel(identityKey, config)
+}
+
+function formatAccess(
+	readers: string[],
+	linkIdentity: string | undefined,
+): string {
+	const hasLink = Boolean(linkIdentity && readers.includes(linkIdentity))
+	const named = hasLink
+		? readers.filter((identityKey) => identityKey !== linkIdentity)
+		: readers
+	if (named.length === 0 && !hasLink) return 'Access:   This wallet only'
+	const parts = ['This wallet']
+	if (named.length > 0) {
+		parts.push(
+			`${named.length} shared identit${named.length === 1 ? 'y' : 'ies'}`,
+		)
+	}
+	if (hasLink) parts.push('reader link')
+	return `Access:   ${parts.join(' + ')}`
+}
+
 interface ConfirmInput {
 	file: string
 	title: string | null
@@ -510,6 +569,7 @@ interface ConfirmInput {
 	sharedWith: string[]
 	removedReaders: string[]
 	config: ConfigFile
+	linkIdentity?: string
 	skip: boolean
 	quiet: boolean
 }
@@ -536,7 +596,13 @@ async function confirmPublish(input: ConfirmInput): Promise<void> {
 	} else {
 		console.log('Readers requested:')
 		for (const identityKey of input.sharedWith) {
-			console.log(`          ${identityKey}`)
+			console.log(
+				`          ${
+					input.linkIdentity && identityKey === input.linkIdentity
+						? 'reader link'
+						: identityKey
+				}`,
+			)
 		}
 		console.log(
 			'          The publishing wallet is ignored if it is in this list.',
@@ -545,7 +611,7 @@ async function confirmPublish(input: ConfirmInput): Promise<void> {
 	}
 	if (input.origin && input.removedReaders.length > 0) {
 		console.log(
-			`Removed:  ${input.removedReaders.map((key) => readerLabel(key, input.config)).join(', ')}`,
+			`Removed:  ${input.removedReaders.map((key) => labeledReader(key, input.config, input.linkIdentity)).join(', ')}`,
 		)
 	}
 	if (input.removedReaders.length > 0) {

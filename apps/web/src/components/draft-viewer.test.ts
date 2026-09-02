@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   isViewerStateCurrent,
   metaRows,
+  showsOpenedWithLinkLabel,
   type ViewerState,
   viewerRequestKey,
 } from "./draft-viewer";
@@ -68,6 +69,12 @@ describe("DraftViewer route state", () => {
     expect(isViewerStateCurrent(decryptedState(requestKey), requestKey)).toBe(
       true
     );
+  });
+
+  test("shows the opened-with-a-link label only for link sessions", () => {
+    expect(showsOpenedWithLinkLabel()).toBe(false);
+    expect(showsOpenedWithLinkLabel(false)).toBe(false);
+    expect(showsOpenedWithLinkLabel(true)).toBe(true);
   });
 });
 

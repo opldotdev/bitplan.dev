@@ -25,9 +25,10 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { type DraftsWallet, walletOwnsDraft } from "@/lib/drafts";
-import type { DraftMeta, DraftPlaintext } from "@/lib/envelope";
+import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
 import { EnvelopeAccessError, openEnvelope } from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
+import { linkWallet, parseLinkFragment } from "@/lib/link-reader";
 import {
   fetchOrdfsContent,
   type OrdfsContent,
@@ -103,6 +104,7 @@ export type ViewerState =
       phase: "encrypted";
       requestKey: string;
       draft: LoadedDraft;
+      linkIssue: WalletIssue | null;
       walletIssue: WalletIssue | null;
     }
   | {
@@ -110,6 +112,7 @@ export type ViewerState =
       requestKey: string;
       draft: LoadedDraft;
       canPublish: boolean;
+      openedWithLink?: boolean;
       plaintext: DraftPlaintext;
     };
 
@@ -126,6 +129,11 @@ export function viewerRequestKey(
   requestedVersion: number | null
 ): string {
   return `${originParam}:${requestedVersion ?? "latest"}`;
+}
+
+/** Decrypted header shows "Opened with a link" instead of share. */
+export function showsOpenedWithLinkLabel(openedWithLink?: boolean): boolean {
+  return openedWithLink === true;
 }
 
 function assertNever(value: never): never {
@@ -213,26 +221,43 @@ export async function resolveDraft(
   };
 }
 
-/** Re-open a draft with an already-connected wallet after a version switch. */
+function hasListOutputs(wallet: EnvelopeWallet): wallet is DraftsWallet {
+  return "listOutputs" in wallet && typeof wallet.listOutputs === "function";
+}
+
+async function decryptDraft(
+  wallet: EnvelopeWallet,
+  draft: LoadedDraft
+): Promise<{
+  plaintext: DraftPlaintext | null;
+  issue: WalletIssue | null;
+}> {
+  try {
+    const opened = await openEnvelope(wallet, draft.content.bytes);
+    return { issue: null, plaintext: opened.plaintext };
+  } catch (error) {
+    return { issue: accessIssue(error), plaintext: null };
+  }
+}
+
+/** Re-open a draft after resolve. Link wallets never call canPublishDraft. */
 async function reopenDraft(
-  wallet: DraftsWallet,
+  wallet: EnvelopeWallet,
   draft: LoadedDraft
 ): Promise<{
   canPublish: boolean;
   plaintext: DraftPlaintext | null;
   issue: WalletIssue | null;
 }> {
-  try {
-    const opened = await openEnvelope(wallet, draft.content.bytes);
-    const canPublish = await canPublishDraft(wallet, draft);
-    return { canPublish, issue: null, plaintext: opened.plaintext };
-  } catch (error) {
-    return {
-      canPublish: false,
-      issue: accessIssue(error),
-      plaintext: null,
-    };
+  const opened = await decryptDraft(wallet, draft);
+  if (!opened.plaintext) {
+    return { canPublish: false, issue: opened.issue, plaintext: null };
   }
+  if (!hasListOutputs(wallet)) {
+    return { canPublish: false, issue: null, plaintext: opened.plaintext };
+  }
+  const canPublish = await canPublishDraft(wallet, draft);
+  return { canPublish, issue: null, plaintext: opened.plaintext };
 }
 
 function accessIssue(error: unknown): WalletIssue {
@@ -269,6 +294,76 @@ async function canPublishDraft(
   } catch {
     return false;
   }
+}
+
+async function viewForFoundDraft(
+  draft: LoadedDraft,
+  requestKey: string,
+  existingWallet: DraftsWallet | null
+): Promise<{
+  view: Extract<ViewerState, { phase: "decrypted" | "encrypted" }>;
+  wallet: DraftsWallet | null;
+}> {
+  const secret =
+    typeof window === "undefined"
+      ? null
+      : parseLinkFragment(window.location.hash);
+  let linkIssue: WalletIssue | null = null;
+  if (secret) {
+    const linked = await reopenDraft(linkWallet(secret), draft);
+    if (linked.plaintext) {
+      return {
+        view: {
+          canPublish: false,
+          draft,
+          openedWithLink: true,
+          phase: "decrypted",
+          plaintext: linked.plaintext,
+          requestKey,
+        },
+        wallet: existingWallet,
+      };
+    }
+    linkIssue = linked.issue;
+  }
+
+  const wallet = existingWallet ?? (await walletForDecrypt());
+  if (!wallet) {
+    return {
+      view: {
+        draft,
+        linkIssue,
+        phase: "encrypted",
+        requestKey,
+        walletIssue: null,
+      },
+      wallet: null,
+    };
+  }
+
+  const reopened = await reopenDraft(wallet, draft);
+  if (reopened.plaintext) {
+    return {
+      view: {
+        canPublish: reopened.canPublish,
+        draft,
+        phase: "decrypted",
+        plaintext: reopened.plaintext,
+        requestKey,
+      },
+      wallet,
+    };
+  }
+  return {
+    view: {
+      draft,
+      linkIssue,
+      phase: "encrypted",
+      requestKey,
+      walletIssue: reopened.issue,
+    },
+    wallet,
+  };
 }
 
 function VersionPill({
@@ -332,41 +427,18 @@ export function DraftViewer() {
         return;
       }
 
-      const wallet = walletRef.current ?? (await walletForDecrypt());
-      if (cancelled) {
-        return;
-      }
-      if (!wallet) {
-        setView({
-          draft: result.draft,
-          phase: "encrypted",
-          requestKey,
-          walletIssue: null,
-        });
-        return;
-      }
-
-      walletRef.current = wallet;
-      const reopened = await reopenDraft(wallet, result.draft);
-      if (cancelled) {
-        return;
-      }
-      if (reopened.plaintext) {
-        setView({
-          canPublish: reopened.canPublish,
-          draft: result.draft,
-          phase: "decrypted",
-          plaintext: reopened.plaintext,
-          requestKey,
-        });
-        return;
-      }
-      setView({
-        draft: result.draft,
-        phase: "encrypted",
+      const opened = await viewForFoundDraft(
+        result.draft,
         requestKey,
-        walletIssue: reopened.issue,
-      });
+        walletRef.current
+      );
+      if (cancelled) {
+        return;
+      }
+      if (opened.wallet) {
+        walletRef.current = opened.wallet;
+      }
+      setView(opened.view);
     }
 
     load();
@@ -455,6 +527,7 @@ export function DraftViewer() {
         currentVersion={view.draft.currentVersion}
         latestVersion={view.draft.latestVersion}
         onVersion={handleVersion}
+        openedWithLink={view.openedWithLink}
         origin={view.draft.origin}
         plaintext={view.plaintext}
       />
@@ -467,6 +540,7 @@ export function DraftViewer() {
       content={view.draft.content}
       currentVersion={view.draft.currentVersion}
       latestVersion={view.draft.latestVersion}
+      linkIssue={view.linkIssue}
       onConnect={handleConnect}
       origin={view.draft.origin}
       walletIssue={view.walletIssue}
@@ -567,6 +641,7 @@ function EncryptedView({
   content,
   currentVersion,
   latestVersion,
+  linkIssue,
   walletIssue,
   busy,
   onConnect,
@@ -575,6 +650,7 @@ function EncryptedView({
   content: OrdfsContent;
   currentVersion: number;
   latestVersion: number;
+  linkIssue: WalletIssue | null;
   walletIssue: WalletIssue | null;
   busy: boolean;
   onConnect: () => void;
@@ -613,6 +689,12 @@ function EncryptedView({
               <dd className="font-mono text-xs">{content.contentType}</dd>
             </dl>
             <div className="space-y-2">
+              {linkIssue === "not-authorized" ? (
+                <p className="text-center text-muted-foreground text-sm">
+                  This link does not open this version. A wallet that is a
+                  reader can still open it.
+                </p>
+              ) : null}
               {needsConnect ? (
                 <Button
                   className="w-full"
@@ -654,6 +736,7 @@ function EncryptedView({
 
 function DecryptedView({
   canPublish,
+  openedWithLink,
   plaintext,
   currentVersion,
   latestVersion,
@@ -661,6 +744,7 @@ function DecryptedView({
   origin,
 }: {
   canPublish: boolean;
+  openedWithLink?: boolean;
   plaintext: DraftPlaintext;
   currentVersion: number;
   latestVersion: number;
@@ -692,7 +776,11 @@ function DecryptedView({
           <div className="flex-1" />
         )}
         <div className="ml-auto flex items-center gap-1">
-          {canPublish ? <ShareDraftDialog origin={origin} /> : null}
+          <DecryptedShare
+            canPublish={canPublish}
+            openedWithLink={openedWithLink}
+            origin={origin}
+          />
           <MetaInfo meta={plaintext.meta} />
           <ThemeToggle />
         </div>
@@ -706,6 +794,24 @@ function DecryptedView({
       />
     </div>
   );
+}
+
+function DecryptedShare({
+  canPublish,
+  openedWithLink,
+  origin,
+}: {
+  canPublish: boolean;
+  openedWithLink?: boolean;
+  origin: string;
+}) {
+  if (showsOpenedWithLinkLabel(openedWithLink)) {
+    return <p className="text-muted-foreground text-xs">Opened with a link</p>;
+  }
+  if (canPublish) {
+    return <ShareDraftDialog origin={origin} />;
+  }
+  return null;
 }
 
 function OriginCopy({ origin }: { origin: string }) {
