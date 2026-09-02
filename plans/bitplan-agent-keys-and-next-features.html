@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BitPlan: one envelope, links, hosted drafts</title>
+  <title>BitPlan: one envelope, links, folders, hosted drafts</title>
   <meta name="description" content="Plain-English plan for one bitplan envelope, reader links without a wallet, hosted drafts that can be inscribed later, and what a plan is allowed to do in the browser.">
   <style>
     :root {
@@ -75,15 +75,16 @@
     body:has(#q6-unsure:checked) .ans-q6-unsure { display: inline; }
     body:has(#q7-envelope:checked) .ans-q7-envelope { display: inline; }
     body:has(#q7-links:checked) .ans-q7-links { display: inline; }
+    body:has(#q7-folder:checked) .ans-q7-folder { display: inline; }
     body:has(#q7-hosted:checked) .ans-q7-hosted { display: inline; }
     body:has(#q7-skill:checked) .ans-q7-skill { display: inline; }
     body:has(#q7-unsure:checked) .ans-q7-unsure { display: inline; }
   </style>
 </head>
 <body>
-  <p class="eyebrow">BitPlan · draft 4 · 2026-09-02</p>
-  <h1>One envelope, links, hosted drafts</h1>
-  <p class="lede">Four small steps that let anyone use BitPlan, with or without Bitcoin, and a clear answer to what a plan is allowed to do in the browser. Everything the previous drafts added that we do not need is gone.</p>
+  <p class="eyebrow">BitPlan · draft 5 · 2026-09-02</p>
+  <h1>One envelope, links, folders, hosted drafts</h1>
+  <p class="lede">Five small steps that let anyone use BitPlan, with or without Bitcoin, let a plan be a whole folder, and settle what a plan is allowed to do in the browser.</p>
 
   <h2>Where we landed</h2>
   <ul>
@@ -92,10 +93,13 @@
     <li><b>Links need no new format.</b> A reader link is a throwaway key. Its public half is a normal reader entry in the envelope. Its private half rides in the link. The bytes on chain look exactly like a plan shared with one more person.</li>
     <li><b>Hosted drafts are a go.</b> The same encrypted envelope stored by bitplan.dev instead of the chain, so people with no Bitcoin can use BitPlan. Moving a hosted draft to the chain is called <code>inscribe</code>.</li>
     <li><b>Handing a plan to another person</b> already works with <code>1sat ordinals send</code>. No BitPlan command needed.</li>
+    <li><b>A plan can be a folder.</b> The envelope encrypts bytes, so a folder packed into one bundle is the same envelope, one transaction per version, same readers. Diagrams, images, fonts, a built React app. No new on-chain format needed.</li>
+    <li><b>External images are fine.</b> Most will be on-chain assets served from ORDFS gateways such as api.1sat.app, which are immutable and cheap. A plan may reference them directly. The trade-off, stated once: a reference to a host you do not control can tell that host when the plan was opened.</li>
+    <li><b>Hosting has a cost line.</b> Storing folders and images for hosted drafts is where free ends and paid begins. Chain publishing stays pay-per-byte.</li>
     <li><b>Cut for now:</b> Secure Enclave policies, a headless wallet daemon, signed version lists, a wallet-signed account system, a new viewer route, plugin manifests for four editors. Each has a Linear issue if it comes back.</li>
   </ul>
 
-  <h2>The four steps</h2>
+  <h2>The five steps</h2>
 
   <div class="step">
     <h3>1. One envelope</h3>
@@ -113,16 +117,25 @@
   </div>
 
   <div class="step">
-    <h3>3. Hosted drafts and inscribe</h3>
+    <h3>3. A plan can be a folder</h3>
+    <p class="meta">CLI and viewer · about three days · no envelope changes</p>
+    <p><code>bitplan upload ./plan/</code> packs the folder into one bundle, a small index plus the files, and encrypts it exactly like a single file. The viewer decrypts, unpacks in memory, and hands the files to the frame by rewriting relative paths to in-memory URLs. Images, SVG, CSS, fonts, and a Vite build with one script bundle all resolve. Versioning does not change: a new version is the whole bundle again.</p>
+    <p>Two things this deliberately does not do yet. It does not give a plan a real URL space, so module imports and relative fetches inside a compiled app need the per-plan origin described under "Later". And it re-uploads unchanged files on every version. ORDFS directories, once 1sat-sdk can write them, are the way to reference unchanged files across versions and keep drafts lean. Not required for encrypted plans, so not on the critical path.</p>
+    <p><b>Done when:</b> a folder with an image and a stylesheet opens in the viewer with both showing, and a 2 MB Vite build opens with its script running when scripts are on.</p>
+  </div>
+
+  <div class="step">
+    <h3>4. Hosted drafts and inscribe</h3>
     <p class="meta">Web and CLI · about a week · needs step 2 for the no-wallet case</p>
     <p><code>bitplan upload plan.html --hosted</code> stores the encrypted envelope on bitplan.dev and prints a link. Updating it is the same command again. The server holds ciphertext and a per-draft secret the CLI keeps in its local drafts map, the same idea postplan uses. No accounts, no sign-in, no wallet needed to publish or read when combined with a reader link. When a wallet is present, the plan is also encrypted to it, so it can be inscribed later.</p>
     <p><code>bitplan inscribe h_xxxx</code> puts the draft on the chain. Hosted versions are not transactions, so the on-chain origin does not exist until this moment. The hosted link must redirect to the chain forever after, and inscribe should offer to replay every hosted version so history and version numbers match what people saw.</p>
     <p>What this reuses: the storage helper already used for sponsor images, and the content proxy the viewer already reads from, which learns to serve <code>h_</code> ids. The viewer does not change except for a badge that says "not on chain".</p>
+    <p>Cost lives here. A hosted single-file plan is kilobytes. A hosted folder with images is megabytes, and the same bytes again on every version until ORDFS directories exist. Free covers a handful of plans at the 5 MB limit; folders, more plans, and long histories are the paid tier. Numbers are in the pricing memo, not here.</p>
     <p><b>Done when:</b> a machine with no wallet and no BSV publishes a plan and shares a link that opens; the same plan is inscribed later and the old link still resolves.</p>
   </div>
 
   <div class="step">
-    <h3>4. Skill package</h3>
+    <h3>5. Skill package</h3>
     <p class="meta">New repo · one day · no code changes</p>
     <p>One <code>SKILL.md</code> installable with <code>npx skills add opldotdev/bitplan-skill</code>, laid out like the 1sat CLI skill. It lists the phrases an agent hears ("publish this plan", "share this with X", "put this on chain"), tells the agent to read <code>bitplan.dev/llms.txt</code> first and trust live CLI output over the skill text, wraps the CLI's <code>--json</code> mode, and spells out three rules: a wallet must be unlocked, a plan an agent reads enters its context, and no tool ever returns key material. Other editors get their manifests when someone asks.</p>
   </div>
@@ -130,7 +143,7 @@
   <h2>Three questions answered</h2>
 
   <h3>What is the 512 KB limit?</h3>
-  <p>A number we copied from postplan. It is not a Bitcoin limit. Publishing costs about one satoshi per kilobyte, so a 5 MB plan would cost a few thousand satoshis, still cents. The real ceilings are the content proxy, which refuses envelopes over 640 KB, and how large a single transaction the relay accepts, which we have not tested past this size. Raising the limit means changing two constants and publishing one big test plan.</p>
+  <p>A number we copied from postplan. It is not a Bitcoin limit. Publishing costs about one satoshi per kilobyte, so a 5 MB plan would cost a few thousand satoshis, still cents. The real ceilings are the content proxy, which refuses envelopes over 640 KB, and how large a single transaction the relay accepts, which we have not tested past this size. Raising it to 5 MB means changing two constants and publishing one big test plan. 5 MB is the number: it fits a built app with images, and a 5 MB plan on chain still costs cents.</p>
 
   <h3>Why are scripts off, and what do others do?</h3>
   <div class="wrap"><table>
@@ -140,24 +153,26 @@
       <tr><th>Claude Artifacts</th><td>Yes, can even call Claude</td><td>Yes</td></tr>
       <tr><th>ChatGPT Sites</th><td>Yes, full apps with a database</td><td>Yes</td></tr>
       <tr><th>postplan</th><td>No</td><td>No</td></tr>
-      <tr><th>BitPlan today</th><td>No</td><td>Images from any host, which is a leak</td></tr>
+      <tr><th>BitPlan today</th><td>No</td><td>Images from any host</td></tr>
     </tbody>
   </table></div>
   <p>We are the odd one out with postplan, and for the same reason: a plan is a file someone else wrote, rendered inside our site. The worry is a poison plan. Someone shares a plan with you, you open it, and it does something to you.</p>
   <p>What a poison plan could actually do, and what stops it:</p>
   <ul>
-    <li><b>Phone home.</b> Report that you opened it, when, from where, and anything you typed into it. Stopped by denying the page all network access. Today an image tag can already do this, because we allow images from any host. That needs fixing whether scripts stay off or not.</li>
+    <li><b>Phone home.</b> Report that you opened it, when, from where, and anything you typed into it. Scripts are stopped by denying the page network access. An image from a host the author controls can still report an open, and we accept that, because most plan images are on-chain assets on ORDFS gateways and the rest are a trade the author makes knowingly.</li>
     <li><b>Fake a wallet prompt.</b> Draw a convincing "enter your seed" box. Nothing technical stops a picture of a box. The defence is that the real wallet never asks inside the plan, and the viewer says so around the frame.</li>
     <li><b>Reach the wallet or the site.</b> Stopped already. The plan runs in a frame with no identity of its own, so it cannot see bitplan.dev cookies, storage, or the wallet connection.</li>
     <li><b>Open windows or navigate you away.</b> Stopped already by the frame's sandbox.</li>
   </ul>
-  <p>So the choice is not "scripts or safety". It is whether to allow scripts with the network shut. A page that can compute but cannot talk gives plans copy buttons, choices that build a reply, live tables, and small tools, and a poison plan still has nowhere to send anything. The way to do it is one policy line injected into every rendered plan and a matching rule at upload: no external images, no external anything. Two things to test first: that copy to clipboard works from inside a sandboxed frame, and that the injected policy holds in Safari as well as Chrome.</p>
+  <p>So the choice is not "scripts or safety". It is whether to allow scripts with the network shut. A page that can compute but cannot talk gives plans copy buttons, choices that build a reply, live tables, and small tools, and a poison plan still has nowhere to send anything. The way to do it is one policy line injected into every rendered plan that allows images and fonts from anywhere but denies scripts any network call. Two things to test first: that copy to clipboard works from inside a sandboxed frame, and that the injected policy holds in Safari as well as Chrome.</p>
 
   <h3>Do reader links expose key material?</h3>
   <p>No. The link secret is a fresh random key made for that plan. It is not derived from any wallet, and nothing about a wallet can be derived from it. A link holder gets the plan and nothing else.</p>
 
   <h2>Later, with issues already filed</h2>
   <ul>
+    <li><b>A real origin per plan</b> such as <code>&lt;origin&gt;.plans.bitplan.dev</code> with a service worker serving the decrypted bundle. That is what a compiled app with module imports and relative fetches needs, and what here.now and postplan do. Isolation then comes from the browser's origin model instead of the sandbox attribute.</li>
+    <li><b>ORDFS directories</b> for plans, once <a href="https://github.com/b-open-io/1sat-sdk/pull/13">1sat-sdk #13</a> lands, so a new version references unchanged files instead of re-uploading them. Leaner drafts, not a requirement.</li>
     <li><b>Headless agents</b> that run with nobody present get their own wallet identity. The Secure Enclave part is small: the key already has no hardware lock, so "no fingerprint" is skipping one call. OPL-4324 and OPL-4325.</li>
     <li><b>Billing</b> for hosted drafts, only if they see use. OPL-4330.</li>
     <li><b>Clearer errors</b> when a publish is interrupted or two publishes race. OPL-4333.</li>
@@ -201,28 +216,29 @@
 
   <div class="q">
     <h3>5. Scripts inside plans</h3>
-    <p class="why">Rich plans versus poison plans. Either way, external images get blocked.</p>
+    <p class="why">Rich plans versus poison plans. External images stay allowed either way.</p>
     <label class="opt"><input type="radio" name="q5" id="q5-on"><span><b>Scripts on, network off <span class="rec">Recommended</span></b><small>Copy buttons, choices, live tables, small tools. A poison plan can compute but cannot send anything anywhere. Needs the two tests named above before it ships.</small></span></label>
     <label class="opt"><input type="radio" name="q5" id="q5-off"><span><b>Keep scripts off</b><small>Plans stay CSS-only. Questionnaires copy by select and paste. Smallest surface, same as postplan.</small></span></label>
-    <label class="opt"><input type="radio" name="q5" id="q5-unsure"><span><b>Unsure</b><small>Block external images now. Decide scripts after the two tests.</small></span></label>
+    <label class="opt"><input type="radio" name="q5" id="q5-unsure"><span><b>Unsure</b><small>Decide after the two tests.</small></span></label>
   </div>
 
   <div class="q">
     <h3>6. Size limit</h3>
     <p class="why">512 KB is postplan's number, not Bitcoin's.</p>
-    <label class="opt"><input type="radio" name="q6" id="q6-2mb"><span><b>Raise to 2 MB <span class="rec">Recommended</span></b><small>Room for images and fonts inlined in the plan. Two constants and one big test publish to confirm the relay accepts it.</small></span></label>
+    <label class="opt"><input type="radio" name="q6" id="q6-2mb"><span><b>Raise to 5 MB <span class="rec">Recommended</span></b><small>Room for a built app with images. Two constants and one big test publish to confirm the relay accepts it. Cents on chain; the cost shows up in hosted storage instead.</small></span></label>
     <label class="opt"><input type="radio" name="q6" id="q6-keep"><span><b>Keep 512 KB</b><small>Nothing to test. Plans stay text-sized.</small></span></label>
     <label class="opt"><input type="radio" name="q6" id="q6-unsure"><span><b>Unsure</b><small>Keep 512 KB until a real plan hits it.</small></span></label>
   </div>
 
   <div class="q">
     <h3>7. Start with</h3>
-    <p class="why">All four steps need no wallet work. Pick the one for this week.</p>
+    <p class="why">All five steps need no wallet work. Pick the one for this week.</p>
     <label class="opt"><input type="radio" name="q7" id="q7-envelope"><span><b>One envelope <span class="rec">Recommended</span></b><small>Deletion first. Everything after it touches less code.</small></span></label>
     <label class="opt"><input type="radio" name="q7" id="q7-links"><span><b>Reader links</b><small>The most visible gap closes first. Slightly more code to touch while two formats still exist.</small></span></label>
+    <label class="opt"><input type="radio" name="q7" id="q7-folder"><span><b>Folders</b><small>Three days. Diagrams and assets in plans right away. Needs the size limit raised to be useful.</small></span></label>
     <label class="opt"><input type="radio" name="q7" id="q7-hosted"><span><b>Hosted drafts</b><small>Biggest reach, longest step, and without links it still needs a wallet on both ends.</small></span></label>
     <label class="opt"><input type="radio" name="q7" id="q7-skill"><span><b>Skill package</b><small>One day and useful today, but it changes nothing users can do yet.</small></span></label>
-    <label class="opt"><input type="radio" name="q7" id="q7-unsure"><span><b>Unsure</b><small>Envelope, links, hosted, skill, in that order.</small></span></label>
+    <label class="opt"><input type="radio" name="q7" id="q7-unsure"><span><b>Unsure</b><small>Envelope, links, folders, hosted, skill, in that order.</small></span></label>
   </div>
 
   <div class="q">
@@ -235,18 +251,18 @@
     <button class="btn" type="button" id="copy">Copy my decisions</button>
     <p class="hint">If the button does nothing, scripts are off in this viewer. Click inside the block below to select it all, then copy.</p>
     <pre id="out">=== BITPLAN RESPONSE ===
-Plan: One envelope, links, hosted drafts (draft 4)
+Plan: One envelope, links, folders, hosted drafts (draft 5)
 Origin: 556c3a37caa7fd26945864692b417c2ef60b2a5cb0da7a5428cb7a07d64779af_0
 1. Retire the private envelope: <span class="ans ans-q1-yes">Yes, delete it</span><span class="ans ans-q1-keep">Stop writing it, keep reading it</span><span class="ans ans-q1-unsure">Unsure</span>
 2. Reader links: <span class="ans ans-q2-yes">Build it</span><span class="ans ans-q2-no">Do not build it</span><span class="ans ans-q2-unsure">Unsure</span>
 3. Hosted drafts: <span class="ans ans-q3-token">Per-draft secret, no wallet required</span><span class="ans ans-q3-wallet">Wallet required, no BSV required</span><span class="ans ans-q3-no">No hosted drafts</span><span class="ans ans-q3-unsure">Unsure</span>
 4. Inscribe writes: <span class="ans ans-q4-all">Every hosted version</span><span class="ans ans-q4-latest">Latest only</span><span class="ans ans-q4-unsure">Unsure</span>
 5. Scripts inside plans: <span class="ans ans-q5-on">Scripts on, network off</span><span class="ans ans-q5-off">Keep scripts off</span><span class="ans ans-q5-unsure">Unsure</span>
-6. Size limit: <span class="ans ans-q6-2mb">Raise to 2 MB</span><span class="ans ans-q6-keep">Keep 512 KB</span><span class="ans ans-q6-unsure">Unsure</span>
-7. Start with: <span class="ans ans-q7-envelope">One envelope</span><span class="ans ans-q7-links">Reader links</span><span class="ans ans-q7-hosted">Hosted drafts</span><span class="ans ans-q7-skill">Skill package</span><span class="ans ans-q7-unsure">Unsure</span></pre>
+6. Size limit: <span class="ans ans-q6-2mb">Raise to 5 MB</span><span class="ans ans-q6-keep">Keep 512 KB</span><span class="ans ans-q6-unsure">Unsure</span>
+7. Start with: <span class="ans ans-q7-envelope">One envelope</span><span class="ans ans-q7-links">Reader links</span><span class="ans ans-q7-folder">Folders</span><span class="ans ans-q7-hosted">Hosted drafts</span><span class="ans ans-q7-skill">Skill package</span><span class="ans ans-q7-unsure">Unsure</span></pre>
   </div>
 
-  <p class="muted" style="margin-top:3rem">This plan describes work that has not been built. It replaces drafts 1 to 3 at the same origin.</p>
+  <p class="muted" style="margin-top:3rem">This plan describes work that has not been built. It replaces drafts 1 to 4 at the same origin.</p>
   <script>
     (function () {
       var btn = document.getElementById('copy');
