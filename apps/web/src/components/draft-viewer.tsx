@@ -34,6 +34,7 @@ import {
   type OrdfsContentResult,
 } from "@/lib/ordfs";
 import { normalizeOrigin } from "@/lib/outpoint";
+import { withRenderPolicy } from "@/lib/render-policy";
 import {
   clampVersion,
   parseVersionQuery,
@@ -697,9 +698,10 @@ function DecryptedView({
         </div>
       </header>
       <iframe
+        allow="clipboard-write"
         className="min-h-0 w-full flex-1 border-0 bg-background"
-        sandbox=""
-        srcDoc={plaintext.html}
+        sandbox="allow-scripts"
+        srcDoc={withRenderPolicy(plaintext.html)}
         title={title ?? "Draft"}
       />
     </div>
