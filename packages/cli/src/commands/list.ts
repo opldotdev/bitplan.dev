@@ -26,6 +26,8 @@ export interface ListedDraft {
 	version: number | null
 	updatedAt: string | null
 	file: string | null
+	/** True when the on-chain envelope could not be opened. */
+	unreadable?: boolean
 }
 
 interface RecoveredMetadata {
@@ -53,35 +55,11 @@ export async function listCommand(options: ListOptions): Promise<void> {
 		byOrigin.set(record.origin, { file, record })
 	}
 
-	const drafts: ListedDraft[] = []
-	const recoveryErrors: Array<{ origin: string; error: unknown }> = []
-	for (const coin of coins) {
-		const local = byOrigin.get(coin.origin)
-		let recovered: RecoveredMetadata | undefined
-		if (!local || local.record.latestOutpoint !== coin.outpoint) {
-			try {
-				recovered = await recoverDraftMetadata(wallet, coin)
-			} catch (error) {
-				recoveryErrors.push({ origin: coin.origin, error })
-			}
-		}
-		drafts.push({
-			origin: coin.origin,
-			outpoint: coin.outpoint,
-			id: coin.id,
-			title: recovered ? recovered.title : (local?.record.title ?? null),
-			description: recovered
-				? recovered.description
-				: (local?.record.description ?? null),
-			version: recovered
-				? recovered.version
-				: (local?.record.latestVersion ?? null),
-			updatedAt: recovered
-				? recovered.updatedAt
-				: (local?.record.updatedAt ?? null),
-			file: local?.file ?? null,
-		})
-	}
+	const { drafts, recoveryErrors } = await listedDraftsForCoins(
+		wallet,
+		coins,
+		byOrigin,
+	)
 
 	if (recoveryErrors.length > 0) {
 		console.error(
@@ -110,6 +88,57 @@ export async function listCommand(options: ListOptions): Promise<void> {
 	console.log(
 		options.verbose ? formatDraftsVerbose(drafts) : formatDraftsTable(drafts),
 	)
+}
+
+/** Map wallet coins to list rows, recovering encrypted metadata when needed. */
+export async function listedDraftsForCoins(
+	wallet: WalletInterface,
+	coins: readonly BitplanCoin[],
+	byOrigin: ReadonlyMap<string, { file: string; record: DraftRecord }>,
+	load: FetchDraft = fetchLatest,
+): Promise<{
+	drafts: ListedDraft[]
+	recoveryErrors: Array<{ origin: string; error: unknown }>
+}> {
+	const drafts: ListedDraft[] = []
+	const recoveryErrors: Array<{ origin: string; error: unknown }> = []
+	for (const coin of coins) {
+		const local = byOrigin.get(coin.origin)
+		let recovered: RecoveredMetadata | undefined
+		let unreadable = false
+		if (!local || local.record.latestOutpoint !== coin.outpoint) {
+			try {
+				recovered = await recoverDraftMetadata(wallet, coin, load)
+			} catch (error) {
+				recoveryErrors.push({ origin: coin.origin, error })
+				unreadable = true
+			}
+		}
+		drafts.push({
+			origin: coin.origin,
+			outpoint: coin.outpoint,
+			id: coin.id,
+			title: unreadable
+				? null
+				: recovered
+					? recovered.title
+					: (local?.record.title ?? null),
+			description: unreadable
+				? null
+				: recovered
+					? recovered.description
+					: (local?.record.description ?? null),
+			version: recovered
+				? recovered.version
+				: (local?.record.latestVersion ?? null),
+			updatedAt: recovered
+				? recovered.updatedAt
+				: (local?.record.updatedAt ?? null),
+			file: local?.file ?? null,
+			...(unreadable ? { unreadable: true } : {}),
+		})
+	}
+	return { drafts, recoveryErrors }
 }
 
 export function parseListLimit(value: string | undefined): number {
@@ -195,7 +224,9 @@ export function formatDraftsTable(
 	const headers = ['Title', 'Ver', 'Origin', 'Outpoint', 'Updated']
 
 	const rows = drafts.map((draft) => {
-		const title = draft.title ?? 'Untitled (no local record)'
+		const title = draft.unreadable
+			? '(unreadable: old envelope format)'
+			: (draft.title ?? 'Untitled (no local record)')
 		const ver = draft.version === null ? '-' : `v${draft.version}`
 		return [
 			title,
@@ -214,7 +245,12 @@ export function formatDraftsVerbose(drafts: readonly ListedDraft[]): string {
 	return drafts
 		.map((draft, index) => {
 			const fields: ReadonlyArray<readonly [string, string]> = [
-				['Title', draft.title ?? 'Untitled'],
+				[
+					'Title',
+					draft.unreadable
+						? '(unreadable: old envelope format)'
+						: (draft.title ?? 'Untitled'),
+				],
 				['Description', draft.description ?? '-'],
 				['Version', draft.version === null ? '-' : `v${draft.version}`],
 				['Origin', draft.origin],

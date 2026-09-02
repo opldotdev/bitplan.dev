@@ -1,11 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { PrivateKey, ProtoWallet } from "@bsv/sdk";
 
-import { sealEnvelope as sealCliEnvelope } from "../../../../packages/cli/src/envelope";
-
 import {
   type DraftPlaintext,
-  ENVELOPE_VERSION,
+  ENVELOPE_WIRE_VERSION,
   EnvelopeAccessError,
   EnvelopeError,
   type EnvelopeHeader,
@@ -14,7 +12,7 @@ import {
   MAGIC,
   openEnvelope,
   parseEnvelope,
-  sealPrivateEnvelope,
+  sealEnvelope,
   sharedWith,
 } from "./envelope";
 
@@ -26,11 +24,15 @@ const TOO_SHORT = /too short/;
 const TRUNCATED = /Truncated/;
 const NO_CIPHERTEXT = /no ciphertext/;
 const NOT_JSON = /not valid JSON/;
-const TAMPERED = /not valid JSON|no html document/;
-const VERSION_MISMATCH = /does not match/;
+const TAMPERED = /failed authentication/;
 const WRONG_PROTOCOL = /must be \[2, bitplan\]/;
 const INVALID_CURVE_POINT = /secp256k1 point/;
 const NONCONTIGUOUS = /not contiguous/;
+const UNSUPPORTED_0X01 =
+  "Unsupported bitplan envelope version 0x01; this viewer reads envelope version 0x02.";
+
+const SENDER_IDENTITY =
+  "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 
 const PAD = Uint8Array.from(
   Array.from({ length: 32 }, (_, i) => ((i * 37 + 11) % 251) + 1)
@@ -41,7 +43,7 @@ function xorPad(bytes: number[]): number[] {
   return bytes.map((byte, i) => byte ^ (PAD[i % PAD.length] ?? 0));
 }
 
-function createMockWallet(): {
+function createMockWallet(identityKey = SENDER_IDENTITY): {
   calls: {
     decrypt: Array<{
       counterparty?: string;
@@ -51,6 +53,7 @@ function createMockWallet(): {
     encrypt: Array<{
       counterparty?: string;
       keyID: string;
+      plaintextLength: number;
       protocolID: unknown;
     }>;
   };
@@ -72,6 +75,7 @@ function createMockWallet(): {
     encrypt: [] as Array<{
       counterparty?: string;
       keyID: string;
+      plaintextLength: number;
       protocolID: unknown;
     }>,
   };
@@ -96,14 +100,14 @@ function createMockWallet(): {
       calls.encrypt.push({
         counterparty: args.counterparty,
         keyID: args.keyID,
+        plaintextLength: args.plaintext.length,
         protocolID: args.protocolID,
       });
       return Promise.resolve({ ciphertext: xorPad(args.plaintext) });
     },
     getPublicKey() {
       return Promise.resolve({
-        publicKey:
-          "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        publicKey: identityKey,
       });
     },
   };
@@ -133,45 +137,61 @@ function validHeader(): EnvelopeHeader {
   return {
     key: {
       keyID: "key-1",
-      mode: "brc2-self",
+      mode: "brc2-multi",
+      payloadLength: 48,
       protocolID: [2, "bitplan"],
+      senderIdentityKey: SENDER_IDENTITY,
+      slots: [{ identityKey: SENDER_IDENTITY, length: 1, offset: 48 }],
     },
-    v: 1,
+    v: 2,
   };
 }
 
+function validBody(): Uint8Array {
+  return new Uint8Array(49);
+}
+
 describe("envelope round trip", () => {
-  test("seals and opens through a mock wallet involution", async () => {
+  test("seals a publisher-only envelope as wire 0x02 with one self slot", async () => {
     const { calls, wallet } = createMockWallet();
-    const envelope = await sealPrivateEnvelope(wallet, PLAINTEXT, "key-1");
+    const envelope = await sealEnvelope(wallet, PLAINTEXT, "key-1");
+    const parsed = parseEnvelope(envelope);
     const opened = await openEnvelope(wallet, envelope);
 
+    expect(envelope[MAGIC.length]).toBe(0x02);
+    expect(parsed.header.v).toBe(2);
+    expect(parsed.header.key.mode).toBe("brc2-multi");
+    expect(parsed.header.key.slots).toHaveLength(1);
+    expect(parsed.header.key.slots[0]?.identityKey).toBe(SENDER_IDENTITY);
+    expect(parsed.header.key.senderIdentityKey).toBe(SENDER_IDENTITY);
+    expect(sharedWith(parsed.header)).toEqual([]);
     expect(opened.plaintext).toEqual(PLAINTEXT);
     expect(opened.header.key.keyID).toBe("key-1");
     expect(calls.encrypt).toHaveLength(1);
+    expect(calls.encrypt[0]?.counterparty).toBe("self");
+    expect(calls.encrypt[0]?.plaintextLength).toBe(32);
+    expect(calls.encrypt[0]?.protocolID).toEqual([2, "bitplan"]);
+    expect(calls.encrypt[0]?.keyID).toBe("key-1");
     expect(calls.decrypt).toHaveLength(1);
   });
 
-  test("encrypts the document through the wallet, not a homemade content key", async () => {
+  test("wraps the 32-byte document key, not the whole document", async () => {
     const { calls, wallet } = createMockWallet();
-    const envelope = await sealPrivateEnvelope(wallet, PLAINTEXT, "key-1");
-    const { ciphertext } = parseEnvelope(envelope);
+    const envelope = await sealEnvelope(wallet, PLAINTEXT, "key-1");
+    const { ciphertext, header } = parseEnvelope(envelope);
     const body = Array.from(
       new TextEncoder().encode(JSON.stringify(PLAINTEXT))
     );
 
-    expect(Array.from(ciphertext)).toEqual(xorPad(body));
-    expect(ciphertext.length).toBe(body.length);
-
-    const [wrapCall] = calls.encrypt;
-    expect(wrapCall?.counterparty).toBe("self");
-    expect(wrapCall?.protocolID).toEqual([2, "bitplan"]);
-    expect(wrapCall?.keyID).toBe("key-1");
+    expect(ciphertext.length).toBeGreaterThan(body.length);
+    expect(header.key.payloadLength).toBeLessThan(ciphertext.length);
+    expect(calls.encrypt[0]?.plaintextLength).toBe(32);
+    expect(calls.encrypt[0]?.counterparty).toBe("self");
   });
 
   test("a tampered ciphertext does not round-trip as the document", async () => {
     const { wallet } = createMockWallet();
-    const envelope = await sealPrivateEnvelope(wallet, PLAINTEXT, "key-1");
+    const envelope = await sealEnvelope(wallet, PLAINTEXT, "key-1");
     const last = envelope.length - 1;
     // biome-ignore lint/suspicious/noBitwiseOperators: flip bits to corrupt the body
     envelope[last] = (envelope[last] ?? 0) ^ 0xff;
@@ -181,12 +201,12 @@ describe("envelope round trip", () => {
 
   test("reads the protocolID out of the header", async () => {
     const { calls, wallet } = createMockWallet();
-    const envelope = await sealPrivateEnvelope(wallet, PLAINTEXT, "key-1");
+    const envelope = await sealEnvelope(wallet, PLAINTEXT, "key-1");
     await openEnvelope(wallet, envelope);
     expect(calls.decrypt[0]?.protocolID).toEqual([2, "bitplan"]);
   });
 
-  test("opens a shared slot for the owner and a recipient", async () => {
+  test("opens a recipient slot and rejects a third wallet", async () => {
     const owner = new ProtoWallet(new PrivateKey(1));
     const recipient = new ProtoWallet(new PrivateKey(2));
     const recipientIdentity = (
@@ -194,15 +214,14 @@ describe("envelope round trip", () => {
     ).publicKey;
     const ownerIdentity = (await owner.getPublicKey({ identityKey: true }))
       .publicKey;
-    const envelope = await sealCliEnvelope(
-      owner,
-      PLAINTEXT,
-      "shared-key",
-      [recipientIdentity],
-      ownerIdentity
-    );
+    const envelope = await sealEnvelope(owner, PLAINTEXT, "shared-key", [
+      recipientIdentity,
+    ]);
 
     const parsed = parseEnvelope(envelope);
+    expect(envelope[MAGIC.length]).toBe(0x02);
+    expect(parsed.header.key.slots).toHaveLength(2);
+    expect(parsed.header.key.slots[0]?.identityKey).toBe(ownerIdentity);
     expect(sharedWith(parsed.header)).toEqual([recipientIdentity]);
     expect((await openEnvelope(owner, envelope)).plaintext).toEqual(PLAINTEXT);
     let recipientCounterparty: string | undefined;
@@ -231,7 +250,7 @@ describe("envelope round trip", () => {
 
 describe("envelope header parsing", () => {
   test("rejects bad magic", () => {
-    const envelope = frameEnvelope(validHeader(), new Uint8Array([1, 2, 3]));
+    const envelope = frameEnvelope(validHeader(), validBody());
     // biome-ignore lint/suspicious/noBitwiseOperators: derive a byte that is definitely not the magic
     envelope[0] = 0x42 ^ 0xff;
     expect(() => parseEnvelope(envelope)).toThrow(EnvelopeError);
@@ -239,15 +258,15 @@ describe("envelope header parsing", () => {
   });
 
   test("rejects an unknown version byte", () => {
-    const envelope = frameEnvelope(validHeader(), new Uint8Array([1, 2, 3]));
+    const envelope = frameEnvelope(validHeader(), validBody());
     envelope[4] = 0x03;
     expect(() => parseEnvelope(envelope)).toThrow(BAD_VERSION);
   });
 
-  test("rejects a binary/header version mismatch", () => {
-    const envelope = frameEnvelope(validHeader(), new Uint8Array([1, 2, 3]));
-    envelope[4] = 2;
-    expect(() => parseEnvelope(envelope)).toThrow(VERSION_MISMATCH);
+  test("rejects a 0x01 frame", () => {
+    const envelope = frameEnvelope(validHeader(), validBody());
+    envelope[4] = 0x01;
+    expect(() => parseEnvelope(envelope)).toThrow(UNSUPPORTED_0X01);
   });
 
   test("rejects a buffer too short to hold a header", () => {
@@ -257,7 +276,7 @@ describe("envelope header parsing", () => {
   });
 
   test("rejects a truncated header", () => {
-    const envelope = frameEnvelope(validHeader(), new Uint8Array([1, 2, 3]));
+    const envelope = frameEnvelope(validHeader(), validBody());
     const truncated = envelope.subarray(0, 20);
     expect(() => parseEnvelope(truncated)).toThrow(TRUNCATED);
   });
@@ -271,7 +290,7 @@ describe("envelope header parsing", () => {
     const body = new TextEncoder().encode("not json at all");
     const out = new Uint8Array(9 + body.length + 3);
     out.set(MAGIC, 0);
-    out[4] = ENVELOPE_VERSION;
+    out[4] = ENVELOPE_WIRE_VERSION;
     new DataView(out.buffer).setUint32(5, body.length, true);
     out.set(body, 9);
     out.set([1, 2, 3], 9 + body.length);
@@ -282,7 +301,7 @@ describe("envelope header parsing", () => {
     const header = validHeader();
     const envelope = frameEnvelope(
       { ...header, key: { ...header.key, mode: "plaintext" } } as never,
-      new Uint8Array([1, 2, 3])
+      validBody()
     );
     expect(() => parseEnvelope(envelope)).toThrow(BAD_WRAP_MODE);
   });
@@ -291,7 +310,7 @@ describe("envelope header parsing", () => {
     const header = validHeader();
     const envelope = frameEnvelope(
       { ...header, key: { ...header.key, keyID: "" } },
-      new Uint8Array([1, 2, 3])
+      validBody()
     );
     expect(() => parseEnvelope(envelope)).toThrow(NO_KEY_ID);
   });
@@ -300,22 +319,20 @@ describe("envelope header parsing", () => {
     const header = validHeader();
     const envelope = frameEnvelope(
       { ...header, key: { ...header.key, protocolID: [2, "other"] } },
-      new Uint8Array([1, 2, 3])
+      validBody()
     );
     expect(() => parseEnvelope(envelope)).toThrow(WRONG_PROTOCOL);
   });
 
   test("rejects malformed shared identities and slot coverage", () => {
-    const owner =
-      "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
     const header: EnvelopeHeader = {
       key: {
         keyID: "shared-key",
         mode: "brc2-multi",
         payloadLength: 48,
         protocolID: [2, "bitplan"],
-        senderIdentityKey: owner,
-        slots: [{ identityKey: owner, length: 1, offset: 48 }],
+        senderIdentityKey: SENDER_IDENTITY,
+        slots: [{ identityKey: SENDER_IDENTITY, length: 1, offset: 48 }],
       },
       v: 2,
     };
@@ -323,9 +340,6 @@ describe("envelope header parsing", () => {
     expect(() => parseEnvelope(frameEnvelope(header, body))).not.toThrow();
 
     const invalidIdentity = structuredClone(header);
-    if (invalidIdentity.v !== 2) {
-      throw new Error("expected shared header");
-    }
     invalidIdentity.key.senderIdentityKey = `02${"f".repeat(64)}`;
     const [invalidSlot] = invalidIdentity.key.slots;
     if (!invalidSlot) {
@@ -337,9 +351,6 @@ describe("envelope header parsing", () => {
     );
 
     const gap = structuredClone(header);
-    if (gap.v !== 2) {
-      throw new Error("expected shared header");
-    }
     const [gapSlot] = gap.key.slots;
     if (!gapSlot) {
       throw new Error("expected shared slot");

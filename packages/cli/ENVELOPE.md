@@ -19,58 +19,29 @@ reading. Those are separate capabilities.
 
 ## Binary frame
 
-The envelope is a container, not an encryption algorithm. Its framing and JSON
-header are public. Encryption protects the document in the body.
+The bitplan envelope is a container, not an encryption algorithm. Its framing
+and JSON header are public. Encryption protects the document in the body.
 
 All multi-byte integers are little-endian.
 
 ```text
-+--------+---------+-------------------+------------------+-----------------+
-| 'BPLN' | version | uint32-LE         | header           | ciphertext body |
-| 4 B    | 1 B     | 4 B: header bytes | UTF-8 JSON       | to end          |
-+--------+---------+-------------------+------------------+-----------------+
++--------+------+-------------------+------------------+-------------------+---------------+
+| 'BPLN' | 0x02 | uint32-LE         | header           | payload           | wrapped keys  |
+| 4 B    | 1 B  | 4 B: header bytes | UTF-8 JSON       | ciphertext        | to end        |
++--------+------+-------------------+------------------+-------------------+---------------+
 ```
 
-The version byte is `0x01` for a private envelope and `0x02` for a shared
-envelope. Readers reject unknown versions, bad magic, invalid headers, buffer
-overruns, headers larger than 64 KiB, and empty ciphertext.
-`brc2-self` and `brc2-multi` are BitPlan wire labels; `brc2-multi`
-describes BitPlan's shared layout.
+The wire version byte is `0x02`. Readers reject unknown versions, bad magic,
+invalid headers, buffer overruns, headers larger than 64 KiB, and empty
+ciphertext. `brc2-multi` is the BitPlan wire label for this layout.
 
-## Private
+## Header
 
-Private drafts use this compact format:
-
-```json
-{
-  "v": 1,
-  "key": {
-    "mode": "brc2-self",
-    "protocolID": [2, "bitplan"],
-    "keyID": "<per-draft UUID>"
-  }
-}
-```
-
-The body is one complete result from:
-
-```ts
-wallet.encrypt({
-  protocolID: header.key.protocolID,
-  keyID: header.key.keyID,
-  counterparty: "self",
-  plaintext
-})
-```
-
-The same wallet decrypts it with `counterparty: "self"`.
-
-## Shared
-
-Shared drafts encrypt the document once with the SDK's `SymmetricKey`. The
-wallet then encrypts only that 32-byte document key for each reader. The first
-slot is the publisher's self-encrypted key; each remaining slot is a key wrap
-for one recipient identity public key.
+The document is encrypted once with the SDK's `SymmetricKey`. The wallet then
+encrypts only that 32-byte document key for each reader. The first slot is the
+publisher's self-encrypted key; each remaining slot is a key wrap for one
+recipient identity public key. A plan with no invited readers has one slot, the
+publisher's.
 
 ```json
 {
@@ -127,7 +98,7 @@ material. The identity key names the counterparty; it is not the document key.
 
 ## Plaintext
 
-The private body or shared payload decrypts to this UTF-8 JSON:
+The payload decrypts to this UTF-8 JSON:
 
 ```json
 {
@@ -149,20 +120,20 @@ The private body or shared payload decrypts to this UTF-8 JSON:
 }
 ```
 
-Shared plaintext also has a top-level `headerSha256` field. It is checked and
+Plaintext also has a top-level `headerSha256` field. It is checked and
 removed before the document is returned to the CLI or viewer.
 
 ## Privacy and permanence
 
-With private plans, only the envelope parameters and ciphertext are public.
-Shared plans also publish the reader identity keys so each reader can
-locate its slot. This reveals the access graph, and size and inscription cost
-grow only by one small wrapped key and header entry per reader. BitPlan caps a
-shared version at 128 additional readers.
+Envelope parameters, ciphertext, the publisher identity, and reader identity
+keys are public so each reader can locate its slot. This reveals the access
+graph, and size and inscription cost grow only by one small wrapped key and
+header entry per reader. BitPlan caps a version at 128 additional readers.
 
-Publishing a later private version does not revoke access to an older shared
-version. No inscription can be edited or deleted. BitPlan therefore scans the
-plaintext for credentials before asking the wallet to encrypt it.
+Publishing a later wallet-only version does not revoke access to an older
+version that included other readers. No inscription can be edited or deleted.
+BitPlan therefore scans the plaintext for credentials before asking the wallet
+to encrypt it.
 
 The envelope does not prove who published it. Publishing authority comes from
 the ordinal origin and transaction chain.

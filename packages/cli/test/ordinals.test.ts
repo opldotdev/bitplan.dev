@@ -23,7 +23,7 @@ const SELF_PUB = PrivateKey.fromRandom().toPublicKey().toString()
 /** A tiny BPLN frame, enough to prove the envelope is what got inscribed. */
 const ENVELOPE = Uint8Array.from([
 	...MAGIC,
-	0x01,
+	0x02,
 	0x04,
 	0x00,
 	0x00,

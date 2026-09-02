@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Every envelope the CLI writes or reads is the bitplan envelope (wire version
+  `0x02`, header `v: 2`, key mode `brc2-multi`). A plan with no invited readers
+  has one slot, the publisher's.
+- `bitplan list` still shows coins it cannot decrypt, with `unreadable: true`
+  and the title `(unreadable: old envelope format)`.
+
 ## 0.0.14
 
 ### Changed

@@ -3,11 +3,11 @@
  *
  * Binary layout (see ENVELOPE.md):
  *
- *   'BPLN' | version | uint32-LE header length | UTF-8 JSON header | body
+ *   'BPLN' | 0x02 | uint32-LE header length | UTF-8 JSON header | payload ciphertext | wrapped keys
  *
- * v1 has one self-encrypted BRC-2 ciphertext. v2 encrypts the document once
- * with an SDK SymmetricKey, then concatenates one wallet-wrapped copy of that
- * key per authorized identity after the payload ciphertext.
+ * The document is encrypted once with an SDK SymmetricKey. One wallet-wrapped
+ * copy of that key follows the payload ciphertext per authorized identity.
+ * A plan with no invited readers has one slot, the publisher's.
  */
 
 import { Buffer } from 'node:buffer'
@@ -24,8 +24,8 @@ import { CliError } from './errors.js'
 
 /** ASCII 'BPLN'. */
 export const MAGIC = Uint8Array.from([0x42, 0x50, 0x4c, 0x4e])
-export const ENVELOPE_VERSION = 0x01
 export const SHARED_ENVELOPE_VERSION = 0x02
+export const ENVELOPE_WIRE_VERSION = SHARED_ENVELOPE_VERSION
 
 /** Largest header we will parse; a real header is a few hundred bytes. */
 const MAX_HEADER_BYTES = 64 * 1024
@@ -33,18 +33,6 @@ export const MAX_SHARED_RECIPIENTS = 128
 const CONTENT_KEY_BYTES = 32
 const SYMMETRIC_CIPHERTEXT_OVERHEAD = 48
 const HEADER_SHA256_PLACEHOLDER = '0'.repeat(64)
-
-export interface PrivateEnvelopeKey {
-	/** BRC-2 self-encryption through the author's wallet. */
-	mode: 'brc2-self'
-	protocolID: [number, string]
-	keyID: string
-}
-
-export interface PrivateEnvelopeHeader {
-	v: 1
-	key: PrivateEnvelopeKey
-}
 
 export interface SharedEnvelopeSlot {
 	/** Identity public key authorized to decrypt this slot. */
@@ -70,7 +58,7 @@ export interface SharedEnvelopeHeader {
 	key: SharedEnvelopeKey
 }
 
-export type EnvelopeHeader = PrivateEnvelopeHeader | SharedEnvelopeHeader
+export type EnvelopeHeader = SharedEnvelopeHeader
 
 export interface DraftMeta {
 	title: string | null
@@ -91,7 +79,7 @@ export interface DraftMeta {
 export interface DraftPlaintext {
 	meta: DraftMeta
 	html: string
-	/** Present on new shared envelopes to bind the public header to the payload. */
+	/** Binds the public header to the payload. */
 	headerSha256?: string
 }
 
@@ -127,9 +115,8 @@ export function normalizeIdentityKey(value: string): string {
 	}
 }
 
-/** Recipient identities in a shared header, excluding the sender's self slot. */
+/** Recipient identities in the header, excluding the sender's self slot. */
 export function sharedWith(header: EnvelopeHeader): string[] {
-	if (header.v === 1) return []
 	return header.key.slots
 		.map((slot) => slot.identityKey)
 		.filter((identityKey) => identityKey !== header.key.senderIdentityKey)
@@ -167,10 +154,10 @@ function compareKeys(a: string, b: string): number {
 /**
  * Encrypt a plaintext document into a complete envelope.
  *
- * Private bodies are `wallet.encrypt` of the JSON. Shared bodies contain one
- * SDK-encrypted JSON payload followed by wallet-wrapped copies of its key.
- * protocolID and keyID ride in the cleartext header so a reader can ask its
- * wallet to decrypt without local state.
+ * The body is one SDK-encrypted JSON payload followed by wallet-wrapped copies
+ * of its key. A plan with no invited readers still has the publisher's self
+ * slot. protocolID and keyID ride in the cleartext header so a reader can ask
+ * its wallet to decrypt without local state.
  */
 export async function sealEnvelope(
 	wallet: EnvelopeWallet,
@@ -188,40 +175,13 @@ export async function sealEnvelope(
 			`A shared draft supports at most ${MAX_SHARED_RECIPIENTS} recipient identities; got ${recipients.length}.`,
 		)
 	}
-	if (recipients.length > 0) {
-		return sealSharedEnvelope(
-			wallet,
-			body,
-			keyID,
-			recipients,
-			resolvedSenderIdentityKey,
-		)
-	}
-
-	let encrypted: Awaited<ReturnType<typeof wallet.encrypt>>
-	try {
-		encrypted = await wallet.encrypt({
-			protocolID: BITPLAN_PROTOCOL,
-			keyID,
-			counterparty: 'self',
-			plaintext: Array.from(body),
-		})
-	} catch (error) {
-		throw new CliError(
-			`The wallet refused to encrypt this draft (protocol bitplan, keyID ${keyID}): ${error instanceof Error ? error.message : String(error)}`,
-		)
-	}
-
-	const header: EnvelopeHeader = {
-		v: 1,
-		key: {
-			mode: 'brc2-self',
-			protocolID: [BITPLAN_PROTOCOL[0], BITPLAN_PROTOCOL[1]],
-			keyID,
-		},
-	}
-
-	return frameEnvelope(header, Uint8Array.from(encrypted.ciphertext))
+	return sealSharedEnvelope(
+		wallet,
+		body,
+		keyID,
+		recipients,
+		resolvedSenderIdentityKey,
+	)
 }
 
 async function sealSharedEnvelope(
@@ -354,7 +314,7 @@ export function frameEnvelope(
 /**
  * Split a serialized envelope into its header and ciphertext.
  *
- * Reads private v1 and shared v2 bitplan envelopes.
+ * Reads the bitplan envelope (wire version 0x02).
  */
 export function parseEnvelope(bytes: Uint8Array): ParsedEnvelope {
 	const prefix = MAGIC.length + 1 + 4
@@ -370,10 +330,10 @@ export function parseEnvelope(bytes: Uint8Array): ParsedEnvelope {
 			)
 		}
 	}
-	const version = bytes[MAGIC.length]
-	if (version !== ENVELOPE_VERSION && version !== SHARED_ENVELOPE_VERSION) {
+	const version = bytes[MAGIC.length] ?? 0
+	if (version !== ENVELOPE_WIRE_VERSION) {
 		throw new CliError(
-			`Unsupported bitplan envelope version 0x${(version ?? 0).toString(16).padStart(2, '0')}; this CLI understands 0x01 and 0x02.`,
+			`Unsupported bitplan envelope version 0x${version.toString(16).padStart(2, '0')}; this CLI reads envelope version 0x02.`,
 		)
 	}
 
@@ -404,9 +364,10 @@ export function parseEnvelope(bytes: Uint8Array): ParsedEnvelope {
 	}
 
 	const header = assertHeader(parsed)
-	if (header.v !== version) {
+	const wireVersion: number = version
+	if (header.v !== wireVersion) {
 		throw new CliError(
-			`Malformed bitplan envelope: binary version 0x${version.toString(16).padStart(2, '0')} does not match header version ${header.v}.`,
+			`Malformed bitplan envelope: binary version 0x${wireVersion.toString(16).padStart(2, '0')} does not match header version ${header.v}.`,
 		)
 	}
 	const ciphertext = bytes.subarray(prefix + headerLength)
@@ -414,7 +375,7 @@ export function parseEnvelope(bytes: Uint8Array): ParsedEnvelope {
 		throw new CliError('Truncated bitplan envelope: no ciphertext present.')
 	}
 
-	if (header.v === 2) assertSharedLayout(header, ciphertext.length)
+	assertSharedLayout(header, ciphertext.length)
 	return { header, ciphertext }
 }
 
@@ -423,9 +384,9 @@ function assertHeader(value: unknown): EnvelopeHeader {
 		throw new CliError('Malformed bitplan envelope: header is not an object.')
 	}
 	const h = value as Record<string, unknown>
-	if (h.v !== 1 && h.v !== 2) {
+	if (h.v !== 2) {
 		throw new CliError(
-			`Unsupported bitplan header version ${String(h.v)}; this CLI understands 1 and 2.`,
+			`Unsupported bitplan header version ${String(h.v)}; this CLI reads envelope version 2.`,
 		)
 	}
 	const key = h.key
@@ -456,19 +417,8 @@ function assertHeader(value: unknown): EnvelopeHeader {
 	}
 
 	const protocolID: [number, string] = [k.protocolID[0], k.protocolID[1]]
-	if (h.v === 1) {
-		if (k.mode !== 'brc2-self') {
-			throw new CliError(
-				`Unsupported bitplan key mode "${String(k.mode)}" for header v1.`,
-			)
-		}
-		return { v: 1, key: { mode: 'brc2-self', protocolID, keyID: k.keyID } }
-	}
-
 	if (k.mode !== 'brc2-multi') {
-		throw new CliError(
-			`Unsupported bitplan key mode "${String(k.mode)}" for header v2.`,
-		)
+		throw new CliError(`Unsupported bitplan key mode "${String(k.mode)}".`)
 	}
 	if (
 		!Number.isSafeInteger(k.payloadLength) ||
@@ -616,32 +566,28 @@ export async function openEnvelope(
 ): Promise<{ header: EnvelopeHeader; plaintext: DraftPlaintext }> {
 	const { header, ciphertext: body } = parseEnvelope(bytes)
 	const level = assertProtocolLevel(header.key.protocolID[0])
-	let counterparty: string = 'self'
-	let ciphertext = body
-	if (header.v === 2) {
-		let identityKey: string
-		try {
-			const result = await wallet.getPublicKey({ identityKey: true })
-			identityKey = normalizeIdentityKey(result.publicKey)
-		} catch (error) {
-			throw new CliError(
-				`The wallet could not provide its identity key to open this shared draft: ${error instanceof Error ? error.message : String(error)}`,
-			)
-		}
-		const slot = header.key.slots.find(
-			(candidate) => candidate.identityKey === identityKey,
+	let identityKey: string
+	try {
+		const result = await wallet.getPublicKey({ identityKey: true })
+		identityKey = normalizeIdentityKey(result.publicKey)
+	} catch (error) {
+		throw new CliError(
+			`The wallet could not provide its identity key to open this shared draft: ${error instanceof Error ? error.message : String(error)}`,
 		)
-		if (!slot) {
-			throw new CliError(
-				'This wallet identity is not authorized to decrypt this version of the draft.',
-			)
-		}
-		counterparty =
-			identityKey === header.key.senderIdentityKey
-				? 'self'
-				: header.key.senderIdentityKey
-		ciphertext = body.subarray(slot.offset, slot.offset + slot.length)
 	}
+	const slot = header.key.slots.find(
+		(candidate) => candidate.identityKey === identityKey,
+	)
+	if (!slot) {
+		throw new CliError(
+			'This wallet identity is not authorized to decrypt this version of the draft.',
+		)
+	}
+	const counterparty =
+		identityKey === header.key.senderIdentityKey
+			? 'self'
+			: header.key.senderIdentityKey
+	const ciphertext = body.subarray(slot.offset, slot.offset + slot.length)
 
 	let decrypted: Awaited<ReturnType<typeof wallet.decrypt>>
 	try {
@@ -657,25 +603,24 @@ export async function openEnvelope(
 		)
 	}
 
-	let plaintextBytes = Uint8Array.from(decrypted.plaintext)
-	if (header.v === 2) {
-		if (plaintextBytes.length !== CONTENT_KEY_BYTES) {
-			throw new CliError(
-				`The wallet unwrapped ${plaintextBytes.length} key bytes; a shared bitplan key must be exactly ${CONTENT_KEY_BYTES} bytes.`,
-			)
-		}
-		try {
-			const contentKey = new SymmetricKey(Array.from(plaintextBytes))
-			plaintextBytes = Uint8Array.from(
-				contentKey.decrypt(
-					Array.from(body.subarray(0, header.key.payloadLength)),
-				) as number[],
-			)
-		} catch {
-			throw new CliError(
-				'The shared draft payload failed authenticated decryption.',
-			)
-		}
+	const unwrappedKey = Uint8Array.from(decrypted.plaintext)
+	if (unwrappedKey.length !== CONTENT_KEY_BYTES) {
+		throw new CliError(
+			`The wallet unwrapped ${unwrappedKey.length} key bytes; a shared bitplan key must be exactly ${CONTENT_KEY_BYTES} bytes.`,
+		)
+	}
+	let plaintextBytes: Uint8Array
+	try {
+		const contentKey = new SymmetricKey(Array.from(unwrappedKey))
+		plaintextBytes = Uint8Array.from(
+			contentKey.decrypt(
+				Array.from(body.subarray(0, header.key.payloadLength)),
+			) as number[],
+		)
+	} catch {
+		throw new CliError(
+			'The shared draft payload failed authenticated decryption.',
+		)
 	}
 
 	let parsed: unknown
@@ -688,12 +633,10 @@ export async function openEnvelope(
 	}
 
 	const plaintext = assertPlaintext(parsed)
-	if (header.v === 2) {
-		if (plaintext.headerSha256 !== headerSha256(header)) {
-			throw new CliError(
-				'The shared draft header does not match its authenticated payload.',
-			)
-		}
+	if (plaintext.headerSha256 !== headerSha256(header)) {
+		throw new CliError(
+			'The shared draft header does not match its authenticated payload.',
+		)
 	}
 	const { headerSha256: _headerSha256, ...document } = plaintext
 	return { header, plaintext: document }

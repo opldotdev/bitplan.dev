@@ -193,11 +193,12 @@ encryption or publishing rather than assuming consent.
 
 ## How it works
 
-- **Encryption.** Private drafts use one BRC-2 `wallet.encrypt` call with
-  `counterparty: self`. Shared drafts use the SDK's `SymmetricKey` to encrypt
-  the document once, then BRC-2-wrap that key for the owner and each recipient.
-  The CLI never handles identity private keys or implements its own cipher. See
-  [ENVELOPE.md](./ENVELOPE.md) for the byte layout.
+- **Encryption.** Each draft is the bitplan envelope: the SDK's `SymmetricKey`
+  encrypts the document once, then BRC-2-wraps that 32-byte key for the
+  publisher and each invited reader. A plan with no invited readers has one
+  slot, the publisher's. The CLI never handles identity private keys or
+  implements its own cipher. See [ENVELOPE.md](./ENVELOPE.md) for the byte
+  layout.
 - **Versioning.** The first publish inscribes a 1-satoshi output. Later
   publishes spend that satoshi back to you carrying a new envelope. Only the
   wallet holding the coin can publish the next one.

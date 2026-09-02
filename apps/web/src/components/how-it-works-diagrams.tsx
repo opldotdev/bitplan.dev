@@ -33,9 +33,8 @@ export function ArchitectureDiagram() {
       </div>
       <figcaption className="sr-only">
         The CLI validates and packages the draft. The wallet performs identity
-        key operations and publishes. In the browser, the wallet decrypts a
-        private draft or unwraps a shared document key; the SDK opens the shared
-        payload.
+        key operations and publishes. In the browser, the wallet unwraps the
+        document key; the SDK opens the payload.
       </figcaption>
     </figure>
   );
@@ -70,24 +69,11 @@ export function EncryptionDiagram() {
   return (
     <figure>
       <div
-        aria-label="Private plans are encrypted entirely by the wallet. Shared plans are encrypted once with a fresh document key, then the wallet encrypts that key for the owner and every reader. Both become BPLN envelopes on-chain."
-        className="not-typeset grid gap-3 sm:grid-cols-2"
+        aria-label="The plan is encrypted once with a fresh document key. The wallet encrypts that key for the publisher and every named reader. The result is a BPLN envelope on-chain."
+        className="not-typeset mx-auto max-w-sm"
         role="img"
       >
         <div className="rounded-lg border bg-card p-3">
-          <p className="mb-3 font-semibold text-sm">Private</p>
-          <EncryptionStep>Plan JSON</EncryptionStep>
-          <DownArrow />
-          <EncryptionStep detail={'[2, "bitplan"] · keyID · self'}>
-            wallet.encrypt
-          </EncryptionStep>
-          <DownArrow />
-          <EncryptionStep detail="public header + encrypted body">
-            BPLN v1
-          </EncryptionStep>
-        </div>
-        <div className="rounded-lg border bg-card p-3">
-          <p className="mb-3 font-semibold text-sm">Shared</p>
           <EncryptionStep detail="fresh random 32-byte document key">
             Plan JSON
           </EncryptionStep>
@@ -96,8 +82,12 @@ export function EncryptionDiagram() {
             SDK AES-256-GCM
           </EncryptionStep>
           <DownArrow />
-          <EncryptionStep detail="wallet-wrapped key per identity">
-            BPLN v2
+          <EncryptionStep detail={'[2, "bitplan"] · keyID · self or reader'}>
+            wallet.encrypt
+          </EncryptionStep>
+          <DownArrow />
+          <EncryptionStep detail="document ciphertext + one wrapped key per reader">
+            BPLN 0x02
           </EncryptionStep>
         </div>
       </div>
@@ -112,7 +102,7 @@ export function EncryptionDiagram() {
 function BitPlanStackDiagram() {
   return (
     <svg
-      aria-label="BitPlan publish path: the CLI validates and encrypts a shared payload with the SDK, then asks the BRC-100 wallet to wrap reader keys, sign, and publish to the BSV chain. Read path: OrdFS returns ciphertext to bitplan.dev, which asks the wallet to unwrap the document key and decrypts the payload in the browser."
+      aria-label="BitPlan publish path: the CLI validates and encrypts the payload with the SDK, then asks the BRC-100 wallet to wrap reader keys, sign, and publish to the BSV chain. Read path: OrdFS returns ciphertext to bitplan.dev, which asks the wallet to unwrap the document key and decrypts the payload in the browser."
       className="mx-auto h-auto w-full max-w-xl"
       role="img"
       viewBox="0 0 480 280"

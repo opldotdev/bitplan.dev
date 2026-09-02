@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 const LAYOUT = [
   { field: "magic", size: "4 bytes", value: "ASCII BPLN" },
-  { field: "version", size: "1 byte", value: "0x01 private / 0x02 shared" },
+  { field: "version", size: "1 byte", value: "0x02" },
   {
     field: "header size",
     size: "4 bytes",
@@ -27,7 +27,7 @@ const LAYOUT = [
   {
     field: "ciphertext",
     size: "rest",
-    value: "private ciphertext, or shared payload followed by wrapped keys",
+    value: "document ciphertext followed by one wrapped key per reader",
   },
 ] as const;
 
@@ -94,25 +94,24 @@ export default function EnvelopePage() {
         </div>
       </section>
       <section id="content-key">
-        <h2>Private</h2>
+        <h2>Content key</h2>
         <p>
-          The header names the fixed <code>[2, &quot;bitplan&quot;]</code>
-          protocol and <code>keyID</code>. The wallet derives the encryption key
-          internally and encrypts the complete plan with{" "}
-          <code>counterparty: &quot;self&quot;</code>. The <code>keyID</code> is
-          a public derivation label, not key material.
+          The SDK encrypts the plan once with a fresh random 32-byte document
+          key and AES-256-GCM. The wallet encrypts that key for each reader. A
+          plan with no invited readers has one slot, the publisher&apos;s. The
+          header names the fixed <code>[2, &quot;bitplan&quot;]</code> protocol
+          and <code>keyID</code>. The <code>keyID</code> is a public derivation
+          label, not key material.
         </p>
       </section>
       <section id="sharing">
-        <h2>Shared</h2>
+        <h2>Readers</h2>
         <p>
-          The SDK encrypts the plan once with a fresh random 32-byte key and
-          AES-256-GCM. The wallet encrypts that key for the owner and each
-          reader. A reader asks their wallet for their copy, then decrypts the
-          plan locally. Identity keys are public; private keys stay in the
-          wallet. The SDK gets the document key and each IV from the operating
-          system&apos;s secure random generator and fails if none is available.
-          Each IV is 32 bytes.
+          A reader asks their wallet for their wrapped copy of the document key,
+          then decrypts the plan locally. Identity keys are public; private keys
+          stay in the wallet. The SDK gets the document key and each IV from the
+          operating system&apos;s secure random generator and fails if none is
+          available. Each IV is 32 bytes.
         </p>
       </section>
       <section id="security">
@@ -120,10 +119,10 @@ export default function EnvelopePage() {
         <p>
           AES-GCM provides confidentiality and tamper detection. The wallet will
           fail on the wrong protocol, <code>keyID</code>, counterparty, or
-          ciphertext. A shared payload includes a SHA-256 commitment to its
-          canonical header. It detects changes made without the document key.
-          The envelope does not prove authorship by itself; the ordinal&apos;s
-          origin and transaction chain do that.
+          ciphertext. The payload includes a SHA-256 commitment to its canonical
+          header. It detects changes made without the document key. The envelope
+          does not prove authorship by itself; the ordinal&apos;s origin and
+          transaction chain do that.
         </p>
       </section>
     </>

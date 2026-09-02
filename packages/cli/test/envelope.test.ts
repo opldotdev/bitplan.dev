@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { PrivateKey, ProtoWallet } from '@bsv/sdk'
-import { BITPLAN_PROTOCOL } from '../src/constants.js'
 import {
 	type DraftPlaintext,
-	ENVELOPE_VERSION,
+	ENVELOPE_WIRE_VERSION,
 	frameEnvelope,
 	MAGIC,
 	MAX_SHARED_RECIPIENTS,
@@ -16,7 +15,7 @@ import {
 	sharedWith,
 } from '../src/envelope.js'
 import { CliError } from '../src/errors.js'
-import { createMockWallet, xorPad } from './mockWallet.js'
+import { createMockWallet } from './mockWallet.js'
 
 const PLAINTEXT: DraftPlaintext = {
 	meta: {
@@ -38,17 +37,6 @@ const PLAINTEXT: DraftPlaintext = {
 
 const OWNER_IDENTITY = new PrivateKey(1).toPublicKey().toString()
 const RECIPIENT_IDENTITY = new PrivateKey(2).toPublicKey().toString()
-
-function validHeader() {
-	return {
-		v: 1 as const,
-		key: {
-			mode: 'brc2-self' as const,
-			protocolID: [2, 'bitplan'] as [number, string],
-			keyID: 'key-1',
-		},
-	}
-}
 
 function validSharedHeader() {
 	return {
@@ -78,19 +66,24 @@ describe('envelope round trip', () => {
 		expect(calls.decrypt).toHaveLength(1)
 	})
 
-	test('encrypts the document through the wallet, not a homemade content key', async () => {
-		const { wallet, calls } = createMockWallet()
+	test('sealEnvelope with no recipients writes one publisher slot', async () => {
+		const identityKey =
+			'0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+		const { wallet } = createMockWallet(identityKey)
 		const envelope = await sealEnvelope(wallet, PLAINTEXT, 'key-1')
-		const { ciphertext } = parseEnvelope(envelope)
-		const body = Array.from(new TextEncoder().encode(JSON.stringify(PLAINTEXT)))
 
-		expect(Array.from(ciphertext)).toEqual(xorPad(body))
-		expect(ciphertext.length).toBe(body.length)
-
-		const wrapCall = calls.encrypt[0]
-		expect(wrapCall?.counterparty).toBe('self')
-		expect(wrapCall?.protocolID).toEqual(BITPLAN_PROTOCOL)
-		expect(wrapCall?.keyID).toBe('key-1')
+		expect(envelope[4]).toBe(ENVELOPE_WIRE_VERSION)
+		const parsed = parseEnvelope(envelope)
+		expect(parsed.header.v).toBe(2)
+		expect(parsed.header.key.mode).toBe('brc2-multi')
+		expect(parsed.header.key.slots).toHaveLength(1)
+		expect(parsed.header.key.slots[0]?.identityKey).toBe(
+			normalizeIdentityKey(identityKey),
+		)
+		expect(parsed.header.key.senderIdentityKey).toBe(
+			normalizeIdentityKey(identityKey),
+		)
+		expect((await openEnvelope(wallet, envelope)).plaintext).toEqual(PLAINTEXT)
 	})
 
 	test('reuses the keyID given, so every version of a draft shares one', async () => {
@@ -105,21 +98,6 @@ describe('envelope round trip', () => {
 		expect(second.header.key.keyID).toBe('draft-k')
 	})
 
-	test('header describes the layout the spec promises', async () => {
-		const { wallet } = createMockWallet()
-		const envelope = await sealEnvelope(wallet, PLAINTEXT, 'key-1')
-
-		expect(Array.from(envelope.subarray(0, 4))).toEqual(Array.from(MAGIC))
-		expect(envelope[4]).toBe(ENVELOPE_VERSION)
-
-		const { header, ciphertext } = parseEnvelope(envelope)
-		expect(header.v).toBe(1)
-		expect(header.key.mode).toBe('brc2-self')
-		expect(header.key.protocolID).toEqual([2, 'bitplan'])
-		expect(header.key.keyID).toBe('key-1')
-		expect(ciphertext.length).toBeGreaterThan(0)
-	})
-
 	test('a tampered ciphertext does not round-trip as the document', async () => {
 		const { wallet } = createMockWallet()
 		const envelope = await sealEnvelope(wallet, PLAINTEXT, 'key-1')
@@ -127,11 +105,11 @@ describe('envelope round trip', () => {
 		envelope[last] = (envelope[last] ?? 0) ^ 0xff
 
 		await expect(openEnvelope(wallet, envelope)).rejects.toThrow(
-			/not valid JSON|no html document/,
+			/failed authenticated decryption|must be exactly 32 bytes/,
 		)
 	})
 
-	test('uses the exact bitplan protocol for v1 wallet decryption', async () => {
+	test('uses the exact bitplan protocol for wallet decryption', async () => {
 		const { wallet, calls } = createMockWallet()
 		const envelope = await sealEnvelope(wallet, PLAINTEXT, 'key-1')
 		await openEnvelope(wallet, envelope)
@@ -170,7 +148,6 @@ describe('envelope round trip', () => {
 			recipientIdentity,
 			secondRecipientIdentity,
 		])
-		if (parsed.header.v !== 2) throw new Error('expected shared header')
 		expect(parsed.header.key.mode).toBe('brc2-multi')
 		expect(parsed.header.key.payloadLength).toBeGreaterThan(plaintextBytes + 48)
 		expect(parsed.header.key.slots).toHaveLength(3)
@@ -221,7 +198,6 @@ describe('envelope round trip', () => {
 			recipientIdentity,
 		])
 		const parsed = parseEnvelope(envelope)
-		if (parsed.header.v !== 2) throw new Error('expected shared header')
 		const tamperedHeader = structuredClone(parsed.header)
 		const recipientSlot = tamperedHeader.key.slots[1]
 		if (!recipientSlot) throw new Error('expected recipient slot')
@@ -275,16 +251,33 @@ describe('envelope round trip', () => {
 
 describe('envelope header parsing', () => {
 	test('rejects bad magic', () => {
-		const envelope = frameEnvelope(validHeader(), new Uint8Array([1, 2, 3]))
+		const envelope = frameEnvelope(validSharedHeader(), new Uint8Array(128))
 		envelope[0] = 0x42 ^ 0xff
 		expect(() => parseEnvelope(envelope)).toThrow(CliError)
 		expect(() => parseEnvelope(envelope)).toThrow(/magic/)
 	})
 
 	test('rejects an unknown version byte', () => {
-		const envelope = frameEnvelope(validHeader(), new Uint8Array([1, 2, 3]))
+		const envelope = frameEnvelope(validSharedHeader(), new Uint8Array(128))
 		envelope[4] = 0x03
 		expect(() => parseEnvelope(envelope)).toThrow(/version 0x03/)
+	})
+
+	test('rejects a 0x01 frame', () => {
+		const envelope = frameEnvelope(validSharedHeader(), new Uint8Array(128))
+		envelope[4] = 0x01
+		expect(() => parseEnvelope(envelope)).toThrow(
+			'Unsupported bitplan envelope version 0x01; this CLI reads envelope version 0x02.',
+		)
+		try {
+			parseEnvelope(envelope)
+			throw new Error('expected parseEnvelope to throw')
+		} catch (error) {
+			expect(error).toBeInstanceOf(CliError)
+			expect((error as Error).message).toBe(
+				'Unsupported bitplan envelope version 0x01; this CLI reads envelope version 0x02.',
+			)
+		}
 	})
 
 	test('rejects a buffer too short to hold a header', () => {
@@ -294,13 +287,13 @@ describe('envelope header parsing', () => {
 	})
 
 	test('rejects a truncated header', () => {
-		const envelope = frameEnvelope(validHeader(), new Uint8Array([1, 2, 3]))
+		const envelope = frameEnvelope(validSharedHeader(), new Uint8Array(128))
 		const truncated = envelope.subarray(0, 20)
 		expect(() => parseEnvelope(truncated)).toThrow(/Truncated/)
 	})
 
 	test('rejects a header with no ciphertext behind it', () => {
-		const envelope = frameEnvelope(validHeader(), new Uint8Array([]))
+		const envelope = frameEnvelope(validSharedHeader(), new Uint8Array([]))
 		expect(() => parseEnvelope(envelope)).toThrow(/no ciphertext/)
 	})
 
@@ -308,7 +301,7 @@ describe('envelope header parsing', () => {
 		const body = new TextEncoder().encode('not json at all')
 		const out = new Uint8Array(9 + body.length + 3)
 		out.set(MAGIC, 0)
-		out[4] = ENVELOPE_VERSION
+		out[4] = ENVELOPE_WIRE_VERSION
 		new DataView(out.buffer).setUint32(5, body.length, true)
 		out.set(body, 9)
 		out.set([1, 2, 3], 9 + body.length)
@@ -316,34 +309,28 @@ describe('envelope header parsing', () => {
 	})
 
 	test('rejects an unknown key mode', () => {
-		const header = validHeader()
+		const header = validSharedHeader()
 		const envelope = frameEnvelope(
 			{ ...header, key: { ...header.key, mode: 'plaintext' } } as never,
-			new Uint8Array([1, 2, 3]),
+			new Uint8Array(128),
 		)
 		expect(() => parseEnvelope(envelope)).toThrow(/key mode/)
 	})
 
 	test('rejects a header with no keyID', () => {
-		const header = validHeader()
+		const header = validSharedHeader()
 		const envelope = frameEnvelope(
 			{ ...header, key: { ...header.key, keyID: '' } },
-			new Uint8Array([1, 2, 3]),
+			new Uint8Array(128),
 		)
 		expect(() => parseEnvelope(envelope)).toThrow(/keyID is missing/)
 	})
 
-	test('requires the exact bitplan protocol in private and shared headers', () => {
-		const privateHeader = validHeader()
-		privateHeader.key.protocolID = [2, 'not-bitplan']
+	test('requires the exact bitplan protocol in the header', () => {
+		const header = validSharedHeader()
+		header.key.protocolID = [1, 'bitplan']
 		expect(() =>
-			parseEnvelope(frameEnvelope(privateHeader, Uint8Array.of(1))),
-		).toThrow(/protocolID must be/)
-
-		const sharedHeader = validSharedHeader()
-		sharedHeader.key.protocolID = [1, 'bitplan']
-		expect(() =>
-			parseEnvelope(frameEnvelope(sharedHeader, new Uint8Array(128))),
+			parseEnvelope(frameEnvelope(header, new Uint8Array(128))),
 		).toThrow(/protocolID must be/)
 	})
 
@@ -435,7 +422,6 @@ describe('envelope header parsing', () => {
 			OWNER_IDENTITY,
 		)
 		const parsed = parseEnvelope(envelope)
-		if (parsed.header.v !== 2) throw new Error('expected shared header')
 		const headerBytes = new TextEncoder().encode(JSON.stringify(parsed.header))
 		const payloadOffset = MAGIC.length + 1 + 4 + headerBytes.length
 		envelope[payloadOffset] = (envelope[payloadOffset] ?? 0) ^ 0xff

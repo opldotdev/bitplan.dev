@@ -1,10 +1,6 @@
 import { Hash, Utils, type WalletInterface } from "@bsv/sdk";
 
-import {
-  type DraftPlaintext,
-  sealPrivateEnvelope,
-  toBase64,
-} from "@/lib/envelope";
+import { type DraftPlaintext, sealEnvelope, toBase64 } from "@/lib/envelope";
 
 const CONTENT_TYPE = "application/x-bitplan";
 const MAX_BODY_LENGTH = 50_000;
@@ -166,11 +162,7 @@ export async function publishDraft(
   plaintext: DraftPlaintext
 ): Promise<PublishedDraft> {
   const { createContext, inscribe } = await import("@1sat/actions");
-  const envelope = await sealPrivateEnvelope(
-    wallet,
-    plaintext,
-    crypto.randomUUID()
-  );
+  const envelope = await sealEnvelope(wallet, plaintext, crypto.randomUUID());
   const result = await inscribe.execute(
     createContext(wallet, { chain: "main" }),
     {

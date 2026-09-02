@@ -60,14 +60,11 @@ export async function fetchCommand(
 		contentType: content.contentType,
 		envelopeVersion: header.v,
 		keyID: header.key.keyID,
-		access:
-			header.v === 1
-				? { mode: 'wallet-only', readers: [] }
-				: {
-						mode: 'shared',
-						senderIdentityKey: header.key.senderIdentityKey,
-						readers: sharedWith(header),
-					},
+		access: {
+			mode: sharedWith(header).length === 0 ? 'wallet-only' : 'shared',
+			senderIdentityKey: header.key.senderIdentityKey,
+			readers: sharedWith(header),
+		},
 		meta: plaintext.meta,
 	}
 

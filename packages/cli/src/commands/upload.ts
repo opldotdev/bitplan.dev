@@ -436,7 +436,7 @@ async function adoptFromChain(
 		)
 	}
 	const { header, plaintext } = await openEnvelope(wallet, content.bytes)
-	const previousPublisher = header.v === 2 ? [header.key.senderIdentityKey] : []
+	const previousPublisher = [header.key.senderIdentityKey]
 	return {
 		keyID: header.key.keyID,
 		sequence: content.sequence,

@@ -3,11 +3,12 @@ import {
 	formatDraftsTable,
 	formatDraftsVerbose,
 	type ListedDraft,
+	listedDraftsForCoins,
 	parseListLimit,
 	recoverDraftMetadata,
 	timeAgo,
 } from '../src/commands/list.js'
-import { type DraftPlaintext, sealEnvelope } from '../src/envelope.js'
+import { type DraftPlaintext, MAGIC, sealEnvelope } from '../src/envelope.js'
 import type { BitplanCoin } from '../src/ordinals.js'
 import { createMockWallet } from './mockWallet.js'
 
@@ -95,6 +96,63 @@ describe('list options and recovery', () => {
 			updatedAt: '2026-08-29T16:00:00.000Z',
 		})
 		expect(calls.decrypt).toHaveLength(1)
+	})
+
+	test('openEnvelope failure still lists the coin as unreadable', async () => {
+		const { wallet } = createMockWallet()
+		const oldPrivate = Uint8Array.from([
+			...MAGIC,
+			0x01,
+			0x04,
+			0x00,
+			0x00,
+			0x00,
+			0x7b,
+			0x7d,
+			0x00,
+			0x01,
+			0x02,
+			0x03,
+		])
+		const coin = {
+			id: 'coin-1',
+			origin: ORIGIN,
+			outpoint: TIP,
+			output: {},
+		} as BitplanCoin
+		const { drafts } = await listedDraftsForCoins(
+			wallet,
+			[coin],
+			new Map(),
+			async () => ({
+				bytes: oldPrivate,
+				contentType: 'application/x-bitplan',
+				origin: ORIGIN,
+				outpoint: TIP,
+				sequence: 0,
+			}),
+		)
+
+		expect(drafts).toEqual([
+			{
+				origin: ORIGIN,
+				outpoint: TIP,
+				id: 'coin-1',
+				title: null,
+				description: null,
+				version: null,
+				updatedAt: null,
+				file: null,
+				unreadable: true,
+			},
+		])
+		expect(JSON.stringify(drafts, null, 2)).toContain('"unreadable": true')
+		expect(formatDraftsTable(drafts, { now: NOW })).toContain(
+			'(unreadable: old envelope format)',
+		)
+		expect(formatDraftsVerbose(drafts)).toContain(
+			'(unreadable: old envelope format)',
+		)
 	})
 })
 

@@ -11,17 +11,23 @@ const TXID = "a".repeat(64);
 const ORIGIN = `${TXID}_0`;
 const originalFetch = globalThis.fetch;
 
+const SENDER_IDENTITY =
+  "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+
 function envelopeBytes(): Uint8Array {
   return frameEnvelope(
     {
       key: {
         keyID: "test-key",
-        mode: "brc2-self",
+        mode: "brc2-multi",
+        payloadLength: 48,
         protocolID: [2, "bitplan"],
+        senderIdentityKey: SENDER_IDENTITY,
+        slots: [{ identityKey: SENDER_IDENTITY, length: 1, offset: 48 }],
       },
-      v: 1,
+      v: 2,
     },
-    Uint8Array.of(1, 2, 3)
+    new Uint8Array(49)
   );
 }
 

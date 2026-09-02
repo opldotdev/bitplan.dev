@@ -9,37 +9,23 @@ import {
 } from "@/components/how-it-works-diagrams";
 
 const PRIVATE_CODE = `
-import type { WalletInterface } from "@bsv/sdk"
+import { SymmetricKey, type WalletInterface } from "@bsv/sdk"
 
 const protocolID: [2, string] = [2, "bitplan"]
-type Wallet = Pick<WalletInterface, "decrypt" | "encrypt">
+type Wallet = Pick<WalletInterface, "encrypt">
 
-export async function encryptPrivate(
+export async function wrapPublisherKey(
   wallet: Wallet,
   keyID: string,
-  planBytes: Uint8Array,
+  documentKey: SymmetricKey,
 ) {
   const { ciphertext } = await wallet.encrypt({
     protocolID,
     keyID,
     counterparty: "self",
-    plaintext: Array.from(planBytes),
+    plaintext: documentKey.toArray("be", 32),
   })
   return Uint8Array.from(ciphertext)
-}
-
-export async function decryptPrivate(
-  wallet: Wallet,
-  keyID: string,
-  ciphertext: Uint8Array,
-) {
-  const { plaintext } = await wallet.decrypt({
-    protocolID,
-    keyID,
-    counterparty: "self",
-    ciphertext: Array.from(ciphertext),
-  })
-  return Uint8Array.from(plaintext)
 }
 `;
 
@@ -85,17 +71,15 @@ export default function HowItWorksPage() {
       <p>
         BitPlan publishes encrypted HTML drafts as versioned 1Sat Ordinal
         inscriptions. BRC-100 is the interface BitPlan uses to talk to the
-        wallet; it is not an inscription format. For sharing, the CLI uses the
-        SDK to encrypt the document once and asks the wallet to wrap its key for
-        each reader. The wallet always owns the identity keys, signs, and
-        publishes.
+        wallet; it is not an inscription format. The CLI uses the SDK to encrypt
+        the document once and asks the wallet to wrap its key for each reader.
+        The wallet always owns the identity keys, signs, and publishes.
       </p>
       <ArchitectureDiagram />
       <p>
         bitplan.dev fetches public ciphertext from 1Sat. In the browser, the
-        connected wallet decrypts a private draft or unwraps a shared document
-        key. The site has no drafts database, and plaintext never reaches its
-        server.
+        connected wallet unwraps the document key. The site has no drafts
+        database, and plaintext never reaches its server.
       </p>
       <section id="encryption">
         <h2>Encryption</h2>
@@ -106,10 +90,10 @@ export default function HowItWorksPage() {
           secret key.
         </p>
         <EncryptionDiagram />
-        <h3>Private</h3>
+        <h3>Only you</h3>
         <p>
-          The wallet encrypts the complete plan through the BRC-100{" "}
-          <code>encrypt</code> method. It derives the key from the wallet root,
+          The wallet encrypts the 32-byte document key to itself, not the whole
+          document. It derives that wrap from the wallet root,
           <code> [2, &quot;bitplan&quot;]</code>, the draft&apos;s{" "}
           <code>keyID</code>, and <code>counterparty: &quot;self&quot;</code>.
           The root key and derived key stay in the wallet. The{" "}
@@ -117,10 +101,10 @@ export default function HowItWorksPage() {
         </p>
         <CodeExample
           code={PRIVATE_CODE}
-          filename="private-envelope.ts"
-          label="See the private wallet calls"
+          filename="self-slot.ts"
+          label="See the publisher self slot"
         />
-        <h3>Shared</h3>
+        <h3>You and named readers</h3>
         <p>
           The CLI creates a fresh random 32-byte document key and encrypts the
           plan once with the <code>@bsv/sdk</code> AES-256-GCM implementation.
@@ -137,16 +121,16 @@ export default function HowItWorksPage() {
         </p>
         <CodeExample
           code={SHARED_CODE}
-          filename="shared-envelope.ts"
-          label="See the shared key flow"
+          filename="reader-slots.ts"
+          label="See the document key flow"
         />
         <h3>What this protects</h3>
         <p>
           AES-GCM hides the plan and detects changes to its ciphertext. A wrong
           wallet, key, or counterparty cannot decrypt it. The chain still
-          reveals the envelope size and version. Shared envelopes also reveal
-          the publisher and reader identity keys. Access to an older shared
-          version cannot be revoked because that inscription is permanent.
+          reveals the envelope size, version, and the publisher and reader
+          identity keys. Access to an older version cannot be revoked because
+          that inscription is permanent.
         </p>
       </section>
       <section id="publishing">
@@ -162,11 +146,10 @@ export default function HowItWorksPage() {
             and content fee, then asks for confirmation.
           </li>
           <li>
-            <strong>Encrypt.</strong> A private draft is one BRC-100 wallet{" "}
-            <code>wallet.encrypt</code> call. A shared draft is encrypted once
-            with the SDK, then the wallet wraps its 32-byte key for the owner
-            and each reader. The wallet keeps every identity private key. The
-            CLI builds the <Link href="/docs/envelope">envelope</Link>.
+            <strong>Encrypt.</strong> The plan is encrypted once with the SDK,
+            then the wallet wraps its 32-byte document key for the owner and
+            each reader. The wallet keeps every identity private key. The CLI
+            builds the <Link href="/docs/envelope">envelope</Link>.
           </li>
           <li>
             <strong>Publish through the wallet.</strong> The wallet signs and
@@ -193,9 +176,8 @@ export default function HowItWorksPage() {
         </p>
         <p>
           The access list is public. Each reader adds only a small wrapped key,
-          not another copy of the document. <code>--private</code> makes a later
-          version wallet-only, but no transaction can revoke access to an older
-          shared inscription.
+          not another copy of the document. A later version can drop invited
+          readers, but no transaction can revoke access to an older inscription.
         </p>
       </section>
       <section id="versions">
@@ -212,10 +194,10 @@ export default function HowItWorksPage() {
         <h2>Reading</h2>
         <p>
           The viewer fetches and validates the encrypted envelope, then calls
-          <code> wallet.decrypt</code>. For a shared draft the wallet returns
-          the document key and the SDK decrypts the payload in the browser. The
-          HTML stays in the browser and renders in a sandboxed iframe. The CLI
-          equivalent is <code>bitplan fetch &lt;origin|url&gt;</code>.
+          <code> wallet.decrypt</code>. The wallet returns the document key and
+          the SDK decrypts the payload in the browser. The HTML stays in the
+          browser and renders in a sandboxed iframe. The CLI equivalent is{" "}
+          <code>bitplan fetch &lt;origin|url&gt;</code>.
         </p>
         <p>
           <code>bitplan list</code> finds drafts by asking the wallet for
