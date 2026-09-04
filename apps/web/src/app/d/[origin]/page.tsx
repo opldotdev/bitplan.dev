@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { permanentRedirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { DraftResolving, DraftViewer } from "@/components/draft-viewer";
+import { HostedDraftRedirect } from "@/components/hosted-draft-redirect";
 import { draftShareDescription } from "@/lib/format";
 import { readHostedRecord } from "@/lib/hosted";
 import { isHostedId } from "@/lib/hosted-id";
@@ -68,7 +68,7 @@ export default async function DraftPage({
   if (origin && isHostedId(origin)) {
     const record = await readHostedRecord(origin);
     if (record?.origin) {
-      permanentRedirect(`/d/${record.origin}`);
+      return <HostedDraftRedirect origin={record.origin} />;
     }
   }
 
