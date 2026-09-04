@@ -2,7 +2,6 @@ import { SITE_URL } from "@/lib/site";
 
 const ROBOTS_TXT = `User-Agent: *
 Allow: /
-Disallow: /d/
 Content-Signal: ai-train=no, search=yes, ai-input=yes
 
 Sitemap: ${SITE_URL}/sitemap.xml

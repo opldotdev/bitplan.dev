@@ -30,10 +30,19 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "X-Robots-Tag",
-            value: "noindex",
+            value: "noindex, nofollow, nosnippet, noimageindex",
           },
         ],
         source: "/d/:path*",
+      },
+      {
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow, nosnippet",
+          },
+        ],
+        source: "/ordfs/:path*",
       },
       {
         headers: [
