@@ -5,11 +5,13 @@ description: >
   with BitPlan and a BRC-100 wallet. Use when asked to make a BitPlan, publish
   or update a plan, share one with a person or team, create a private reader
   link, move a hosted draft on chain, or explain bitplan.dev.
+metadata:
+  version: "0.2.1"
 ---
 
 # BitPlan
 
-**Skill version: 0.2.0**
+**Skill version: 0.2.1**
 
 BitPlan turns one self-contained HTML file into an encrypted living plan. A
 BRC-100 wallet owns the keys. A draft can stay hosted as ciphertext while it
@@ -18,6 +20,22 @@ wallet interface, not the inscription format.
 
 Use `bunx bitplan` or `npx bitplan`. Never install the CLI globally. Run it
 from the repository the plan belongs to so BitPlan records Git metadata.
+
+## Choose the wallet honestly
+
+Prefer a compatible BRC-100 wallet the user already has. Check it with
+`bunx bitplan auth`; do not silently create, import, or replace a wallet.
+
+The 1Sat CLI is intended to become the local fallback wallet for agents, but
+that application-facing bridge is not released yet. `1sat serve wallet`
+currently serves authenticated wallet storage; it is not a drop-in endpoint
+for BitPlan's BRC-100 `HTTPWalletJSON` client. Do not point BitPlan at it or
+claim the fallback works until the 1Sat headless-wallet acceptance test passes.
+
+If no compatible wallet is available, explain that BitPlan cannot create or
+update an encrypted plan today. Let the calling workflow offer a local file or
+an explicitly approved non-BitPlan host. Never weaken BitPlan into a plaintext
+or agent-held-key mode to make the command succeed.
 
 ## Check the live product first
 

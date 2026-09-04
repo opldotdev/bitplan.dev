@@ -36,6 +36,13 @@ export default function AgentsAndWalletsPage() {
           The CLI never asks for a mnemonic or private key. The wallet still
           controls every permission.
         </p>
+        <p>
+          Prefer a compatible wallet you already use. The 1Sat CLI is planned as
+          a local fallback for agent sessions, but its current{" "}
+          <code>1sat serve wallet</code> command exposes wallet storage rather
+          than the application-facing endpoint BitPlan needs. Do not configure
+          it as a BitPlan wallet yet.
+        </p>
       </section>
 
       <section id="phone">
