@@ -28,6 +28,7 @@ export function buildProgram(): Command {
 			'Create encrypted hosted plans and publish them as 1Sat Ordinals.',
 		)
 		.version(CLI_VERSION)
+		.enablePositionalOptions()
 
 	const auth = program
 		.command('auth')
