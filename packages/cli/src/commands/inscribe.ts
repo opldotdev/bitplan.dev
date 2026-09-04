@@ -4,6 +4,11 @@ import readline from 'node:readline/promises'
 import { bestEffortCatalogInscribed } from '../catalog.js'
 import { CliError } from '../errors.js'
 import {
+	estimatePayloadCostAtNetworkFloorForPayloadsOrNull,
+	fetchArcadeMiningFee,
+	type MiningFeePolicy,
+} from '../fee.js'
+import {
 	isHostedId,
 	markHostedInscribed,
 	readHostedRecord,
@@ -27,7 +32,7 @@ import {
 	saveDraftRecord,
 } from '../state.js'
 import { connectWallet } from '../wallet.js'
-import { estimateFeeSats, viewerUrl } from './upload.js'
+import { viewerUrl } from './upload.js'
 
 export interface InscribeOptions {
 	allVersions?: boolean
@@ -99,6 +104,14 @@ export async function inscribeCommand(
 		envelopes.push(content.bytes)
 	}
 	const totalBytes = envelopes.reduce((sum, bytes) => sum + bytes.length, 0)
+	const networkFee = options.json ? null : await fetchArcadeMiningFee()
+	const networkFloorSats =
+		networkFee === null
+			? null
+			: estimatePayloadCostAtNetworkFloorForPayloadsOrNull(
+					envelopes.map((envelope) => envelope.length),
+					networkFee,
+				)
 
 	await confirmInscribe({
 		id: target.id,
@@ -106,6 +119,8 @@ export async function inscribeCommand(
 		allVersions: options.allVersions === true,
 		totalVersions: hosted.versions,
 		envelopeBytes: totalBytes,
+		networkFloorSats,
+		networkFee,
 		skip: options.yes === true,
 		quiet: options.json === true,
 	})
@@ -430,6 +445,8 @@ interface ConfirmInscribeInput {
 	allVersions: boolean
 	totalVersions: number
 	envelopeBytes: number
+	networkFloorSats: number | null
+	networkFee: MiningFeePolicy | null
 	skip: boolean
 	quiet: boolean
 }
@@ -445,7 +462,16 @@ async function confirmInscribe(input: ConfirmInscribeInput): Promise<void> {
 	)
 	console.log(`Writing:  ${input.versionsToWrite}`)
 	console.log(
-		`Fee:      ~${estimateFeeSats(input.envelopeBytes).toLocaleString('en-US')} sats at 1 sat/KB`,
+		`Size:     ${input.envelopeBytes.toLocaleString('en-US')} bytes of encrypted payload`,
+	)
+	console.log(
+		input.networkFloorSats === null || input.networkFee === null
+			? 'Network floor: unavailable (Arcade policy could not be fetched).'
+			: `Network floor: ~${input.networkFloorSats.toLocaleString('en-US')} sats for ${input.versionsToWrite === 1 ? 'payload' : `${input.versionsToWrite} payloads`} at ${input.networkFee.satoshis} sats / ${input.networkFee.bytes} bytes`,
+	)
+	console.log('Excludes transaction overhead; your wallet may charge more.')
+	console.log(
+		'Fee:      Set by your wallet; review the amount in its approval prompt.',
 	)
 	console.log('')
 	console.log(

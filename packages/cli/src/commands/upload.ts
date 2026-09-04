@@ -11,7 +11,6 @@ import {
 import { bestEffortCatalogSync } from '../catalog.js'
 import {
 	ENVELOPE_OVERHEAD_ESTIMATE,
-	FEE_SATS_PER_KB,
 	isBitplanContentType,
 	VIEWER_BASE_URL,
 } from '../constants.js'
@@ -26,6 +25,11 @@ import {
 	sharedWith as sharedWithHeader,
 } from '../envelope.js'
 import { CliError } from '../errors.js'
+import {
+	estimatePayloadCostAtNetworkFloorOrNull,
+	fetchArcadeMiningFee,
+	type MiningFeePolicy,
+} from '../fee.js'
 import { collectGitMetadata } from '../git.js'
 import {
 	appendHostedVersion,
@@ -282,10 +286,19 @@ export async function uploadCommand(
 	const plaintextBytes = new TextEncoder().encode(
 		JSON.stringify(plaintext),
 	).length
+	const envelopeBytes = estimateEnvelopeBytes(plaintextBytes, sharedWith.length)
+	const networkFee =
+		!hosted && !options.json ? await fetchArcadeMiningFee() : null
+	const networkFloorSats =
+		networkFee === null
+			? null
+			: estimatePayloadCostAtNetworkFloorOrNull(envelopeBytes, networkFee)
 	await confirmPublish({
 		file: resolvedFile,
 		title: meta.title,
-		envelopeBytes: estimateEnvelopeBytes(plaintextBytes, sharedWith.length),
+		envelopeBytes,
+		networkFloorSats,
+		networkFee,
 		origin: targetOrigin,
 		version: nextVersion,
 		walletUrl: url,
@@ -531,11 +544,6 @@ export function viewerUrl(origin: string): string {
 	return `${VIEWER_BASE_URL}/${encodeURIComponent(origin)}`
 }
 
-/** 1 sat/KB, rounded up — the usual 1Sat Ordinals rate. */
-export function estimateFeeSats(bytes: number): number {
-	return Math.max(1, Math.ceil((bytes / 1000) * FEE_SATS_PER_KB))
-}
-
 /** Approximation shown before wallet encryption prompts. */
 export function estimateEnvelopeBytes(
 	plaintextBytes: number,
@@ -678,6 +686,8 @@ interface ConfirmInput {
 	file: string
 	title: string | null
 	envelopeBytes: number
+	networkFloorSats: number | null
+	networkFee: MiningFeePolicy | null
 	origin: string | null
 	version: number | null
 	walletUrl: string
@@ -697,13 +707,19 @@ async function confirmPublish(input: ConfirmInput): Promise<void> {
 	console.log(`${kind} of: ${input.file}`)
 	console.log(`Title:    ${input.title ?? '(untitled)'}`)
 	console.log(
-		`Size:     ${input.envelopeBytes.toLocaleString('en-US')} bytes on chain (encrypted)`,
+		`Size:     ${input.envelopeBytes.toLocaleString('en-US')} bytes estimated encrypted payload`,
 	)
 	if (input.hosted) {
 		console.log('Hosted by bitplan.dev (no transaction)')
 	} else {
 		console.log(
-			`Fee:      ~${estimateFeeSats(input.envelopeBytes).toLocaleString('en-US')} sats at 1 sat/KB`,
+			input.networkFloorSats === null || input.networkFee === null
+				? 'Network floor: unavailable (Arcade policy could not be fetched).'
+				: `Network floor: ~${input.networkFloorSats.toLocaleString('en-US')} sats for payload at ${input.networkFee.satoshis} sats / ${input.networkFee.bytes} bytes`,
+		)
+		console.log('Excludes transaction overhead; your wallet may charge more.')
+		console.log(
+			'Fee:      Set by your wallet; review the amount in its approval prompt.',
 		)
 	}
 	if (input.origin) {

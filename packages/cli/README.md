@@ -172,6 +172,14 @@ Version:  1
 Viewer:   https://bitplan.dev/d/<txid>_0
 ```
 
+Before an on-chain confirmation, the CLI reads Arcade's public `/policy` and
+shows a payload-only cost at the current network floor. It uses the estimated
+encrypted payload size for uploads and the sum of independently rounded
+payload costs for multi-version inscribes. This is not a wallet quote: it
+excludes transaction overhead and wallet rate or ancestor differences. If the
+policy cannot be read, the floor is shown as unavailable and publishing still
+continues. Hosted uploads and quiet `--json` output do not request the policy.
+
 ## Flags
 
 ```

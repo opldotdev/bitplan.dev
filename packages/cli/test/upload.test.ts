@@ -99,6 +99,7 @@ if (!CHILD_RUN) {
 	let envelopeSenderIdentityKey = OWNER_IDENTITY_KEY
 	let relayError: Error | undefined
 	let stateSaveError: Error | undefined
+	let policyFetchCalls: number
 	let config: ConfigFile
 	let ordfsContent:
 		| {
@@ -280,6 +281,7 @@ if (!CHILD_RUN) {
 		envelopeSenderIdentityKey = OWNER_IDENTITY_KEY
 		relayError = undefined
 		stateSaveError = undefined
+		policyFetchCalls = 0
 		config = { shareWith: [] }
 		ordfsContent = undefined
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bitplan-upload-test-'))
@@ -290,6 +292,15 @@ if (!CHILD_RUN) {
 		)
 		spyOn(console, 'log').mockImplementation(() => {})
 		spyOn(console, 'warn').mockImplementation(() => {})
+		spyOn(globalThis, 'fetch').mockImplementation((async () => {
+			policyFetchCalls += 1
+			return new Response(
+				JSON.stringify({
+					policy: { miningFee: { satoshis: 100, bytes: 1000 } },
+				}),
+				{ status: 200, headers: { 'content-type': 'application/json' } },
+			)
+		}) as unknown as typeof fetch)
 	})
 
 	afterEach(() => {
@@ -304,6 +315,30 @@ if (!CHILD_RUN) {
 			await uploadCommand(htmlFile, { yes: true })
 
 			expect(calls.seals[0]?.sharedWith).toEqual(['default-reader'])
+		})
+
+		test('shows the payload floor while keeping the wallet fee approval note', async () => {
+			await uploadCommand(htmlFile, { new: true, yes: true })
+
+			const printed = (
+				console.log as unknown as { mock: { calls: Array<[string]> } }
+			).mock.calls
+				.map(([message]) => String(message))
+				.join('\n')
+			expect(printed).toContain('Network floor: ~')
+			expect(printed).toContain(
+				'Excludes transaction overhead; your wallet may charge more.',
+			)
+			expect(printed).toContain(
+				'Fee:      Set by your wallet; review the amount in its approval prompt.',
+			)
+		})
+
+		test('skips the policy request for hosted and quiet JSON uploads', async () => {
+			await uploadCommand(htmlFile, { hosted: true, yes: true })
+			await uploadCommand(htmlFile, { new: true, json: true, yes: true })
+
+			expect(policyFetchCalls).toBe(0)
 		})
 
 		test('shared size estimates count the document once', () => {

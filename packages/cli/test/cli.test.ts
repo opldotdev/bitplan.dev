@@ -4,11 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { Command } from 'commander'
 import { fetchCommand } from '../src/commands/fetch.js'
-import {
-	estimateFeeSats,
-	resolveDescription,
-	viewerUrl,
-} from '../src/commands/upload.js'
+import { resolveDescription, viewerUrl } from '../src/commands/upload.js'
 import { isBitplanContentType } from '../src/constants.js'
 import { buildProgram, main } from '../src/index.js'
 import { originFromReference } from '../src/ordfs.js'
@@ -323,17 +319,10 @@ describe('npx and bunx bin runners', () => {
 	})
 })
 
-describe('viewer urls and fees', () => {
+describe('viewer urls', () => {
 	test('the viewer url url-encodes the outpoint', () => {
 		expect(viewerUrl(ORIGIN)).toBe(`https://bitplan.dev/d/${ORIGIN}`)
 		expect(viewerUrl('a b')).toBe('https://bitplan.dev/d/a%20b')
-	})
-
-	test('the fee estimate is 1 sat per KB, rounded up', () => {
-		expect(estimateFeeSats(1)).toBe(1)
-		expect(estimateFeeSats(1000)).toBe(1)
-		expect(estimateFeeSats(1001)).toBe(2)
-		expect(estimateFeeSats(45_000)).toBe(45)
 	})
 })
 

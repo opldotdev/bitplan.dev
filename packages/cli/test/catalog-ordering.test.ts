@@ -220,6 +220,14 @@ if (!CHILD_RUN) {
 			const method = (
 				init?.method ?? (input instanceof Request ? input.method : 'GET')
 			).toUpperCase()
+			if (url === 'https://arcade.1sat.app/policy' && method === 'GET') {
+				return new Response(
+					JSON.stringify({
+						policy: { miningFee: { satoshis: 100, bytes: 1000 } },
+					}),
+					{ status: 200, headers: { 'content-type': 'application/json' } },
+				)
+			}
 			if (url.includes('/api/catalog/') && method === 'PUT') {
 				order.push('sync')
 			}

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.0.18
+
+### Added
+
+- On-chain upload and inscribe confirmations show Arcade's advertised fee
+  rate and an estimate for the encrypted payload at that rate. Policy failures
+  do not block publishing.
+
+### Fixed
+
+- Removed the hard-coded 1 sat/KB estimate. The CLI now distinguishes the
+  network floor from the wallet's actual fee and excludes transaction overhead
+  from the payload estimate.
+
 ## 0.0.17
 
 ### Fixed

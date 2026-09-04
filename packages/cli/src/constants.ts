@@ -53,13 +53,13 @@ export const DEFAULT_ORDFS_URL = 'https://api.1sat.app'
 /** Accepts Atomic BEEF, attempts ORDFS capture, then submits to Arcade. */
 export const DEFAULT_RELAY_URL = 'https://api.1sat.app/1sat/tx'
 
-/** Fee estimate shown before publishing, in satoshis per 1000 bytes. */
-export const FEE_SATS_PER_KB = 1
+/** Arcade's public mining-fee floor policy used for payload-only estimates. */
+export const DEFAULT_ARCADE_POLICY_URL = 'https://arcade.1sat.app/policy'
 
 /**
  * Approximate bytes the BPLN envelope adds on top of the plaintext: magic +
  * version + header length + JSON header (base64 wrapped key dominates) + GCM
- * tag. Used only for the pre-confirmation size/fee estimate — the exact size
+ * tag. Used only for the pre-confirmation size estimate — the exact size
  * is known after sealing.
  */
 export const ENVELOPE_OVERHEAD_ESTIMATE = 700
