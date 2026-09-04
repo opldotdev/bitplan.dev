@@ -141,6 +141,16 @@ export function viewerDocumentTitle(
   return trimmedTitle ? `${trimmedTitle} · BitPlan` : genericTitle;
 }
 
+export function viewerVersionHref(
+  origin: string,
+  version: number,
+  latestVersion: number,
+  fragment = ""
+): string {
+  const query = version === latestVersion ? "" : `?v=${version}`;
+  return `/d/${origin}${query}${fragment}`;
+}
+
 function assertNever(value: never): never {
   throw new Error(`Unhandled state: ${String(value)}`);
 }
@@ -514,8 +524,16 @@ export function DraftViewer() {
       if (view.phase !== "decrypted" || version === view.draft.currentVersion) {
         return;
       }
-      const query = version === view.draft.latestVersion ? "" : `?v=${version}`;
-      router.replace(`/d/${view.draft.origin}${query}`, { scroll: false });
+      const fragment = view.openedWithLink ? window.location.hash : "";
+      router.replace(
+        viewerVersionHref(
+          view.draft.origin,
+          version,
+          view.draft.latestVersion,
+          fragment
+        ),
+        { scroll: false }
+      );
     },
     [router, view]
   );

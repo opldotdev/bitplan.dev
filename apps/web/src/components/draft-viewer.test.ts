@@ -6,6 +6,7 @@ import {
   type ViewerState,
   viewerDocumentTitle,
   viewerRequestKey,
+  viewerVersionHref,
 } from "./draft-viewer";
 
 const ORIGIN_A = `${"a".repeat(64)}_0`;
@@ -69,6 +70,24 @@ describe("DraftViewer route state", () => {
     expect(isViewerStateCurrent(decryptedState(requestKey), requestKey)).toBe(
       true
     );
+  });
+});
+
+describe("DraftViewer version links", () => {
+  test("keeps the reader key when selecting an older version", () => {
+    expect(viewerVersionHref("h_example", 2, 3, "#k=a_B-c_D")).toBe(
+      "/d/h_example?v=2#k=a_B-c_D"
+    );
+  });
+
+  test("keeps the reader key and omits the query for the latest version", () => {
+    expect(viewerVersionHref("h_example", 3, 3, "#k=a_B-c_D")).toBe(
+      "/d/h_example#k=a_B-c_D"
+    );
+  });
+
+  test("does not add a fragment for wallet-opened plans", () => {
+    expect(viewerVersionHref(ORIGIN_A, 1, 2)).toBe(`/d/${ORIGIN_A}?v=1`);
   });
 });
 
