@@ -33,6 +33,19 @@ npx bitplan fetch <origin>
 npx bitplan version
 ```
 
+Install the BitPlan agent skill:
+
+```sh
+bunx bitplan skill install
+```
+
+This runs the Skills CLI to install the skill from `opldotdev/bitplan.dev`.
+If the wrapper cannot run, use the Skills CLI directly:
+
+```sh
+npx skills add opldotdev/bitplan.dev --skill bitplan -g
+```
+
 ## How it works
 
 ```mermaid

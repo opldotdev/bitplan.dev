@@ -134,6 +134,22 @@ relay status, and viewer URL. `--json` still requires `--yes`; it never treats a
 machine-readable response as permission to publish. Fetch JSON includes both
 the decrypted HTML and its metadata, so `--meta` is not needed.
 
+## Agent skill
+
+Install the BitPlan agent skill:
+
+```sh
+bunx bitplan skill install
+```
+
+This runs the Skills CLI to install the skill from `opldotdev/bitplan.dev`.
+It does not touch your BRC-100 wallet. If the wrapper cannot run, use the
+Skills CLI directly:
+
+```sh
+npx skills add opldotdev/bitplan.dev --skill bitplan -g
+```
+
 ## Hosted drafts
 
 `bitplan upload plan.html --hosted` seals the same envelope, then stores it on
@@ -219,6 +235,8 @@ bitplan team add <name> <contacts...>
 bitplan team remove <name> <contacts...>
 bitplan team delete <name>
 bitplan team list [name] [--json]
+
+bitplan skill install
 
 bitplan version
 ```

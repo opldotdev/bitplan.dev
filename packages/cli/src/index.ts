@@ -15,6 +15,7 @@ import { configCommand } from './commands/config.js'
 import { fetchCommand } from './commands/fetch.js'
 import { inscribeCommand } from './commands/inscribe.js'
 import { listCommand } from './commands/list.js'
+import { skillInstallCommand } from './commands/skill.js'
 import { uploadCommand } from './commands/upload.js'
 import { whoamiCommand } from './commands/whoami.js'
 import { CLI_VERSION } from './version.js'
@@ -216,6 +217,15 @@ export function buildProgram(): Command {
 		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
 		.option('--site-url <url>', 'bitplan.dev origin for hosted drafts')
 		.action(catalogSyncCommand)
+
+	const skill = program
+		.command('skill')
+		.description('Install the BitPlan agent skill.')
+
+	skill
+		.command('install')
+		.description('Install the BitPlan agent skill with the Skills CLI.')
+		.action(() => skillInstallCommand())
 
 	return program
 }

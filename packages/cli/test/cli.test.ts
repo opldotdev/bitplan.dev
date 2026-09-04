@@ -65,6 +65,7 @@ describe('cli surface', () => {
 			'list',
 			'fetch',
 			'catalog',
+			'skill',
 		])
 		const auth = commandNamed(program, 'auth')
 		expect(auth.commands.map((c) => c.name())).toEqual(['login'])

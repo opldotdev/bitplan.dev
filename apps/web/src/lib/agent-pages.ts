@@ -80,11 +80,12 @@ Docs: ${SITE_URL}/docs/cli-setup
 `,
   "/docs/commands": `# Commands · BitPlan
 
-CLI commands: upload, list, fetch, config, contact, team, whoami, version, auth, catalog sync.
+CLI commands: upload, list, fetch, config, contact, team, whoami, version, auth, catalog sync, skill install.
 
     bunx bitplan upload ./plan.html --hosted --link
     bunx bitplan inscribe ./plan.html
     bunx bitplan catalog sync
+    bunx bitplan skill install
     npx bitplan list
     npx bitplan fetch <origin>
     npx bitplan contact set <name> <identity-key>
@@ -170,7 +171,7 @@ Do not use BitPlan as a general file host, a server-side notes app, or a substit
 - Share: \`npx bitplan upload ./plan.html --share-with <identity-key-or-contact>\`
 - Reader link, no wallet needed to read: \`npx bitplan upload ./plan.html --link\`
 - Catalog sync: \`bunx bitplan catalog sync\`
-- Agent skill: \`npx skills add opldotdev/bitplan.dev --skill bitplan -g\`
+- Agent skill: \`bunx bitplan skill install\` (runs \`npx skills add opldotdev/bitplan.dev --skill bitplan -g\`)
 
 After a hosted upload, the CLI tries to sync an encrypted catalog; the sync is best effort and never fails the upload. Connecting the same BRC-100 wallet identity on /drafts lists your own hosted plans on another device; that device can read but cannot update them.
 

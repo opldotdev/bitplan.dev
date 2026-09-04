@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.17 — 2026-09-04
+
+### Added
+
+- Add `bitplan skill install`, a small wrapper that installs the official
+  BitPlan agent skill through the Skills CLI. It does not connect to a wallet
+  or handle wallet keys.
+
 ## 0.0.16 — 2026-09-04
 
 ### Added
