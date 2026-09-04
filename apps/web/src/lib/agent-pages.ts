@@ -36,6 +36,8 @@ CLI: https://www.npmjs.com/package/bitplan
 
 The CLI packages a self-contained HTML document and uses the BRC-100 interface to ask your wallet to encrypt it. Keep the ciphertext hosted while the plan changes, or publish it as a 1Sat Ordinal.
 
+After a hosted upload, the CLI tries to sync an encrypted catalog. The sync is best effort and never fails the upload. Connecting the same BRC-100 wallet identity on /drafts lets the browser locate and decrypt that catalog to list your own hosted plans on another device. BitPlan keeps only ciphertext and a hash used to check later writes.
+
     npx bitplan
 
 - How it works: ${SITE_URL}/docs/how-it-works
@@ -78,10 +80,11 @@ Docs: ${SITE_URL}/docs/cli-setup
 `,
   "/docs/commands": `# Commands · BitPlan
 
-CLI commands: upload, list, fetch, config, contact, team, whoami, version, auth.
+CLI commands: upload, list, fetch, config, contact, team, whoami, version, auth, catalog sync.
 
     bunx bitplan upload ./plan.html --hosted --link
     bunx bitplan inscribe ./plan.html
+    bunx bitplan catalog sync
     npx bitplan list
     npx bitplan fetch <origin>
     npx bitplan contact set <name> <identity-key>
@@ -92,6 +95,8 @@ CLI commands: upload, list, fetch, config, contact, team, whoami, version, auth.
     npx bitplan team remove <name> <contacts...>
     npx bitplan team delete <name>
     npx bitplan team list
+
+Run \`bunx bitplan catalog sync\` when the automatic sync was skipped or failed; it retries the catalog sync and merges locally tracked drafts. A second device with the same BRC-100 wallet identity can list and read those hosted plans, but it cannot update them.
 
 Docs: ${SITE_URL}/docs/commands
 `,
@@ -164,7 +169,10 @@ Do not use BitPlan as a general file host, a server-side notes app, or a substit
 - Fetch: \`npx bitplan fetch <origin>\`
 - Share: \`npx bitplan upload ./plan.html --share-with <identity-key-or-contact>\`
 - Reader link, no wallet needed to read: \`npx bitplan upload ./plan.html --link\`
+- Catalog sync: \`bunx bitplan catalog sync\`
 - Agent skill: \`npx skills add opldotdev/bitplan.dev --skill bitplan -g\`
+
+After a hosted upload, the CLI tries to sync an encrypted catalog; the sync is best effort and never fails the upload. Connecting the same BRC-100 wallet identity on /drafts lists your own hosted plans on another device; that device can read but cannot update them.
 
 ## Site
 

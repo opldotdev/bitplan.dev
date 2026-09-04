@@ -67,14 +67,25 @@ if (!CHILD_RUN) {
 	let known: DraftRecord | undefined
 	let hostedOrigin: string | null
 	let hostedVersions: number
+	let failPatch: boolean
+	let storeOnFailedPatch: boolean
+	let failSave: boolean
+	let patchCalls: string[]
 	let tempDir: string
 	let htmlFile: string
 
 	mock.module('../src/state.js', () => ({
 		findDraftByFile: () => known,
-		findDraftByOrigin: () =>
-			known ? { filePath: htmlFile, record: known } : undefined,
+		findDraftByOrigin: (origin: string) =>
+			known && known.origin === origin
+				? { filePath: htmlFile, record: known }
+				: undefined,
+		findDraftByHostedOrigin: (hostedId: string) =>
+			known && known.hostedOrigin === hostedId
+				? { filePath: htmlFile, record: known }
+				: undefined,
 		saveDraftRecord: (file: string, record: DraftRecord) => {
+			if (failSave) throw new Error('disk full')
 			calls.saves.push({ file, record })
 		},
 		readConfig: () => ({}),
@@ -126,6 +137,10 @@ if (!CHILD_RUN) {
 		known = hostedRecord()
 		hostedOrigin = null
 		hostedVersions = 3
+		failPatch = false
+		storeOnFailedPatch = false
+		failSave = false
+		patchCalls = []
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bitplan-inscribe-test-'))
 		htmlFile = path.join(tempDir, 'plan.html')
 		fs.writeFileSync(htmlFile, '<!doctype html><title>Hosted</title>')
@@ -207,6 +222,168 @@ if (!CHILD_RUN) {
 				),
 			)
 		})
+
+		test('redirect failure retains the secret and gives a bunx recovery command', async () => {
+			failPatch = true
+
+			await inscribeCommand(HOSTED, { yes: true })
+
+			expect(calls.genesis).toHaveLength(1)
+			expect(calls.saves).toHaveLength(1)
+			expect(calls.saves[0]?.record).toMatchObject({
+				origin: GENESIS_OUTPOINT,
+				hostedOrigin: HOSTED,
+				hostedSecret: SECRET,
+			})
+			const warnings = (
+				console.warn as unknown as { mock: { calls: Array<[string]> } }
+			).mock.calls.map(([message]) => String(message))
+			expect(warnings.join('\n')).toContain(GENESIS_OUTPOINT)
+			expect(warnings.join('\n')).toMatch(/bunx bitplan inscribe/)
+			expect(warnings.join('\n')).not.toMatch(/edit.*state|by hand/i)
+		})
+
+		test('rerun repairs a null remote redirect with zero publish calls', async () => {
+			known = inscribedPendingRecord()
+			hostedOrigin = null
+
+			await inscribeCommand(HOSTED, { yes: true })
+
+			expect(calls.genesis).toEqual([])
+			expect(calls.version).toEqual([])
+			expect(calls.relays).toEqual([])
+			expect(patchCalls).toHaveLength(1)
+			expect(calls.saves).toHaveLength(1)
+			expect(calls.saves[0]?.record.origin).toBe(GENESIS_OUTPOINT)
+			expect(calls.saves[0]?.record.hostedOrigin).toBe(HOSTED)
+			expect(calls.saves[0]?.record.hostedSecret).toBeUndefined()
+			const printed = (
+				console.log as unknown as { mock: { calls: Array<[string]> } }
+			).mock.calls.map(([message]) => String(message))
+			expect(printed.join('\n')).toMatch(/repaired/i)
+			expect(printed.join('\n')).toMatch(/no new inscription/i)
+		})
+
+		test('rerun via local file repairs the redirect', async () => {
+			known = inscribedPendingRecord()
+			hostedOrigin = null
+
+			await inscribeCommand(htmlFile, { yes: true })
+
+			expect(calls.genesis).toEqual([])
+			expect(patchCalls).toHaveLength(1)
+			expect(calls.saves[0]?.record.hostedSecret).toBeUndefined()
+		})
+
+		test('rerun via viewer URL repairs the redirect', async () => {
+			known = inscribedPendingRecord()
+			hostedOrigin = null
+
+			await inscribeCommand(`https://bitplan.dev/d/${HOSTED}`, { yes: true })
+
+			expect(calls.genesis).toEqual([])
+			expect(patchCalls).toHaveLength(1)
+			expect(calls.saves[0]?.record.hostedSecret).toBeUndefined()
+		})
+
+		test('rerun confirms an already-applied remote redirect', async () => {
+			known = inscribedPendingRecord()
+			hostedOrigin = GENESIS_OUTPOINT
+
+			await inscribeCommand(HOSTED, { yes: true })
+
+			expect(calls.genesis).toEqual([])
+			expect(calls.version).toEqual([])
+			expect(calls.relays).toEqual([])
+			expect(patchCalls).toEqual([])
+			expect(calls.saves).toHaveLength(1)
+			expect(calls.saves[0]?.record.hostedSecret).toBeUndefined()
+			expect(calls.saves[0]?.record.hostedOrigin).toBe(HOSTED)
+		})
+
+		test('a failed PATCH that still stored the origin recovers via reread', async () => {
+			known = inscribedPendingRecord()
+			hostedOrigin = null
+			failPatch = true
+			storeOnFailedPatch = true
+
+			await inscribeCommand(HOSTED, { yes: true })
+
+			expect(calls.genesis).toEqual([])
+			expect(calls.version).toEqual([])
+			expect(calls.relays).toEqual([])
+			expect(patchCalls).toHaveLength(1)
+			expect(calls.saves).toHaveLength(1)
+			expect(calls.saves[0]?.record.origin).toBe(GENESIS_OUTPOINT)
+			expect(calls.saves[0]?.record.hostedOrigin).toBe(HOSTED)
+			expect(calls.saves[0]?.record.hostedSecret).toBeUndefined()
+			const printed = (
+				console.log as unknown as { mock: { calls: Array<[string]> } }
+			).mock.calls.map(([message]) => String(message))
+			expect(printed.join('\n')).toMatch(/repaired/i)
+			expect(printed.join('\n')).toMatch(/no new inscription/i)
+		})
+
+		test('recovery cleanup-save failure keeps retry safe without exposing the secret', async () => {
+			known = inscribedPendingRecord()
+			hostedOrigin = GENESIS_OUTPOINT
+			failSave = true
+
+			const error = await inscribeCommand(HOSTED, { yes: true }).catch(
+				(value: unknown) => value,
+			)
+			expect(error).toBeInstanceOf(Error)
+			const message = String((error as Error).message)
+			expect(message).toMatch(/local cleanup failed/i)
+			expect(message).toContain(GENESIS_OUTPOINT)
+			expect(message).toMatch(/bunx bitplan inscribe/)
+			expect(message).toContain(HOSTED)
+			expect(message).toMatch(/no new inscription/i)
+			expect(message).not.toContain(SECRET)
+			expect(calls.genesis).toEqual([])
+			expect(calls.version).toEqual([])
+			expect(calls.relays).toEqual([])
+			expect(patchCalls).toEqual([])
+			expect(calls.saves).toEqual([])
+		})
+
+		test('a conflicting remote origin fails safely and retains the secret', async () => {
+			known = inscribedPendingRecord()
+			const other = `${'e'.repeat(64)}_0`
+			hostedOrigin = other
+
+			await expect(inscribeCommand(HOSTED, { yes: true })).rejects.toThrow(
+				/does not match|conflict|refusing/i,
+			)
+			expect(calls.genesis).toEqual([])
+			expect(calls.version).toEqual([])
+			expect(calls.relays).toEqual([])
+			expect(patchCalls).toEqual([])
+			expect(calls.saves).toEqual([])
+		})
+
+		test('--json recovery output is pure JSON on stdout', async () => {
+			known = inscribedPendingRecord()
+			hostedOrigin = null
+
+			await inscribeCommand(HOSTED, { json: true, yes: true })
+
+			expect(console.log).toHaveBeenCalledTimes(1)
+			const printed = String(
+				(
+					console.log as unknown as {
+						mock: { calls: Array<[string]> }
+					}
+				).mock.calls[0]?.[0],
+			)
+			const payload = JSON.parse(printed) as Record<string, unknown>
+			expect(payload).toMatchObject({
+				repaired: true,
+				hostedId: HOSTED,
+				origin: GENESIS_OUTPOINT,
+			})
+			expect(printed).not.toContain(SECRET)
+		})
 	})
 
 	function hostedRecord(): DraftRecord {
@@ -218,6 +395,19 @@ if (!CHILD_RUN) {
 			updatedAt: '2026-08-29T12:00:00.000Z',
 			title: 'Hosted draft',
 			hostedSecret: SECRET,
+		}
+	}
+
+	function inscribedPendingRecord(): DraftRecord {
+		return {
+			origin: GENESIS_OUTPOINT,
+			keyID: 'hosted-key',
+			latestOutpoint: GENESIS_OUTPOINT,
+			latestVersion: 1,
+			updatedAt: '2026-08-29T12:00:00.000Z',
+			title: 'Hosted draft',
+			hostedSecret: SECRET,
+			hostedOrigin: HOSTED,
 		}
 	}
 
@@ -249,6 +439,11 @@ if (!CHILD_RUN) {
 			url === `https://bitplan.dev/api/hosted/${HOSTED}` &&
 			method === 'PATCH'
 		) {
+			patchCalls.push(String(init?.body ?? ''))
+			if (failPatch) {
+				if (storeOnFailedPatch) hostedOrigin = GENESIS_OUTPOINT
+				return new Response('redirect down', { status: 500 })
+			}
 			return new Response(
 				JSON.stringify({ id: HOSTED, origin: GENESIS_OUTPOINT }),
 				{ status: 200, headers: { 'content-type': 'application/json' } },

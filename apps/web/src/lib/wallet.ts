@@ -1,13 +1,20 @@
 import type { WalletInterface } from "@bsv/sdk";
 
+import type { CatalogWallet } from "@/lib/catalog-client";
 import type { DraftsWallet } from "@/lib/drafts";
 import { playUiSound } from "@/lib/ui-sound";
 
 /**
- * Browser BRC-100 client. `WalletClient("auto")` races the desktop bridges and
- * the XDM transport used by extensions such as Yours Wallet.
+ * Frozen permission/audit originator for the browser BRC-100 client.
+ * Carried on the WalletClient only; it must not change derived bytes.
+ */
+export const WALLET_ORIGINATOR = "bitplan.dev";
+
+/**
+ * Browser BRC-100 client. `WalletClient("auto", WALLET_ORIGINATOR)` races
+ * the desktop bridges and the XDM transport used by extensions such as
+ * Yours Wallet.
  *
- * `reconnectAuthenticatedWallet` probes `isAuthenticated` and does not prompt.
  * `connectBrowserWallet` calls `waitForAuthentication` and must stay behind
  * an explicit click. The adopted client is cached for the life of the tab.
  */
@@ -62,7 +69,14 @@ function markSubstrateAvailable(): void {
 
 function adopt(wallet: WalletInterface): DraftsWallet {
   cachedClient = wallet;
-  cached = {
+  // The adopted wallet also forwards createHmac/encrypt so catalog discovery
+  // (frozen protocol "bitplan catalog") can run through the same client.
+  // The static DraftsWallet type is unchanged; use hasCatalogSupport to
+  // narrow before catalog calls.
+  const capable: DraftsWallet &
+    CatalogWallet &
+    Pick<WalletInterface, "encrypt"> = {
+    createHmac: (args) => wallet.createHmac(args),
     decrypt: (args) =>
       wallet.decrypt({
         ciphertext: args.ciphertext,
@@ -70,11 +84,13 @@ function adopt(wallet: WalletInterface): DraftsWallet {
         keyID: args.keyID,
         protocolID: args.protocolID as [0 | 1 | 2, string],
       }),
+    encrypt: (args) => wallet.encrypt(args),
     getPublicKey: (args) => wallet.getPublicKey(args),
     listOutputs: (args) => wallet.listOutputs(args),
   };
+  cached = capable;
   notify();
-  return cached;
+  return capable;
 }
 
 function isGranted(result: { authenticated?: boolean }): boolean {
@@ -86,7 +102,7 @@ async function openClient(): Promise<WalletInterface> {
     return cachedClient;
   }
   const { WalletClient } = await import("@bsv/sdk");
-  const wallet = new WalletClient("auto");
+  const wallet = new WalletClient("auto", WALLET_ORIGINATOR);
   await wallet.connectToSubstrate();
   return wallet;
 }

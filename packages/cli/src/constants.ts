@@ -40,6 +40,13 @@ export const VIEWER_BASE_URL = 'https://bitplan.dev/d'
 /** Hosted-draft HTTP API. Override the site origin with config.siteUrl or --site-url. */
 export const HOSTED_API_URL = 'https://bitplan.dev/api/hosted'
 
+/**
+ * Encrypted hosted-catalog HTTP API media type. The CLI ships its own copy so
+ * it never depends on web-app sources; the value must stay identical to the
+ * server worker's `CATALOG_CONTENT_TYPE`.
+ */
+export const CATALOG_CONTENT_TYPE = 'application/x-bitplan-catalog'
+
 /** 1sat content gateway used to read published envelopes back. */
 export const DEFAULT_ORDFS_URL = 'https://api.1sat.app'
 

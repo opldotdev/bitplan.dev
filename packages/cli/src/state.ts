@@ -33,6 +33,10 @@ export interface DraftRecord {
 	updatedAt: string
 	title?: string | null
 	description?: string | null
+	/** Repository provenance saved at upload time for the hosted catalog. */
+	repoHost?: string | null
+	repoOrg?: string | null
+	repoName?: string | null
 	/** Identity public keys authorized on the latest local version. */
 	sharedWith?: string[]
 	/** Fixed identity keys explicitly attached to this draft. */
@@ -43,6 +47,12 @@ export interface DraftRecord {
 	linkKey?: string
 	/** Hosted-draft write secret, 64 hex. Present while the draft is hosted. */
 	hostedSecret?: string
+	/**
+	 * Original hosted id retained after an inscription. Lets an ordinary
+	 * `catalog sync` reconstruct the inscribed catalog entry when the
+	 * best-effort transition failed. Never holds a secret.
+	 */
+	hostedOrigin?: string | null
 }
 
 export interface DraftsFile {
@@ -288,6 +298,18 @@ function validateDraftRecord(
 			)
 		}
 	}
+	for (const field of ['repoHost', 'repoOrg', 'repoName'] as const) {
+		if (
+			value[field] !== undefined &&
+			value[field] !== null &&
+			typeof value[field] !== 'string'
+		) {
+			throw invalidState(
+				file,
+				`record for ${JSON.stringify(filePath)} has a non-string ${field}`,
+			)
+		}
+	}
 	for (const field of ['sharedWith', 'sharedWithRaw'] as const) {
 		try {
 			validateIdentityKeys(
@@ -338,6 +360,16 @@ function validateDraftRecord(
 				`record for ${JSON.stringify(filePath)} has an invalid hostedSecret`,
 			)
 		}
+	}
+	if (
+		value.hostedOrigin !== undefined &&
+		value.hostedOrigin !== null &&
+		(typeof value.hostedOrigin !== 'string' || !isHostedId(value.hostedOrigin))
+	) {
+		throw invalidState(
+			file,
+			`record for ${JSON.stringify(filePath)} has an invalid hostedOrigin`,
+		)
 	}
 	return value as unknown as DraftRecord
 }
@@ -504,6 +536,17 @@ export function findDraftByOrigin(
 ): { filePath: string; record: DraftRecord } | undefined {
 	for (const [filePath, record] of Object.entries(readDrafts(file).files)) {
 		if (record.origin === origin) return { filePath, record }
+	}
+	return undefined
+}
+
+/** Look up any local record for a hosted origin retained after inscription. */
+export function findDraftByHostedOrigin(
+	hostedOrigin: string,
+	file: string = draftsPath(),
+): { filePath: string; record: DraftRecord } | undefined {
+	for (const [filePath, record] of Object.entries(readDrafts(file).files)) {
+		if (record.hostedOrigin === hostedOrigin) return { filePath, record }
 	}
 	return undefined
 }

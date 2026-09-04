@@ -222,6 +222,7 @@ if (!CHILD_RUN) {
 		newHostedSecret: () => HOSTED_SECRET,
 		hostedViewerUrl: (id: string) => `https://bitplan.dev/d/${id}`,
 		resolveSiteUrl: (override?: string) => override ?? 'https://bitplan.dev',
+		assertHttpsSiteUrl: () => {},
 		createHostedDraft: async (
 			siteUrl: string,
 			secretHex: string,

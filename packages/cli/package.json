@@ -1,6 +1,6 @@
 {
 	"name": "bitplan",
-	"version": "0.0.15",
+	"version": "0.0.16",
 	"description": "Create encrypted hosted plans and publish them as 1Sat Ordinals.",
 	"license": "MIT",
 	"homepage": "https://bitplan.dev",

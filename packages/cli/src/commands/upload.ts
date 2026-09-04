@@ -8,6 +8,7 @@ import {
 	resolveNamedReaders,
 	resolveReaderInputs,
 } from '../addressBook.js'
+import { bestEffortCatalogSync } from '../catalog.js'
 import {
 	ENVELOPE_OVERHEAD_ESTIMATE,
 	FEE_SATS_PER_KB,
@@ -334,6 +335,7 @@ export async function uploadCommand(
 	)
 
 	let hostedSecret: string | undefined
+	let hostedSite: string | undefined
 	let published: {
 		origin: string
 		outpoint: string
@@ -342,6 +344,7 @@ export async function uploadCommand(
 	}
 	if (hosted) {
 		const site = resolveSiteUrl(options.siteUrl ?? config.siteUrl)
+		hostedSite = site
 		if (targetOrigin) {
 			const secret = targetLocal?.hostedSecret
 			if (!secret) {
@@ -397,6 +400,9 @@ export async function uploadCommand(
 		updatedAt: new Date().toISOString(),
 		title: meta.title,
 		description: meta.description,
+		repoHost: git.repoHost,
+		repoOrg: git.repoOrg,
+		repoName: git.repoName,
 		sharedWith,
 		sharedWithRaw: fixedReaders,
 		shareWithRefs: namedRefs.length > 0 ? namedRefs : undefined,
@@ -413,6 +419,19 @@ export async function uploadCommand(
 		)
 		console.warn(
 			`Keep the origin and outpoint above. A retry would publish another version.`,
+		)
+	}
+
+	// Hosted upload ordering: remote publish -> local state save ->
+	// best-effort catalog sync. A catalog failure must never turn a
+	// successful publish into a failure. When the local save failed there is
+	// no local entry to sync, so skip the catalog rather than creating a
+	// successful-but-missing remote entry.
+	if (hosted && hostedSite && stateSaved) {
+		await bestEffortCatalogSync(wallet, hostedSite)
+	} else if (hosted && hostedSite && !stateSaved) {
+		console.warn(
+			'Warning: local state was not saved, so the catalog sync was skipped. Repair local state, then run `bunx bitplan catalog sync` to retry.',
 		)
 	}
 

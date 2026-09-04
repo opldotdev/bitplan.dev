@@ -7,6 +7,9 @@ interface AuthResult {
 let connectToSubstrateCalls = 0;
 let isAuthenticatedCalls = 0;
 let waitForAuthenticationCalls = 0;
+let walletConstructorArgs: unknown[][] = [];
+let createHmacCalls: unknown[][] = [];
+let decryptCalls: unknown[][] = [];
 let isAuthenticatedImpl: () => Promise<AuthResult> = () =>
   Promise.resolve({ authenticated: true });
 let waitForAuthenticationImpl: () => Promise<AuthResult> = () =>
@@ -15,6 +18,13 @@ let connectImpl: () => Promise<void> = () => Promise.resolve();
 
 mock.module("@bsv/sdk", () => ({
   WalletClient: class {
+    substrate: unknown;
+    originator: unknown;
+    constructor(substrate?: unknown, originator?: unknown) {
+      this.substrate = substrate;
+      this.originator = originator;
+      walletConstructorArgs.push([substrate, originator]);
+    }
     connectToSubstrate() {
       connectToSubstrateCalls += 1;
       return connectImpl();
@@ -27,8 +37,18 @@ mock.module("@bsv/sdk", () => ({
       waitForAuthenticationCalls += 1;
       return waitForAuthenticationImpl();
     }
-    decrypt() {
+    createHmac(args: unknown) {
+      createHmacCalls.push([args, this.originator]);
+      return Promise.resolve({
+        hmac: Array.from({ length: 32 }, (_, i) => i),
+      });
+    }
+    decrypt(args: unknown) {
+      decryptCalls.push([args, this.originator]);
       return Promise.resolve({ plaintext: [] });
+    }
+    encrypt() {
+      return Promise.resolve({ ciphertext: [] });
     }
     listOutputs() {
       return Promise.resolve({ outputs: [] });
@@ -52,6 +72,9 @@ beforeEach(() => {
   connectToSubstrateCalls = 0;
   isAuthenticatedCalls = 0;
   waitForAuthenticationCalls = 0;
+  walletConstructorArgs = [];
+  createHmacCalls = [];
+  decryptCalls = [];
   isAuthenticatedImpl = () => Promise.resolve({ authenticated: true });
   waitForAuthenticationImpl = () => Promise.resolve({ authenticated: true });
   connectImpl = () => Promise.resolve();
@@ -142,6 +165,58 @@ describe("connectBrowserWallet", () => {
     const client = await connectBrowserWalletClient();
     expect(client).toBe(getConnectedWalletClient());
     expect(getConnectedWallet()).not.toBe(client);
+  });
+
+  test("constructs the client with the frozen bitplan.dev originator", async () => {
+    const { WALLET_ORIGINATOR } = await import("./wallet");
+    expect(WALLET_ORIGINATOR).toBe("bitplan.dev");
+    await connectBrowserWallet();
+    expect(walletConstructorArgs).toHaveLength(1);
+    expect(walletConstructorArgs[0]).toEqual(["auto", "bitplan.dev"]);
+  });
+
+  test("createHmac/decrypt forward through the client carrying that originator", async () => {
+    const wallet = await connectBrowserWallet();
+    const client = getConnectedWalletClient() as unknown as {
+      originator: unknown;
+    };
+    expect(client.originator).toBe("bitplan.dev");
+    await wallet.createHmac({
+      counterparty: "self",
+      data: [1, 2, 3],
+      keyID: "catalog-capability-v1",
+      protocolID: [2, "bitplan catalog"],
+    });
+    await wallet.decrypt({
+      ciphertext: [9],
+      counterparty: "self",
+      keyID: "catalog-content-v1",
+      protocolID: [2, "bitplan catalog"],
+    });
+    expect(createHmacCalls).toHaveLength(1);
+    expect(createHmacCalls[0]?.[1]).toBe("bitplan.dev");
+    expect(decryptCalls).toHaveLength(1);
+    expect(decryptCalls[0]?.[1]).toBe("bitplan.dev");
+    // The originator is permission/audit context only: forwarded derivation
+    // inputs carry no originator field, so derived bytes cannot change.
+    expect(createHmacCalls[0]?.[0]).not.toHaveProperty("originator");
+    expect(decryptCalls[0]?.[0]).not.toHaveProperty("originator");
+  });
+
+  test("forwards catalog capability calls through the adopted wallet", async () => {
+    const { hasCatalogSupport } = await import("./catalog-client");
+    const wallet = await connectBrowserWallet();
+    expect(hasCatalogSupport(wallet)).toBe(true);
+    if (!hasCatalogSupport(wallet)) {
+      throw new Error("Expected catalog support.");
+    }
+    const hmac = await wallet.createHmac({
+      counterparty: "self",
+      data: [1, 2, 3],
+      keyID: "catalog-capability-v1",
+      protocolID: [2, "bitplan catalog"],
+    });
+    expect(hmac.hmac).toHaveLength(32);
   });
 
   test("drops a stale wallet before an explicit action", async () => {

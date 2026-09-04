@@ -56,6 +56,10 @@ const FLAGS = [
     command: "version",
     flags: "prints the installed CLI version",
   },
+  {
+    command: "catalog sync",
+    flags: "--json, --wallet-url <url>, --site-url <url>",
+  },
 ] as const;
 
 export default function CommandsPage() {
@@ -112,6 +116,12 @@ export default function CommandsPage() {
         credential: anyone who has it can read.{" "}
         <code>bitplan inscribe &lt;h_id|file&gt;</code> publishes the latest
         version on chain; <code>--all-versions</code> replays the whole history.
+      </p>
+      <p>
+        Run <code>bunx bitplan catalog sync</code> to retry the catalog sync and
+        merge locally tracked drafts when the automatic sync was skipped or
+        failed. A second device with the same BRC-100 wallet identity can list
+        and read those hosted plans, but it cannot update them.
       </p>
       <p>
         <code>--share-with</code> accepts a public identity key, contact, or

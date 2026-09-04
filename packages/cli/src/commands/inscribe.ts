@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline/promises'
+import { bestEffortCatalogInscribed } from '../catalog.js'
 import { CliError } from '../errors.js'
 import {
 	isHostedId,
@@ -14,11 +15,13 @@ import {
 	publishGenesis,
 	publishVersion,
 } from '../ordinals.js'
+import { isOutpoint } from '../outpoint.js'
 import type { RelayResult } from '../relay.js'
 import { relayBeef } from '../relay.js'
 import {
 	type DraftRecord,
 	findDraftByFile,
+	findDraftByHostedOrigin,
 	findDraftByOrigin,
 	readConfig,
 	saveDraftRecord,
@@ -52,6 +55,37 @@ export async function inscribeCommand(
 	}
 
 	const hosted = await readHostedRecord(site, target.id)
+
+	// Redirect recovery: a local record that already carries a chain origin,
+	// the original hosted id, and the hosted secret means chain publication
+	// succeeded earlier but the hosted redirect still needs repair. Repair
+	// only the redirect; never fetch envelopes, publish, or relay again.
+	const localRecord = target.record
+	if (
+		localRecord &&
+		localRecord.hostedOrigin === target.id &&
+		isOutpoint(localRecord.origin)
+	) {
+		const secret = localRecord.hostedSecret
+		if (typeof secret !== 'string' || !/^[0-9a-f]{64}$/i.test(secret)) {
+			if (hosted.origin) {
+				throw new CliError(`Already on the chain at ${hosted.origin}.`)
+			}
+			throw new CliError(
+				`Already inscribed at ${localRecord.origin}. Refusing to reinscribe.`,
+			)
+		}
+		await repairHostedRedirect({
+			site,
+			hostedId: target.id,
+			record: localRecord,
+			filePath: target.filePath,
+			initialRemote: hosted,
+			json: options.json === true,
+		})
+		return
+	}
+
 	if (hosted.origin) {
 		throw new CliError(`Already on the chain at ${hosted.origin}.`)
 	}
@@ -92,33 +126,95 @@ export async function inscribeCommand(
 	}
 
 	const versionsWritten = envelopes.length
+	// After irreversible chain publication, redirect, local-state save, and
+	// catalog transition are independent bookkeeping attempts. Each failure
+	// warns without skipping the others, and the command always reports the
+	// published origin. Warnings go to stderr so --json stdout stays pure.
 	let redirectRecorded = false
+	let redirectError: string | null = null
 	if (target.record?.hostedSecret) {
-		await markHostedInscribed(
-			site,
-			target.id,
-			target.record.hostedSecret,
-			genesis.origin,
-		)
-		redirectRecorded = true
-	} else {
-		console.warn(
-			'Note: the hosted redirect could not be recorded (no local secret).',
-		)
+		try {
+			await markHostedInscribed(
+				site,
+				target.id,
+				target.record.hostedSecret,
+				genesis.origin,
+			)
+			redirectRecorded = true
+		} catch (error) {
+			redirectError = error instanceof Error ? error.message : String(error)
+		}
 	}
 
+	let saveError: string | null = null
+	let pendingSaved = false
 	if (target.filePath && target.record) {
 		const rest = { ...target.record }
-		delete rest.hostedSecret
+		// Only drop the credential once the redirect is confirmed against
+		// this same chain origin. On redirect failure the secret is retained
+		// alongside hostedOrigin and the chain origin so a later rerun of
+		// this same command can repair only the redirect.
+		if (redirectRecorded) {
+			delete rest.hostedSecret
+		}
 		const record: DraftRecord = {
 			...rest,
 			origin: genesis.origin,
+			hostedOrigin: target.id,
 			latestOutpoint: latest.outpoint,
 			latestVersion: versionsWritten,
 			updatedAt: new Date().toISOString(),
 		}
-		saveDraftRecord(target.filePath, record)
+		try {
+			saveDraftRecord(target.filePath, record)
+			pendingSaved = true
+		} catch (error) {
+			saveError = error instanceof Error ? error.message : String(error)
+		}
 	}
+
+	if (redirectError) {
+		if (pendingSaved) {
+			console.warn(
+				`Warning: the inscription succeeded at ${genesis.origin} but the hosted redirect could not be recorded: ${redirectError}. Do not reinscribe; the chain publication is already permanent. To repair the hosted redirect, rerun \`bunx bitplan inscribe ${target.id}\`.`,
+			)
+		} else if (saveError) {
+			console.warn(
+				`Warning: the inscription succeeded at ${genesis.origin} but the hosted redirect could not be recorded: ${redirectError}. Local state was also not saved: ${saveError}. Do not rerun the inscription command because this machine did not record the chain origin; keep the origin above and fix local state (disk/permissions) before repairing the hosted redirect.`,
+			)
+		} else {
+			console.warn(
+				`Warning: the inscription succeeded at ${genesis.origin} but the hosted redirect could not be recorded: ${redirectError}. Local state was also not saved. Do not rerun the inscription command because this machine did not record the chain origin; keep the origin above and fix local state (disk/permissions) before repairing the hosted redirect.`,
+			)
+		}
+	} else if (!target.record?.hostedSecret) {
+		console.warn(
+			'Note: the hosted redirect could not be recorded (no local secret).',
+		)
+	} else if (saveError) {
+		console.warn(
+			`Warning: the inscription succeeded at ${genesis.origin} and the hosted link now redirects to it, but local state was not saved: ${saveError}. Keep the origin above and do not reinscribe; check disk and permissions.`,
+		)
+	}
+
+	// Inscription ordering: publish/redirect -> safe local state ->
+	// best-effort catalog transition. The catalog keeps the original hosted
+	// id, flips the entry to inscribed, and records the chain origin. A
+	// catalog failure must never turn a successful inscription into a failure.
+	await bestEffortCatalogInscribed(wallet, {
+		siteUrl: site,
+		hostedId: target.id,
+		chainOrigin: genesis.origin,
+		fallback: {
+			title: target.record?.title ?? null,
+			description: target.record?.description ?? null,
+			repoHost: target.record?.repoHost ?? null,
+			repoOrg: target.record?.repoOrg ?? null,
+			repoName: target.record?.repoName ?? null,
+			version: versionsWritten,
+			updatedAt: new Date().toISOString(),
+		},
+	})
 
 	const viewer = viewerUrl(genesis.origin)
 	if (options.json) {
@@ -159,10 +255,25 @@ function resolveHostedTarget(reference: string): {
 
 	if (isHostedId(trimmed)) {
 		const found = findDraftByOrigin(trimmed)
+		if (found) {
+			return {
+				id: trimmed,
+				filePath: found.filePath,
+				record: found.record,
+			}
+		}
+		const byHosted = findDraftByHostedOrigin(trimmed)
+		if (byHosted && isOutpoint(byHosted.record.origin)) {
+			return {
+				id: trimmed,
+				filePath: byHosted.filePath,
+				record: byHosted.record,
+			}
+		}
 		return {
 			id: trimmed,
-			filePath: found?.filePath,
-			record: found?.record,
+			filePath: undefined,
+			record: undefined,
 		}
 	}
 
@@ -172,26 +283,144 @@ function resolveHostedTarget(reference: string): {
 			throw new CliError(`That URL is not a hosted draft: ${reference}`)
 		}
 		const found = findDraftByOrigin(origin)
+		if (found) {
+			return {
+				id: origin,
+				filePath: found.filePath,
+				record: found.record,
+			}
+		}
+		const byHosted = findDraftByHostedOrigin(origin)
+		if (byHosted && isOutpoint(byHosted.record.origin)) {
+			return {
+				id: origin,
+				filePath: byHosted.filePath,
+				record: byHosted.record,
+			}
+		}
 		return {
 			id: origin,
-			filePath: found?.filePath,
-			record: found?.record,
+			filePath: undefined,
+			record: undefined,
 		}
 	}
 
 	const resolved = path.resolve(trimmed)
 	if (fs.existsSync(resolved)) {
 		const record = findDraftByFile(resolved)
-		if (!record || !isHostedId(record.origin)) {
-			throw new CliError(
-				`That file is not mapped to a hosted draft: ${resolved}`,
-			)
+		if (record && isHostedId(record.origin)) {
+			return { id: record.origin, filePath: resolved, record }
 		}
-		return { id: record.origin, filePath: resolved, record }
+		if (
+			record &&
+			typeof record.hostedOrigin === 'string' &&
+			isHostedId(record.hostedOrigin) &&
+			isOutpoint(record.origin)
+		) {
+			return { id: record.hostedOrigin, filePath: resolved, record }
+		}
+		throw new CliError(`That file is not mapped to a hosted draft: ${resolved}`)
 	}
 
 	throw new CliError(
 		`Not a hosted draft id, viewer URL, or local file: ${reference}`,
+	)
+}
+
+interface RepairRedirectInput {
+	site: string
+	hostedId: string
+	record: DraftRecord
+	filePath?: string
+	initialRemote: { versions: number; origin: string | null }
+	json: boolean
+}
+
+/**
+ * Idempotent hosted-redirect repair for an already-published local record.
+ * Never publishes, fetches envelopes, or relays. Never overwrites a
+ * conflicting remote origin and never exposes the hosted secret.
+ */
+async function repairHostedRedirect(input: RepairRedirectInput): Promise<void> {
+	const localOrigin = input.record.origin
+	const secret = input.record.hostedSecret
+	if (typeof secret !== 'string' || !/^[0-9a-f]{64}$/i.test(secret)) {
+		throw new CliError(
+			`Already inscribed at ${localOrigin}. Refusing to reinscribe.`,
+		)
+	}
+	let remote = input.initialRemote
+
+	if (remote.origin !== null && remote.origin !== localOrigin) {
+		throw new CliError(
+			`The hosted draft ${input.hostedId} already points at ${remote.origin}, which does not match the local chain origin ${localOrigin}. Refusing to overwrite the hosted redirect and refusing to reinscribe. The local secret was retained; rerun \`bunx bitplan inscribe ${input.hostedId}\` after resolving the conflict. No new inscription was made.`,
+		)
+	}
+
+	if (remote.origin === null) {
+		try {
+			await markHostedInscribed(input.site, input.hostedId, secret, localOrigin)
+		} catch (error) {
+			let reread: { versions: number; origin: string | null }
+			try {
+				reread = await readHostedRecord(input.site, input.hostedId)
+			} catch {
+				throw new CliError(
+					`Could not repair the hosted redirect for ${input.hostedId}: ${error instanceof Error ? error.message : String(error)}. The local secret was retained; rerun \`bunx bitplan inscribe ${input.hostedId}\` to retry. No new inscription was made.`,
+				)
+			}
+			if (reread.origin === localOrigin) {
+				remote = reread
+			} else if (reread.origin === null) {
+				throw new CliError(
+					`Could not repair the hosted redirect for ${input.hostedId}: ${error instanceof Error ? error.message : String(error)}. The hosted redirect is still empty and the local secret was retained; rerun \`bunx bitplan inscribe ${input.hostedId}\` to retry. No new inscription was made.`,
+				)
+			} else {
+				throw new CliError(
+					`The hosted draft ${input.hostedId} already points at ${reread.origin}, which does not match the local chain origin ${localOrigin}. Refusing to overwrite the hosted redirect and refusing to reinscribe. The local secret was retained; rerun \`bunx bitplan inscribe ${input.hostedId}\` after resolving the conflict. No new inscription was made.`,
+				)
+			}
+		}
+	}
+
+	if (!input.filePath) {
+		throw new CliError(
+			`The hosted redirect for ${input.hostedId} points at ${localOrigin} but there is no local record to clean up. No new inscription was made.`,
+		)
+	}
+
+	const cleaned: DraftRecord = {
+		...input.record,
+		updatedAt: new Date().toISOString(),
+	}
+	delete cleaned.hostedSecret
+	try {
+		saveDraftRecord(input.filePath, cleaned)
+	} catch (error) {
+		throw new CliError(
+			`The hosted redirect now points at ${localOrigin} but local cleanup failed: ${error instanceof Error ? error.message : String(error)}. The local secret was retained; rerun \`bunx bitplan inscribe ${input.hostedId}\` to retry. No new inscription was made.`,
+		)
+	}
+
+	if (input.json) {
+		console.log(
+			JSON.stringify(
+				{
+					repaired: true,
+					hostedId: input.hostedId,
+					origin: localOrigin,
+					outpoint: input.record.latestOutpoint,
+					viewer: viewerUrl(localOrigin),
+				},
+				null,
+				2,
+			),
+		)
+		return
+	}
+
+	console.log(
+		`Repaired the hosted redirect to ${localOrigin}. No new inscription was made.`,
 	)
 }
 

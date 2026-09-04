@@ -64,6 +64,7 @@ describe('cli surface', () => {
 			'inscribe',
 			'list',
 			'fetch',
+			'catalog',
 		])
 		const auth = commandNamed(program, 'auth')
 		expect(auth.commands.map((c) => c.name())).toEqual(['login'])
@@ -178,6 +179,16 @@ describe('cli surface', () => {
 		])
 		expect(flagsOf(fetch)).toEqual(
 			expect.arrayContaining(['--meta', '--json', '--site-url']),
+		)
+	})
+
+	test('catalog sync takes json, wallet-url, and site-url flags', () => {
+		const catalog = commandNamed(program, 'catalog')
+		expect(catalog.commands.map((c) => c.name())).toEqual(['sync'])
+		const sync = commandNamed(catalog, 'sync')
+		expect(sync.registeredArguments).toEqual([])
+		expect(flagsOf(sync)).toEqual(
+			expect.arrayContaining(['--json', '--wallet-url', '--site-url']),
 		)
 	})
 

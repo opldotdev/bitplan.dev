@@ -10,6 +10,7 @@ import {
 	teamSetCommand,
 } from './commands/addressBook.js'
 import { authCommand } from './commands/auth.js'
+import { catalogSyncCommand } from './commands/catalog.js'
 import { configCommand } from './commands/config.js'
 import { fetchCommand } from './commands/fetch.js'
 import { inscribeCommand } from './commands/inscribe.js'
@@ -203,6 +204,18 @@ export function buildProgram(): Command {
 		.option('--ordfs-url <url>', 'ORDFS gateway base URL')
 		.option('--site-url <url>', 'bitplan.dev origin for hosted drafts')
 		.action(fetchCommand)
+
+	const catalog = program
+		.command('catalog')
+		.description('Sync the encrypted hosted catalog.')
+
+	catalog
+		.command('sync')
+		.description('Sync hosted drafts to the encrypted catalog.')
+		.option('--json', 'Print raw JSON')
+		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
+		.option('--site-url <url>', 'bitplan.dev origin for hosted drafts')
+		.action(catalogSyncCommand)
 
 	return program
 }

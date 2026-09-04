@@ -45,6 +45,38 @@ export function resolveSiteUrl(override?: string): string {
 	return new URL(HOSTED_API_URL).origin
 }
 
+function siteOrigin(siteUrl: string): string {
+	let url: URL
+	try {
+		url = new URL(siteUrl)
+	} catch {
+		throw new CliError(
+			`Invalid --site-url: ${JSON.stringify(siteUrl)}. Expected an https origin.`,
+		)
+	}
+	assertHttpsSiteUrl(url)
+	return url.origin
+}
+
+/**
+ * Never send a catalog bearer (or hosted secret) to cleartext remote HTTP.
+ * HTTPS is required; plain HTTP is allowed only for explicit loopback
+ * development origins: localhost, 127.0.0.1, or ::1.
+ */
+export function assertHttpsSiteUrl(url: URL): void {
+	if (url.protocol === 'https:') return
+	if (url.protocol !== 'http:') {
+		throw new CliError(
+			`Invalid site URL ${JSON.stringify(url.toString())}: expected https.`,
+		)
+	}
+	const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+	if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return
+	throw new CliError(
+		`Refusing cleartext http site URL for ${JSON.stringify(url.host)}: use https, or http only for localhost development.`,
+	)
+}
+
 export async function createHostedDraft(
 	siteUrl: string,
 	secretHex: string,
@@ -131,10 +163,6 @@ export async function markHostedInscribed(
 
 function hostedApiUrl(siteUrl: string): string {
 	return `${siteOrigin(siteUrl)}/api/hosted`
-}
-
-function siteOrigin(siteUrl: string): string {
-	return siteUrl.replace(/\/+$/, '')
 }
 
 function secretBytes(secretHex: string): Uint8Array {

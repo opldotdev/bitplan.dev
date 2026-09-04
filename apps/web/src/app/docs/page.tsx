@@ -31,6 +31,14 @@ export default function DocsIntroPage() {
       <div className="not-typeset mt-5">
         <CommandCopy command="bunx bitplan upload ./plan.html --hosted --link" />
       </div>
+      <p>
+        After a hosted upload, the CLI tries to sync an encrypted catalog. The
+        sync is best effort and never fails the upload. Connect the same BRC-100
+        wallet identity on <Link href="/drafts">drafts</Link> and the browser
+        can locate and decrypt that catalog to list your own hosted plans on
+        another device. BitPlan keeps only ciphertext and a hash used to check
+        later writes.
+      </p>
       <h2>Publish on chain</h2>
       <p>
         Use <code>bitplan inscribe</code> when the draft is ready to become a
