@@ -182,6 +182,21 @@ describe('cli surface', () => {
 		)
 	})
 
+	test('fetch --version selects a draft version', async () => {
+		const parsed = overridden()
+		const fetch = commandNamed(parsed, 'fetch')
+		let version: string | undefined
+		fetch.action((_origin: string, options: { version?: string }) => {
+			version = options.version
+		})
+
+		await parsed.parseAsync(['fetch', ORIGIN, '--version', '1'], {
+			from: 'user',
+		})
+
+		expect(version).toBe('1')
+	})
+
 	test('catalog sync takes json, wallet-url, and site-url flags', () => {
 		const catalog = commandNamed(program, 'catalog')
 		expect(catalog.commands.map((c) => c.name())).toEqual(['sync'])
