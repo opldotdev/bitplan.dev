@@ -4,6 +4,7 @@ import {
   isViewerStateCurrent,
   metaRows,
   type ViewerState,
+  viewerDocumentTitle,
   viewerRequestKey,
 } from "./draft-viewer";
 
@@ -72,6 +73,18 @@ describe("DraftViewer route state", () => {
 });
 
 describe("Draft metadata", () => {
+  test("uses a trimmed decrypted title and keeps the generic title when blank", () => {
+    expect(
+      viewerDocumentTitle("  Quarterly plan  ", "Encrypted draft · BitPlan")
+    ).toBe("Quarterly plan · BitPlan");
+    expect(viewerDocumentTitle("   ", "Encrypted draft · BitPlan")).toBe(
+      "Encrypted draft · BitPlan"
+    );
+    expect(viewerDocumentTitle(null, "Encrypted draft · BitPlan")).toBe(
+      "Encrypted draft · BitPlan"
+    );
+  });
+
   test("shows every envelope metadata field", () => {
     const state = decryptedState("test");
     if (state.phase !== "decrypted") {

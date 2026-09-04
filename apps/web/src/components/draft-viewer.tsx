@@ -133,6 +133,14 @@ export function viewerRequestKey(
   return `${originParam}:${requestedVersion ?? "latest"}`;
 }
 
+export function viewerDocumentTitle(
+  title: string | null | undefined,
+  genericTitle: string
+): string {
+  const trimmedTitle = title?.trim();
+  return trimmedTitle ? `${trimmedTitle} · BitPlan` : genericTitle;
+}
+
 function assertNever(value: never): never {
   throw new Error(`Unhandled state: ${String(value)}`);
 }
@@ -767,6 +775,14 @@ function DecryptedView({
 }) {
   const { title } = plaintext.meta;
   const versions = Array.from({ length: latestVersion }, (_, i) => i + 1);
+
+  useEffect(() => {
+    const genericTitle = document.title;
+    document.title = viewerDocumentTitle(title, genericTitle);
+    return () => {
+      document.title = genericTitle;
+    };
+  }, [title]);
 
   return (
     <div className="flex min-h-dvh flex-col">
