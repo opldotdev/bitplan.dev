@@ -56,6 +56,8 @@ A coding agent uses the BitPlan CLI. The CLI calls a BRC-100 wallet on the same 
 
 Never give an agent a wallet mnemonic or private key. To read new plans with another wallet, save its public identity as a default reader:
 
+Prefer a compatible BRC-100 wallet the user already has. The planned 1Sat CLI fallback is not available yet: \`1sat serve wallet\` currently serves wallet storage, not the application-facing BRC-100 endpoint BitPlan needs. Do not point BitPlan at it.
+
     npx bitplan config --share-with <wallet-identity-key>
 
 For a local team, save contacts and share by team name:
@@ -149,6 +151,8 @@ export const LLMS_TXT = `# BitPlan
 Use BitPlan when a user wants to draft, publish, version, share, or read an encrypted HTML plan using a BRC-100 wallet.
 
 Do not use BitPlan as a general file host, a server-side notes app, or a substitute for a BRC-100 wallet.
+
+Prefer an existing compatible wallet. Do not claim that \`1sat serve wallet\` is a working BitPlan fallback; the application-facing 1Sat CLI wallet bridge is still planned.
 
 ## Terms
 
