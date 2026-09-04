@@ -56,3 +56,13 @@ ${flags}
 
 Replace ./plan.html with the actual local source path when needed. The CLI preserves the draft's current readers and asks the connected BRC-100 wallet to wrap the shared document key for each reader. Review the wallet prompts and publish the version. By default, the CLI notifies 1Sat for ORDFS capture after the wallet publishes. Do not use --private or --no-relay. Older on-chain versions and their access lists cannot be changed.`;
 }
+
+export function buildReaderLinkInstructions(origin: string): string {
+  return `Create a reader link for the hosted BitPlan at ${origin}.
+
+On the computer that published this plan, use its local source HTML and run:
+
+npx bitplan upload ./plan.html --draft ${origin} --link
+
+Replace ./plan.html with the actual local source path. The BitPlan CLI needs the hosted draft's locally saved publishing secret. It will publish a new version and return a complete URL containing #k=. Anyone with that complete URL can read the plan, so treat it like a password. Do not use --private.`;
+}

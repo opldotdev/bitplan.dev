@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { HostedShareDialog } from "@/components/hosted-share-dialog";
 import { ShareDraftDialog } from "@/components/share-draft-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -838,6 +839,9 @@ function DecryptedShare({
 }) {
   if (openedWithLink) {
     return <ReaderLinkCopy />;
+  }
+  if (isHostedId(origin)) {
+    return <HostedShareDialog origin={origin} />;
   }
   if (canPublish) {
     return <ShareDraftDialog origin={origin} />;
