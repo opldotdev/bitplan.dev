@@ -1,6 +1,6 @@
 {
 	"name": "bitplan-dev",
-	"description": "Encrypted, versioned HTML plans published as 1Sat Ordinal inscriptions. Wallet access uses BRC-100.",
+	"description": "Encrypted HTML plans, hosted while they change and published as 1Sat Ordinals when ready.",
 	"private": true,
 	"license": "MIT",
 	"packageManager": "bun@1.3.14",

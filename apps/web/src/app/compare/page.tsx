@@ -35,9 +35,10 @@ export default function ComparePage() {
         <p>
           Every tool on this page turns something an agent wrote into a link a
           human can open. They differ on one question: who holds the bytes, and
-          who can read them. BitPlan encrypts the plan in your wallet and
-          inscribes the ciphertext on Bitcoin. The others host cleartext on a
-          server and decide access there.
+          who can read them. BitPlan encrypts the plan in your wallet and can
+          keep the ciphertext hosted while it changes or inscribe it on Bitcoin
+          when it should be permanent. The other products host cleartext and
+          decide access on their servers.
         </p>
         <p>
           The comparisons below try to be fair. Each product is better at

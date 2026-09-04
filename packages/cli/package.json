@@ -1,7 +1,7 @@
 {
 	"name": "bitplan",
 	"version": "0.0.15",
-	"description": "Publish plan documents to Bitcoin as 1Sat Ordinals. Encrypted by default.",
+	"description": "Create encrypted hosted plans and publish them as 1Sat Ordinals.",
 	"license": "MIT",
 	"homepage": "https://bitplan.dev",
 	"repository": {

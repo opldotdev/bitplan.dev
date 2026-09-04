@@ -24,7 +24,7 @@ export function buildProgram(): Command {
 	program
 		.name('bitplan')
 		.description(
-			'Publish plan documents to Bitcoin as 1Sat Ordinals. Encrypted by default.',
+			'Create encrypted hosted plans and publish them as 1Sat Ordinals.',
 		)
 		.version(CLI_VERSION)
 

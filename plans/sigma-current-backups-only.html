@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sigma restore: current backups only</title>
+  <meta name="description" content="Remove unused legacy Sigma backup paths so restore has one supported format and one authority model.">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #fbfaf7;
+      --fg: #1a1a1a;
+      --muted: #665f55;
+      --line: #ded8ce;
+      --card: #fff;
+      --soft: #f2eee6;
+      --accent: #a44324;
+      --good: #176b45;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121110;
+        --fg: #eee9df;
+        --muted: #aaa196;
+        --line: #302d28;
+        --card: #1b1916;
+        --soft: #211e1a;
+        --accent: #ef8b63;
+        --good: #70d3a5;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0 auto;
+      max-width: 880px;
+      padding: 48px 24px 96px;
+      background: var(--bg);
+      color: var(--fg);
+    }
+    h1, h2, h3 { line-height: 1.18; letter-spacing: -.025em; }
+    h1 { margin: .25rem 0 .75rem; font-size: clamp(2.2rem, 7vw, 4rem); letter-spacing: -.055em; }
+    h2 { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+    h3 { margin: 0 0 .4rem; }
+    p, li { max-width: 70ch; }
+    a { color: var(--accent); }
+    code { background: var(--soft); padding: .12em .38em; border-radius: 4px; }
+    .eyebrow { color: var(--accent); font-size: .78rem; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
+    .lede { color: var(--muted); font-size: 1.18rem; }
+    .decision {
+      margin: 1.5rem 0;
+      padding: 16px 18px;
+      border: 1px solid color-mix(in srgb, var(--good) 55%, var(--line));
+      border-left: 5px solid var(--good);
+      border-radius: 10px;
+      background: var(--card);
+    }
+    .decision strong { color: var(--good); }
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 10px;
+      align-items: center;
+      margin: 1.5rem 0;
+    }
+    .node { min-height: 100px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+    .arrow { color: var(--accent); font-weight: 800; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .card, .step { padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+    .card ul { margin-bottom: 0; }
+    .step { margin: 12px 0; }
+    .meta { margin: 0 0 .5rem; color: var(--muted); font-size: .9rem; }
+    .no { color: var(--accent); }
+    .handoff {
+      width: 100%;
+      min-height: 19rem;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--soft);
+      color: var(--fg);
+      font: .86rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+      resize: vertical;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 14px;
+      border: 1px solid var(--fg);
+      border-radius: 8px;
+      background: var(--fg);
+      color: var(--bg);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .foot { margin-top: 3rem; color: var(--muted); font-size: .9rem; }
+    @media (max-width: 720px) {
+      .flow { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); justify-self: center; }
+      .split { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <p class="eyebrow">Sigma · implementation plan · draft 2 · 4 September 2026</p>
+  <h1>Current backups only.</h1>
+  <p class="lede">Remove Sigma's unused legacy restore paths. One current backup format should produce one predictable account key and one clear result.</p>
+
+  <h2>What changed in draft 2</h2>
+  <ul>
+    <li>Named the repository, issue, pull request, and hosted BitPlan ID.</li>
+    <li>Separated current facts from the work that still needs to happen.</li>
+    <li>Added a copyable implementation brief for the agent doing the work.</li>
+  </ul>
+
+  <div class="card">
+    <strong>Work context</strong>
+    <p><strong>Repository:</strong> <code>b-open-io/sigma-auth</code><br>
+    <strong>Linear:</strong> <code>OPL-4146</code><br>
+    <strong>Pull request:</strong> <code>sigma-auth#151</code><br>
+    <strong>Hosted plan:</strong> <code>h_vpGk8HEPTxtw3X09XioO</code></p>
+  </div>
+
+  <div class="decision">
+    <strong>Decision made</strong>
+    <p>Sigma will not support legacy <code>xprv</code> backups or pre-0.3 compatibility paths. There are no legacy Sigma users to migrate, so those branches are dead weight rather than compatibility.</p>
+  </div>
+
+  <h2>The restore rule</h2>
+  <div class="flow" role="img" aria-label="Current Sigma restore flow">
+    <div class="node"><strong>Current Sigma backup</strong><br>Restore the supported key container.</div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node"><strong>Exact profile match</strong><br>Compare with <code>profile.member_pubkey</code>.</div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node"><strong>Sign in</strong><br>No key writes, rotation, migration, or chain action.</div>
+  </div>
+  <div class="card">
+    <strong>Anything else stops clearly.</strong>
+    <p>An old format, missing profile binding, or mismatched key returns a plain unsupported-or-mismatch error. It never guesses, falls back, rewrites the account, or redirects into another password prompt.</p>
+  </div>
+
+  <h2>What gets removed</h2>
+  <div class="split">
+    <div class="card">
+      <h3>Runtime paths</h3>
+      <ul>
+        <li>Legacy <code>xprv</code> restore and format detection.</li>
+        <li>Pre-0.3 identity metadata reissue.</li>
+        <li><code>user.pubkey</code> as a fallback profile locator.</li>
+        <li>Fallback key derivation and automatic conversion.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Maintenance weight</h3>
+      <ul>
+        <li>Legacy fixtures and compatibility tests.</li>
+        <li>Documentation that suggests old backups work.</li>
+        <li>Branches that preserve <code>currentPath</code> only for legacy reissue.</li>
+        <li>Ambiguous errors that invite another fallback.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Implementation steps</h2>
+  <div class="step">
+    <h3>1. Prove the assumption without adding compatibility</h3>
+    <p class="meta">Sigma data · read-only · before deployment</p>
+    <p>Run a one-time count of profiles that would require a legacy path. Zero is expected. If it is not zero, stop and inspect the records; do not restore the fallback.</p>
+  </div>
+  <div class="step">
+    <h3>2. Delete legacy restore code</h3>
+    <p class="meta">sigma-auth · authentication and restore modules</p>
+    <p>Remove old-format detection, <code>xprv</code> loading, metadata reissue, user-level lookup fallback, and conversion branches. Keep only the current restore entry point.</p>
+  </div>
+  <div class="step">
+    <h3>3. Make authority profile-first</h3>
+    <p class="meta">sigma-auth · restore verification</p>
+    <p>Verify the proof, load the selected profile, and require an exact match with <code>profile.member_pubkey</code>. A mismatch performs zero writes.</p>
+  </div>
+  <div class="step">
+    <h3>4. Replace compatibility tests with boundary tests</h3>
+    <p class="meta">sigma-auth · focused test suite</p>
+    <p>Test the current backup success path, wrong-key rejection, unsupported legacy input, zero-write failure behavior, and navigation only after success.</p>
+  </div>
+  <div class="step">
+    <h3>5. Say exactly what Sigma supports</h3>
+    <p class="meta">restore screen and documentation</p>
+    <p>Describe the current Sigma backup format plainly. Remove promises of automatic migration. Tell someone with an unsupported file that it cannot be restored.</p>
+  </div>
+
+  <h2>Protocol boundaries</h2>
+  <ul>
+    <li><strong>BRC-100</strong> is the wallet interface Sigma uses for wallet operations. It is not an inscription or backup format.</li>
+    <li><strong>BAP</strong> identity and operational key rotation remain separate from routine Sigma restore.</li>
+    <li><strong>BitPlan hosted draft</strong> means this encrypted plan is stored off-chain temporarily. It becomes a 1Sat Ordinal only if someone later chooses to inscribe it.</li>
+  </ul>
+
+  <h2>Done when</h2>
+  <ul>
+    <li>Only the current Sigma backup format can enter restore.</li>
+    <li>The restored key must exactly match the selected profile.</li>
+    <li>Legacy inputs fail with one clear message.</li>
+    <li>No fallback, migration, account rewrite, key rotation, or on-chain action remains.</li>
+    <li>The current backup succeeds on another device without changing identity.</li>
+  </ul>
+
+  <h2>Starting points</h2>
+  <ul>
+    <li><a href="https://linear.app/openprotocollabs/issue/OPL-4146/fix-restore-rejection-of-stable-bap-account-key-and-duplicate-password">OPL-4146: restore rejection and password loop</a></li>
+    <li><a href="https://github.com/b-open-io/sigma-auth/pull/151">sigma-auth PR 151</a></li>
+  </ul>
+
+  <h2>Implementation handoff</h2>
+  <p>The product choice is settled, so there is no questionnaire. Copy this brief into the coding task.</p>
+  <textarea id="handoff" class="handoff" readonly>Plan: Sigma restore, current backups only
+Draft: 2
+Hosted BitPlan: h_vpGk8HEPTxtw3X09XioO
+Repository: b-open-io/sigma-auth
+Linear: OPL-4146
+Pull request: sigma-auth#151
+
+Scope
+- Remove legacy xprv restore and pre-0.3 compatibility paths.
+- Remove user.pubkey fallback lookup and automatic conversion or reissue.
+- Keep only the current Sigma backup format.
+- Require an exact match with profile.member_pubkey.
+
+Constraints
+- Do not add a legacy fallback, migration flow, or automatic account rewrite.
+- A failed restore performs no writes, key rotation, or on-chain action.
+- BRC-100 is the wallet interface, not an inscription or backup format.
+
+Done when
+- The current backup restores on another device without changing identity.
+- Wrong keys and legacy inputs fail clearly.
+- Tests cover the current success path and zero-write failure boundaries.
+- Product copy only promises the restore behavior that exists.</textarea>
+  <button id="copy" type="button">Copy implementation brief</button>
+  <noscript><p class="meta">Select the brief above and copy it manually.</p></noscript>
+
+  <p class="foot">This plan records a decided simplification. It contains no migration proposal and no compatibility fallback.</p>
+  <script>
+    (() => {
+      var button = document.getElementById('copy');
+      var handoff = document.getElementById('handoff');
+      button.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(handoff.value);
+          button.textContent = 'Copied';
+        } catch (_) {
+          handoff.focus();
+          handoff.select();
+          try {
+            document.execCommand('copy');
+            button.textContent = 'Copied';
+          } catch (_) {
+            button.textContent = 'Selected. Copy manually';
+          }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

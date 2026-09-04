@@ -1,153 +1,174 @@
 ---
 name: bitplan
 description: >
-  BitPlan publishes encrypted HTML plans as versioned 1Sat Ordinals on
-  Bitcoin SV, with a BRC-100 wallet holding the keys. Use when asked to
-  "publish this plan", "put this plan on chain", "make a bitplan", "share
-  this plan with X", "give X access to the plan", "send a link to the plan",
-  "make the plan private again", "read the plan at this origin", "list my
-  plans", "fetch the bitplan", "update the plan", or "write a plan for
-  review". Also use for questions about bitplan.dev, the bitplan envelope, or
-  the bitplan CLI.
+  Create, review, host, publish, update, fetch, and share encrypted HTML plans
+  with BitPlan and a BRC-100 wallet. Use when asked to make a BitPlan, publish
+  or update a plan, share one with a person or team, create a private reader
+  link, move a hosted draft on chain, or explain bitplan.dev.
 ---
 
 # BitPlan
 
-**Skill version: 0.1.0**
+**Skill version: 0.2.0**
 
-BitPlan turns one self-contained HTML file into an encrypted 1Sat Ordinal.
-Publishing the same file again reinscribes the same satoshi, so one origin
-holds every version. A BRC-100 wallet on the user's machine encrypts, signs,
-pays, and decrypts. bitplan.dev is the viewer. Nothing is stored server-side.
+BitPlan turns one self-contained HTML file into an encrypted living plan. A
+BRC-100 wallet owns the keys. A draft can stay hosted as ciphertext while it
+changes, then become a permanent 1Sat Ordinal when it is ready. BRC-100 is the
+wallet interface, not the inscription format.
 
-To install or update: `npx skills add opldotdev/bitplan.dev --skill bitplan -g`
+Use `bunx bitplan` or `npx bitplan`. Never install the CLI globally. Run it
+from the repository the plan belongs to so BitPlan records Git metadata.
 
-## Read the current docs first
+## Check the live product first
 
-Before answering questions about what BitPlan can do, read
-https://bitplan.dev/llms.txt. Read it again when the user asks how to do
-something or whether something is supported. If the docs and live CLI output
-disagree, trust the CLI. The CLI prints `--help` for every command.
+Before answering what BitPlan supports, read https://bitplan.dev/llms.txt and
+check `bunx bitplan --help`. Check the relevant command's help too. If the
+published CLI and website disagree, say so plainly instead of inventing a
+fallback.
 
-## Requirements
+## Safety and privacy
 
-- Node 20 or Bun. The CLI runs with `npx bitplan` or `bunx bitplan`.
-- A BRC-100 wallet running on the machine and unlocked: BSV Desktop or 1Sat
-  Wallet, serving on `http://127.0.0.1:3321`. The user unlocks it. You cannot.
-- A few satoshis in that wallet. Publishing costs about one satoshi per
-  kilobyte.
-- One HTML file under 5 MB with everything inlined: no external scripts, no
-  forms, no iframes. External images are allowed. Inline scripts are allowed
-  and run in the viewer with no network access.
+1. Never ask for or handle a mnemonic, wallet password, or private key. The
+   user unlocks and approves operations in their BRC-100 wallet.
+2. Tell the user before fetching a plan they did not author. Fetching puts its
+   plaintext in the agent's context.
+3. A reader link is a bearer credential. Anyone with the complete link can
+   read. Pass it intact, do not print its fragment separately, and do not put it
+   in public logs, issues, or pull requests.
+4. Hosted storage contains ciphertext and a public envelope header, not
+   plaintext or wallet keys. A hosted draft still depends on bitplan.dev until
+   it is inscribed.
+5. On-chain versions are permanent. Removing a reader only affects the next
+   version. It cannot revoke access to a version already shared.
 
-## Three rules
+## Choose the destination deliberately
 
-1. **The wallet must be unlocked, and you cannot unlock it.** If a command
-   fails with a connection or authorization error, tell the user to open and
-   unlock the wallet, then retry. Never ask for a seed, password, or key.
-2. **Reading a plan puts its plaintext in your context.** Say so before
-   fetching a plan that the user did not write, and do not paste plan
-   contents into places the user did not ask for.
-3. **No tool returns or accepts key material.** Identity keys are public and
-   fine to show. Reader link secrets appear only as part of a link the CLI
-   prints; pass the whole link on, never split it.
-
-## Commands
-
-Always use `--json` where it exists and parse the result. Every JSON result
-prints on stdout; errors print on stderr with exit code 1.
-
-Check the wallet:
+Use a hosted draft for review and iteration. It costs no BSV:
 
 ```bash
-npx bitplan whoami --json
+bunx bitplan upload ./plan.html --hosted --link
 ```
 
-Publish a new plan or a new version of one (same file path = same plan):
+`--link` lets a reader open the plan without a wallet. The hosted ID is only a
+random locator; the private key after `#` is what decrypts the plan. Treat the
+complete URL like a password.
+
+Use wallet identities when access should follow people rather than a link:
 
 ```bash
-npx bitplan upload ./plan.html --description "One line for the list" --yes --json
+bunx bitplan upload ./plan.html --hosted --share-with <identity-key|contact|team>
 ```
 
-Result fields: `published`, `kind` (`draft` for a new plan, `version` for an
-update), `origin` (the permanent id), `outpoint`, `version`, `access.mode`
-(`wallet-only` or `shared`), `access.readers`, `changes.added`,
-`changes.removed`, `relay.state`, `viewer` (the URL to share), and `link`
-(a reader link, or null).
-
-Share with named readers, by wallet identity key, contact, or team:
+Use the on-chain path when the user asks for permanence or the plan is ready to
+become a record:
 
 ```bash
-npx bitplan upload ./plan.html --share-with <identity-key-or-contact> --yes --json
+bunx bitplan inscribe ./plan.html
 ```
 
-Give out a link anyone can open, kept on later versions:
+Publishing directly on chain is also supported:
 
 ```bash
-npx bitplan upload ./plan.html --link --yes --json
+bunx bitplan upload ./plan.html
 ```
 
-The `link` field holds `https://bitplan.dev/d/<origin>#k=<secret>`. The
-part after `#` never reaches a server. Anyone with the link can read.
+Do not describe a hosted plan as on chain. Do not call a 1Sat Ordinal a
+"BRC-100 inscription."
 
-Stop sharing on the next version:
+## Write the plan before publishing it
+
+Start with the template at
+https://github.com/opldotdev/bitplan.dev/blob/master/docs/templates/plan.html.
+Use it as a design system, not as a reason to add sections the plan does not
+need.
+
+A good BitPlan:
+
+- names the repository, relevant issue or project, current state, and intended
+  reader;
+- says what is true now, what will change, what will not change, and how to
+  know the work is done;
+- uses plain English, short labels, and the real product names;
+- uses a small diagram when it makes a relationship or sequence easier to
+  understand;
+- contains no secrets, local file paths, seed phrases, tokens, or private
+  reader links;
+- works with scripts on or off and keeps all required CSS and JavaScript in the
+  one HTML file;
+- states what changed when updating an existing draft;
+- stays at the same file path so the hosted ID or on-chain origin remains
+  stable.
+
+Never present an idea, proposed feature, or future wallet behavior as something
+that works today.
+
+### Decisions and handoff
+
+Ask questions only when there is a real unresolved choice that changes the
+implementation. Do not manufacture a questionnaire.
+
+For each real decision, give two to four distinct options, mark one
+Recommended, include Unsure, and state the consequence of each choice. End with
+a response block that fills in from the choices and can be copied back to the
+agent.
+
+If the decisions are already settled, end with a short copyable implementation
+brief instead. It should contain the repository, scope, constraints, and done
+conditions. That gives the next agent a useful handoff without fake choices.
+
+## Publish and update
+
+Authenticate if needed, then inspect the wallet identity:
 
 ```bash
-npx bitplan upload ./plan.html --private --yes --json
+bunx bitplan auth
+bunx bitplan whoami --json
 ```
 
-Older versions stay readable by whoever could read them. Nothing on chain can
-be deleted.
+For non-interactive output, use `--json` where supported. `--json` requires
+`--yes`; only add it after the user has approved the publish.
 
-List plans this wallet holds:
+The same file path updates the same plan:
 
 ```bash
-npx bitplan list --json
+bunx bitplan upload ./plan.html --yes --json
 ```
 
-Read a plan (HTML to stdout, metadata to stderr with `--meta`):
+Do not rename or copy the file to make a new draft unless the user explicitly
+wants a separate plan. After publishing, return:
+
+- the reader link when one was requested;
+- the ordinary viewer URL for wallet readers;
+- the hosted ID or on-chain origin;
+- the version number;
+- a one-line access summary.
+
+## Read and organize plans
 
 ```bash
-npx bitplan fetch <origin-or-viewer-url> --meta
+bunx bitplan list --json
+bunx bitplan fetch <origin-or-url> --meta
+bunx bitplan contact set <name> <identity-key>
+bunx bitplan team add <team> <contact...>
 ```
 
-A viewer URL with `#k=` opens without a wallet.
+Contacts and teams are local labels. The server does not receive their names or
+membership. A contact may represent one wallet identity; give one person
+multiple clear contact names when they use multiple identities.
 
-Manage local names for identity keys:
+## Common failures
 
-```bash
-npx bitplan contact set <name> <identity-key>
-npx bitplan team add <team> <contact...>
-```
-
-## Writing a plan for review
-
-Start from the template at
-https://github.com/opldotdev/bitplan.dev/blob/master/docs/templates/plan.html
-and follow the rules in the README beside it. The important ones: one file
-with everything inlined; works with scripts on and off; decisions are
-questions with a recommended option, an Unsure option, and a stated
-consequence per option; the response block at the bottom fills in as the
-reader chooses and has a copy button; plain English; same file path for every
-draft so the origin stays stable.
-
-After publishing, give the user the `viewer` URL, or the `link` when they
-asked for a link, and the origin. Paste the reader's response block back into
-the conversation when they return it.
-
-## Errors you will see
-
-- `Could not connect` or `authorize`: wallet not running or locked. Ask the
-  user to unlock it. Do not retry in a loop.
-- `This wallet does not hold a bitplan draft with origin ...`: either another
-  publish already spent the coin, or a pending wallet action is reserving it.
-  Wait a minute and retry once; if it persists, the plan was published from
-  elsewhere, so fetch the latest version before changing it.
-- `HTML document is N bytes; maximum is 5242880 bytes`: split the plan or
-  drop inlined assets.
-- `External script sources are not allowed`: inline the script or remove it.
+- Connection or authorization error: ask the user to open and unlock the
+  wallet, then retry once. Never ask for wallet secrets.
+- Hosted update secret missing: this machine cannot update that hosted draft.
+  A reader link does not grant write access.
+- Version conflict: fetch the latest version, merge the new information, and
+  update the same file.
+- HTML over 5 MB: reduce inlined assets or split the plan.
+- External script rejected: inline it or remove it.
 
 ## What BitPlan is not
 
-Not a website host, not a file store, not a notes app, and not a wallet.
-Plans are single HTML documents. For a public website, use a web host.
+BitPlan is not a general website host, wallet, database, or notes app. Plans are
+single encrypted HTML documents. Use a normal web host for a public website or
+multi-file application.

@@ -8,6 +8,8 @@
   chain. `bitplan inscribe` puts a hosted draft on the chain. `fetch` and
   `list` work for hosted ids, and `--site-url` overrides the bitplan.dev
   origin on `upload`, `inscribe`, and `fetch`.
+- Hosted drafts cost no BSV. bitplan.dev stores the encrypted envelope and
+  public header, never the plan plaintext or wallet keys.
 - `upload --link` adds a reader link anyone can open. The same link works on
   later versions until `--private`. `bitplan fetch` can open a plan from that
   URL without a wallet.

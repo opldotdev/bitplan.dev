@@ -107,8 +107,11 @@ export default function CommandsPage() {
       </p>
       <p>
         <code>--hosted</code> stores the sealed envelope on bitplan.dev instead
-        of the chain. <code>bitplan inscribe &lt;h_id|file&gt;</code> publishes
-        it on chain; <code>--all-versions</code> replays the whole history.
+        of the chain, so no BSV is needed. Add <code>--link</code> when someone
+        should be able to read without a wallet. The complete link is a bearer
+        credential: anyone who has it can read.{" "}
+        <code>bitplan inscribe &lt;h_id|file&gt;</code> publishes the latest
+        version on chain; <code>--all-versions</code> replays the whole history.
       </p>
       <p>
         <code>--share-with</code> accepts a public identity key, contact, or
@@ -120,8 +123,9 @@ export default function CommandsPage() {
         <code>~/.bitplan/config.json</code>. A local draft may remember a name
         so it can resolve the current members when you publish. Neither names
         nor membership go to BitPlan servers or on-chain; only public identity
-        keys appear in the shared envelope. BitPlan has no accounts, team
-        directory, or plan database.
+        keys appear in the shared envelope. BitPlan has no accounts or team
+        directory. Hosted storage contains sealed envelopes, not contact names,
+        team membership, wallet keys, or plaintext.
       </p>
       <p>
         Removing a team member excludes them from the next version of locally

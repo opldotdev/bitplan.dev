@@ -3,16 +3,16 @@ import { GITHUB_URL, SITE_URL } from "@/lib/site";
 const PAGES: Record<string, string> = {
   "/": `# BitPlan
 
-Secure agent plans on Bitcoin. Encrypted by default. No servers hold your content.
+Secure agent plans. Encrypted before upload. Keep a draft hosted while it changes, then put it on Bitcoin when it should be permanent.
 
 Publish a self-contained HTML file with the CLI:
 
     npx bitplan auth
-    npx bitplan upload ./plan.html
+    bunx bitplan upload ./plan.html --hosted --link
 
-BRC-100 is the interface the CLI uses to talk to a wallet. The published plan is a 1Sat Ordinal inscription; BRC-100 is not an inscription format. The wallet encrypts, signs, and publishes. Upload the same file again to reinscribe the same satoshi. One origin outpoint is the draft identity.
+BRC-100 is the interface the CLI uses to talk to a wallet. It is not an inscription format. Hosted drafts store only sealed envelopes on bitplan.dev and cost no BSV. A finished plan can be published as a 1Sat Ordinal inscription.
 
-This website is the viewer. It fetches public ciphertext from 1Sat and asks the connected wallet to decrypt. It stores no drafts.
+This website stores ciphertext for hosted drafts and fetches on-chain ciphertext from 1Sat. Decryption happens in the browser with an authorized wallet or reader link. The server never receives plaintext.
 
 - CLI: https://www.npmjs.com/package/bitplan
 - Docs: ${SITE_URL}/docs
@@ -22,7 +22,7 @@ This website is the viewer. It fetches public ciphertext from 1Sat and asks the 
 `,
   "/about": `# About · BitPlan
 
-BitPlan is a CLI and a viewer for encrypted HTML plan documents on Bitcoin SV. The npm package is \`bitplan\`. The website is a viewer only.
+BitPlan is a CLI and viewer for encrypted HTML plans. A plan can stay hosted as ciphertext while it changes, then move to Bitcoin as a 1Sat Ordinal. The npm package is \`bitplan\`.
 
 ${SITE_URL}
 `,
@@ -34,7 +34,7 @@ CLI: https://www.npmjs.com/package/bitplan
 `,
   "/docs": `# Docs · BitPlan
 
-The CLI packages a self-contained HTML document and uses the BRC-100 interface to ask your wallet to publish it as an encrypted 1Sat Ordinal inscription.
+The CLI packages a self-contained HTML document and uses the BRC-100 interface to ask your wallet to encrypt it. Keep the ciphertext hosted while the plan changes, or publish it as a 1Sat Ordinal.
 
     npx bitplan
 
@@ -62,7 +62,7 @@ For a local team, save contacts and share by team name:
     npx bitplan team add acme-dev alice
     npx bitplan config --share-with acme-dev
 
-Contact names, their public keys, and team membership are defined in ~/.bitplan/config.json. A local draft may remember a name so it can resolve the current members when publishing. Neither names nor membership go to BitPlan servers or on-chain; only public identity keys appear in the shared envelope. BitPlan has no accounts, membership database, or plan database. Removing a member excludes them from the next version of locally tracked plans that remember the team, but cannot revoke older versions.
+Contact names, their public keys, and team membership are defined in ~/.bitplan/config.json. A local draft may remember a name so it can resolve the current members when publishing. Neither names nor membership go to BitPlan servers or on-chain; only public identity keys appear in the shared envelope. BitPlan has no accounts or membership database. Hosted storage contains sealed envelopes, not names, wallet keys, or plaintext. Removing a member excludes them from the next version of locally tracked plans that remember the team, but cannot revoke older versions.
 
 Docs: ${SITE_URL}/docs/agents
 `,
@@ -80,7 +80,8 @@ Docs: ${SITE_URL}/docs/cli-setup
 
 CLI commands: upload, list, fetch, config, contact, team, whoami, version, auth.
 
-    npx bitplan upload ./plan.html
+    bunx bitplan upload ./plan.html --hosted --link
+    bunx bitplan inscribe ./plan.html
     npx bitplan list
     npx bitplan fetch <origin>
     npx bitplan contact set <name> <identity-key>
@@ -96,15 +97,15 @@ Docs: ${SITE_URL}/docs/commands
 `,
   "/docs/envelope": `# Envelopes · BitPlan
 
-The envelope is the on-chain container: BPLN framing, a public JSON header, and an encrypted body. It is not the encryption key. Envelopes can be private or shared.
+The envelope is BitPlan's sealed container: BPLN framing, a public JSON header, and an encrypted body. The same format works in hosted storage and on chain. It is not the encryption key.
 
 Docs: ${SITE_URL}/docs/envelope
 `,
   "/docs/how-it-works": `# How it works · BitPlan
 
-BitPlan publishes encrypted HTML drafts as versioned 1Sat Ordinal inscriptions. BRC-100 is the interface BitPlan uses to talk to the wallet; it is not an inscription format. Private drafts are encrypted by the wallet. For sharing, the CLI encrypts the document once and asks the wallet to wrap its key for each reader.
+BitPlan encrypts HTML plans before upload. BRC-100 is the interface BitPlan uses to talk to the wallet; it is not an inscription format. The same sealed envelope can stay hosted while it changes or become a versioned 1Sat Ordinal.
 
-bitplan.dev fetches public ciphertext from 1Sat. In the browser, the connected wallet decrypts.
+bitplan.dev stores ciphertext for hosted drafts and fetches on-chain ciphertext from 1Sat. An authorized wallet or reader link decrypts in the browser. The server never receives plaintext.
 
 Private plans use BRC-100 wallet encryption with [2, "bitplan"], a public keyID, and counterparty self. Shared plans use a fresh random 32-byte document key and @bsv/sdk AES-256-GCM, then wallet-encrypt that key once per reader. The authenticated payload commits the exact public header. Wallet private keys never leave the wallet. Shared reader identity keys are public.
 
@@ -120,7 +121,7 @@ On any page, \`list_my_bitplans\` can list plan IDs and viewer links from a wall
 `,
   "/privacy": `# Privacy · BitPlan
 
-BitPlan does not keep a drafts database or user accounts. Encrypted plan documents are inscriptions on Bitcoin. This website fetches public ciphertext from 1Sat and renders it in your browser after your wallet decrypts it.
+BitPlan has no user accounts. Hosted drafts are sealed envelopes stored as ciphertext. On-chain plans are 1Sat Ordinal inscriptions. The website never receives plaintext; your wallet or reader link decrypts in the browser.
 
 Wallet identity keys stay in your BRC-100 wallet. Hosting logs for this website are whatever the host records for ordinary HTTP requests.
 
@@ -136,25 +137,29 @@ Page: ${SITE_URL}/sponsors
 
 export const LLMS_TXT = `# BitPlan
 
-> Encrypted HTML plan documents on Bitcoin. The CLI publishes. This site is the viewer.
+> Encrypted HTML plans. Host ciphertext while a draft changes, then put it on Bitcoin when it should be permanent.
 
 ## When to use this
 
-Use BitPlan when a user wants to publish, version, or read an encrypted HTML plan as a 1Sat Ordinal inscription using a BRC-100 wallet.
+Use BitPlan when a user wants to draft, publish, version, share, or read an encrypted HTML plan using a BRC-100 wallet.
 
 Do not use BitPlan as a general file host, a server-side notes app, or a substitute for a BRC-100 wallet.
 
 ## Terms
 
 - BRC-100 is the interface BitPlan uses to talk to a wallet. It is not an inscription format.
-- A published BitPlan is a 1Sat Ordinal inscription. Later versions reinscribe the same satoshi.
+- A hosted BitPlan is a sealed envelope stored by bitplan.dev. The server cannot decrypt it.
+- An on-chain BitPlan is a 1Sat Ordinal inscription. Later versions reinscribe the same satoshi.
+- A reader link is a bearer credential. Anyone with the complete link can read.
 
 ## CLI
 
 - Install: \`npx bitplan\` or \`bunx bitplan\`
 - Package: https://www.npmjs.com/package/bitplan
 - Auth: \`npx bitplan auth\`
-- Publish: \`npx bitplan upload ./plan.html\`
+- Hosted draft: \`bunx bitplan upload ./plan.html --hosted --link\`
+- Publish on chain: \`bunx bitplan upload ./plan.html\`
+- Move a hosted draft on chain: \`bunx bitplan inscribe ./plan.html\`
 - List: \`npx bitplan list\`
 - Fetch: \`npx bitplan fetch <origin>\`
 - Share: \`npx bitplan upload ./plan.html --share-with <identity-key-or-contact>\`
@@ -173,13 +178,13 @@ Do not use BitPlan as a general file host, a server-side notes app, or a substit
 
 ## HTTP
 
-Read a published encrypted envelope:
+Read an encrypted envelope:
 
     GET ${SITE_URL}/ordfs/content/<origin>:-1
 
-This returns public ciphertext from 1Sat. The CLI is the npm package bitplan: https://www.npmjs.com/package/bitplan
+For an on-chain origin, this returns public ciphertext from 1Sat. For a hosted ID, it returns hosted ciphertext. The CLI is the npm package bitplan: https://www.npmjs.com/package/bitplan
 
-Publishing and decrypting go through the user's wallet via \`npx bitplan\`. Drafts at /d/<origin> are ciphertext and are not indexed.
+Creating and updating a plan goes through the user's wallet via \`npx bitplan\`. Decryption happens in the browser or CLI. Drafts at /d/<origin> are ciphertext and are not indexed.
 `;
 
 export function markdownForPath(pathname: string): string | null {

@@ -7,7 +7,7 @@ import { HomeCta } from "@/components/home-cta";
 
 export const metadata: Metadata = {
   description:
-    "Secure agent plans on Bitcoin. Encrypted by your wallet, inscribed as a 1Sat Ordinal.",
+    "Secure agent plans, encrypted before upload. Host a working draft, then publish it as a 1Sat Ordinal.",
   title: {
     absolute: "BitPlan",
   },
@@ -42,13 +42,15 @@ export default function Home() {
             <h1 className="font-heading font-semibold text-[clamp(2rem,10vw,2.5rem)] leading-[1.08] tracking-tight md:text-6xl lg:text-7xl">
               Secure agent plans{" "}
               <span className="block">
-                <em className="italic">on Bitcoin</em>
+                <em className="italic">on your terms</em>
                 <span className="text-primary">.</span>
               </span>
             </h1>
             <p className="mx-auto mt-5 text-foreground/75 md:text-xl">
-              Encrypted by your wallet,{" "}
-              <span className="block">inscribed as a 1Sat Ordinal.</span>
+              Encrypted before upload.{" "}
+              <span className="block">
+                Hosted while changing. On Bitcoin when ready.
+              </span>
             </p>
             <HomeCta />
           </div>
@@ -58,15 +60,15 @@ export default function Home() {
       <div className="mx-auto w-full max-w-[42rem] space-y-10 px-6 py-16">
         <section className="space-y-3">
           <h2 className="font-medium text-lg tracking-tight">
-            Publish with the BitPlan CLI
+            Create with the BitPlan CLI
           </h2>
           <h3 className="font-medium text-sm">npm package bitplan</h3>
           <p className="text-muted-foreground">
             The CLI is published on the npm registry as bitplan. Run npx bitplan
-            auth, then npx bitplan upload ./plan.html. bunx bitplan is the same
-            binary. Your BRC-100 wallet protects the identity keys and publishes
-            each version. Upload the same file again to reinscribe the same
-            satoshi. One origin outpoint is the draft and its version history.
+            auth, then create a hosted draft with bunx bitplan upload
+            ./plan.html --hosted --link. Your BRC-100 wallet protects the
+            identity keys. Hosted drafts cost no BSV. When the plan is ready,
+            the wallet can publish it as a 1Sat Ordinal.
           </p>
           <h3 className="font-medium text-sm">Auth</h3>
           <CommandCopy command="npx bitplan auth" />
@@ -86,8 +88,9 @@ export default function Home() {
           </p>
           <h3 className="font-medium text-sm">Viewer</h3>
           <p className="text-muted-foreground">
-            This site asks the connected wallet to open private drafts or unlock
-            shared drafts. It stores no drafts server-side.
+            This site opens encrypted plans with an authorized wallet or reader
+            link. Hosted storage contains ciphertext, never plaintext or wallet
+            keys.
           </p>
         </section>
 

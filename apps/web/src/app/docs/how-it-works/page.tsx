@@ -60,7 +60,7 @@ const decryptedPlan = new SymmetricKey(keyBytes).decrypt(encryptedPlan)
 
 export const metadata: Metadata = {
   description:
-    "How BitPlan uses the BRC-100 wallet interface to publish and read encrypted 1Sat Ordinal inscriptions.",
+    "How BitPlan encrypts hosted drafts and 1Sat Ordinal plans with a BRC-100 wallet.",
   title: "How it works",
 };
 
@@ -69,17 +69,16 @@ export default function HowItWorksPage() {
     <>
       <h1>How it works</h1>
       <p>
-        BitPlan publishes encrypted HTML drafts as versioned 1Sat Ordinal
-        inscriptions. BRC-100 is the interface BitPlan uses to talk to the
-        wallet; it is not an inscription format. The CLI uses the SDK to encrypt
-        the document once and asks the wallet to wrap its key for each reader.
-        The wallet always owns the identity keys, signs, and publishes.
+        BitPlan encrypts an HTML plan before it leaves your computer. BRC-100 is
+        the interface BitPlan uses to talk to your wallet; it is not an
+        inscription format. The plan can stay hosted as ciphertext while it
+        changes, then become a permanent 1Sat Ordinal when it is ready.
       </p>
       <ArchitectureDiagram />
       <p>
-        bitplan.dev fetches public ciphertext from 1Sat. In the browser, the
-        connected wallet unwraps the document key. The site has no drafts
-        database, and plaintext never reaches its server.
+        The viewer loads ciphertext from bitplan.dev or 1Sat. In the browser, an
+        authorized wallet or reader link unwraps the document key. Plaintext
+        never reaches the server.
       </p>
       <section id="encryption">
         <h2>Encryption</h2>
@@ -188,16 +187,25 @@ export default function HowItWorksPage() {
           You still need a wallet for the keys, but you do not need BSV.{" "}
           <code>bitplan inscribe</code> puts the draft on chain, and the hosted
           link redirects to that origin forever. bitplan.dev sees only
-          ciphertext.
+          ciphertext and the public envelope header.
+        </p>
+        <p>
+          A hosted ID is a random 120-bit locator. It does not decrypt anything.
+          A separate random 256-bit update secret stays in the CLI&apos;s local
+          state. The server stores only a hash of that secret and requires it
+          for every new version. Losing the local secret means that machine can
+          no longer update the hosted draft.
         </p>
       </section>
       <section id="reader-links">
         <h2>Reader links</h2>
         <p>
-          A reader link is a throwaway key. Its public half is a normal reader
-          slot. Its private half rides in the URL fragment, which browsers never
-          send to a server. Anyone with the link can read until a version is
-          published with <code>--private</code>.
+          A reader link contains a separate random 256-bit private key. Its
+          public half is a normal reader slot. Its private half sits after the
+          <code>#</code> in the URL, which browsers do not send in HTTP
+          requests. Anyone with the complete link can read, so copy and share it
+          as carefully as a password. <code>--private</code> removes that reader
+          from the next version, but it cannot revoke versions already shared.
         </p>
       </section>
       <section id="versions">

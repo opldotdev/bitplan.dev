@@ -39,17 +39,17 @@ export const BITPLAN_PROFILE = {
   name: "BitPlan",
   strengths: [
     "The wallet encrypts every plan before it leaves your machine. There is no cleartext mode.",
-    "No account, no drafts database, no content server. The site can be offline and the plan still exists.",
-    "Every version stays readable at one permanent origin. A concurrent publish fails instead of silently overwriting.",
-    "Readers are wallet identity keys, so an invite is a key, not an email and a password.",
+    "Hosted drafts cost no BSV and store only ciphertext. A finished plan can move on chain for permanence.",
+    "A reader can use a wallet identity or a private reader link. The server never receives the plaintext.",
+    "Hosted and on-chain updates reject version conflicts instead of silently overwriting another writer.",
     "The CLI returns structured JSON, publishes an llms.txt, and exposes WebMCP tools for agents.",
   ],
   weaknesses: [
-    "You need a BRC-100 wallet on your machine with a small amount of BSV. Publishing a 500 KB plan costs under a cent, but it is not free.",
+    "Creating or updating a plan still needs a BRC-100 wallet. Only the on-chain path needs BSV.",
     "One self-contained HTML file per plan, 5 MB maximum, no folders yet.",
     "The viewer runs plan scripts in a sandbox with no network access. A plan cannot phone home.",
-    "Readers need a wallet too. There is no password link or email invite yet.",
-    "Nothing can be deleted or expired. Ciphertext is on a public chain forever.",
+    "A reader link is a bearer credential. Anyone who gets the complete link can read that version.",
+    "Hosted drafts depend on bitplan.dev until they are inscribed. On-chain versions cannot be deleted.",
     "No custom domains, no analytics, no hosted forms.",
   ],
 } as const;
@@ -58,14 +58,14 @@ export const COMPETITORS: Competitor[] = [
   {
     bitplanLimits: [
       "here.now serves folders and scripts. BitPlan serves one sandboxed HTML file.",
-      "here.now has a free tier with no wallet. BitPlan needs a wallet and a few satoshis.",
-      "here.now can gate a page with a password. BitPlan readers need a wallet identity key.",
+      "here.now needs no wallet. BitPlan needs a BRC-100 wallet to create or update a plan.",
+      "here.now has passwords and email gates. BitPlan has wallet identities and bearer reader links.",
     ],
-    checked: "2026-09-02",
+    checked: "2026-09-04",
     chooseBitplan: [
-      "The document is a plan, a spec, or a report that should not be readable by a link holder.",
-      "You want a permanent, versioned record that no host can delete or lose.",
-      "Your readers already have wallet identities, or you are the only reader.",
+      "The document is a plan, spec, or report that the hosting provider should never be able to read.",
+      "You want to review a hosted draft first, then make the finished plan permanent on chain.",
+      "Your readers have wallet identities, or a private reader link is the right tradeoff.",
     ],
     chooseThem: [
       "You are publishing a real site, a demo, or a multi-file artifact.",
@@ -74,10 +74,11 @@ export const COMPETITORS: Competitor[] = [
     ],
     name: "here.now",
     oneLine:
-      "Instant static hosting for coding agents. Public by default, gated on paid plans, hosted by a company.",
+      "General static hosting for agents. Better for websites; BitPlan is built for encrypted plans.",
     rows: [
       {
-        bitplan: "Bitcoin SV. The site stores nothing.",
+        bitplan:
+          "Hosted ciphertext on bitplan.dev while drafting; ciphertext on Bitcoin after inscription.",
         label: "Who holds the content",
         them: "here.now's servers on Cloudflare.",
       },
@@ -87,27 +88,31 @@ export const COMPETITORS: Competitor[] = [
         them: "Public. Anyone with the unguessable link can read it.",
       },
       {
-        bitplan: "Wallet identity keys named at publish time.",
+        bitplan:
+          "Wallet identity keys or a reader link. Decryption happens in the browser.",
         label: "Access control",
-        them: "Password or email allowlist, on claimed sites. Enforced by their server.",
+        them: "Link, password, email, domain, or workspace access. Enforced by their server.",
       },
       {
-        bitplan: "AES-256-GCM with a per-plan key, wrapped by the wallet.",
+        bitplan:
+          "A fresh 32-byte document key, wrapped separately for each authorized reader.",
         label: "Encryption",
         them: "Not stated in their docs or privacy policy.",
       },
       {
-        bitplan: "Every version stays on chain at one origin.",
+        bitplan:
+          "Hosted versions share one random ID. On-chain versions share one permanent origin.",
         label: "Versioning",
         them: "Recorded on Free. Browse and restore from $4/month.",
       },
       {
-        bitplan: "Second publish fails. The coin is already spent.",
+        bitplan: "A stale hosted or on-chain update fails with a conflict.",
         label: "Concurrent edits",
         them: "Optional baseVersionId returns 409 on conflict.",
       },
       {
-        bitplan: "Impossible.",
+        bitplan:
+          "Hosted ciphertext can be removed with an authenticated request. On-chain versions cannot.",
         label: "Deletion",
         them: "Owner can hard-delete. Anonymous sites expire in 24 hours.",
       },
@@ -119,15 +124,16 @@ export const COMPETITORS: Competitor[] = [
       {
         bitplan: "One HTML file, 5 MB, scripts run with no network access.",
         label: "Content",
-        them: "Any static files, folders, SPA routing, up to 5 GB per site.",
+        them: "Static files, folders, and SPA routing, up to 5 GB per file on account plans.",
       },
       {
-        bitplan: "None. A BRC-100 wallet.",
+        bitplan: "No account. A BRC-100 wallet creates and updates plans.",
         label: "Account",
         them: "None for 24-hour links. Email or Google for anything permanent.",
       },
       {
-        bitplan: "Network fee per publish, about 1 satoshi per KB.",
+        bitplan:
+          "Hosted drafts cost no BSV. On-chain publishing pays the Bitcoin network fee.",
         label: "Price",
         them: "Free with 10 GB and 500 sites. Hobby $4/month. Developer $20/month.",
       },
@@ -145,14 +151,14 @@ export const COMPETITORS: Competitor[] = [
       { label: "here.now privacy policy", url: "https://here.now/privacy" },
       { label: "here.now terms", url: "https://here.now/terms" },
     ],
-    tldr: "here.now is the better host: folders, scripts, custom domains, analytics, workspaces, and a free tier with 10 GB. BitPlan is the better vault: the plan is encrypted by your wallet before upload, readers are identity keys, and no company holds the content. Choose here.now for anything you would put on a website. Choose BitPlan for a plan you would not paste into a public link.",
+    tldr: "here.now is the better general host: folders, scripts, custom domains, analytics, and workspaces. BitPlan is the better encrypted plan system: the wallet seals the document before upload, the host never gets plaintext, and a finished plan can move on chain. Choose here.now for a website. Choose BitPlan for a plan the host should not be able to read.",
     url: "https://here.now",
     what: "here.now is a hosting service built for coding agents. An agent calls its API or installed skill, uploads a file or folder, and gets a live URL on Cloudflare's edge in seconds. Anonymous uploads live for 24 hours. An account makes them permanent and unlocks custom domains, analytics, and version history.",
   },
   {
     bitplanLimits: [
-      "postplan needs nothing installed beyond Node. BitPlan needs a wallet with satoshis.",
-      "postplan drafts can be forgotten. BitPlan drafts cannot be deleted.",
+      "postplan needs nothing installed beyond Node. BitPlan needs a BRC-100 wallet.",
+      "postplan is simpler to discard. On-chain BitPlan versions cannot be deleted.",
     ],
     checked: "2026-09-02",
     chooseBitplan: [
@@ -170,7 +176,8 @@ export const COMPETITORS: Competitor[] = [
       "The open-source draft host BitPlan was modelled on. Same CLI shape, public drafts, no encryption.",
     rows: [
       {
-        bitplan: "Bitcoin SV. The site stores nothing.",
+        bitplan:
+          "Hosted ciphertext on bitplan.dev while drafting; ciphertext on Bitcoin after inscription.",
         label: "Who holds the content",
         them: "A Railway-hosted server with S3 storage. Self-hosting is supported.",
       },
@@ -186,12 +193,13 @@ export const COMPETITORS: Competitor[] = [
       },
       {
         bitplan:
-          "Reinscribe the same satoshi. One origin, every version on chain.",
+          "Keep hosted versions at one ID, or reinscribe the same satoshi on chain.",
         label: "Versioning",
         them: "Re-upload the same path. One URL, numbered versions, --new to fork.",
       },
       {
-        bitplan: "Impossible. Permanent by design.",
+        bitplan:
+          "Hosted ciphertext can be removed with an authenticated request. On-chain versions are permanent.",
         label: "Deletion and retention",
         them: "Not documented.",
       },
@@ -212,12 +220,13 @@ export const COMPETITORS: Competitor[] = [
         them: "512 KB.",
       },
       {
-        bitplan: "None. A BRC-100 wallet.",
+        bitplan: "No account. A BRC-100 wallet creates and updates plans.",
         label: "Account",
         them: "Optional. Anonymous uploads work, sign-in adds attribution and listing.",
       },
       {
-        bitplan: "Network fee per publish, about 1 satoshi per KB.",
+        bitplan:
+          "Hosted drafts cost no BSV. On-chain publishing pays the Bitcoin network fee.",
         label: "Price",
         them: "Free. No pricing page. Run by one person.",
       },
@@ -236,7 +245,7 @@ export const COMPETITORS: Competitor[] = [
       },
       { label: "postplan.dev", url: "https://postplan.dev" },
     ],
-    tldr: "postplan and BitPlan have the same job and the same command shape. postplan stores cleartext on a server and relies on an unguessable draft ID. BitPlan stores ciphertext on Bitcoin and relies on your wallet keys. Choose postplan if you want zero setup and do not mind a link being the only lock. Choose BitPlan if the plan needs a real lock and a permanent record.",
+    tldr: "postplan and BitPlan have the same job and a similar command shape. postplan stores cleartext and relies on an unguessable draft ID. BitPlan stores ciphertext, using wallet identities or a reader link for access, and can later put the plan on chain. Choose postplan for zero setup. Choose BitPlan when the host should not be able to read the plan.",
     url: "https://postplan.dev",
     what: "postplan is a small MIT-licensed service and CLI by Theo Browne. An agent runs npx postplan upload on an HTML file and gets a draft URL. Re-uploading the same file creates a new version at the same URL. It runs on Railway with Postgres and S3-compatible storage, and it is self-hostable.",
   },
@@ -261,7 +270,8 @@ export const COMPETITORS: Competitor[] = [
       "Publish straight from a chat. Public on consumer plans, org-only on Team and Enterprise, hosted by Anthropic.",
     rows: [
       {
-        bitplan: "Bitcoin SV. The site stores nothing.",
+        bitplan:
+          "Hosted ciphertext on bitplan.dev while drafting; ciphertext on Bitcoin after inscription.",
         label: "Who holds the content",
         them: "Anthropic.",
       },
@@ -276,12 +286,14 @@ export const COMPETITORS: Competitor[] = [
         them: "Public link, or organization login. No per-reader invites.",
       },
       {
-        bitplan: "Every version stays on chain at one origin.",
+        bitplan:
+          "Hosted versions share one ID. On-chain versions share one permanent origin.",
         label: "Versioning",
         them: "You publish one chosen version. Iterations live in the chat.",
       },
       {
-        bitplan: "Impossible.",
+        bitplan:
+          "Hosted ciphertext can be removed with an authenticated request. On-chain versions cannot.",
         label: "Revocation",
         them: "Unpublish removes the link for good. Storage data is deleted with it.",
       },
@@ -301,12 +313,13 @@ export const COMPETITORS: Competitor[] = [
         them: "Copy the code into a new chat. The Remix button was removed.",
       },
       {
-        bitplan: "None. A BRC-100 wallet.",
+        bitplan: "No account. A BRC-100 wallet creates and updates plans.",
         label: "Account",
         them: "Claude account to publish. None to view public artifacts.",
       },
       {
-        bitplan: "Network fee per publish, about 1 satoshi per KB.",
+        bitplan:
+          "Hosted drafts cost no BSV. On-chain publishing pays the Bitcoin network fee.",
         label: "Price",
         them: "Included in the Claude plan.",
       },
@@ -348,7 +361,8 @@ export const COMPETITORS: Competitor[] = [
       "Full app hosting from a ChatGPT conversation. Private by default, hosted by OpenAI, paid plans only.",
     rows: [
       {
-        bitplan: "Bitcoin SV. The site stores nothing.",
+        bitplan:
+          "Hosted ciphertext on bitplan.dev while drafting; ciphertext on Bitcoin after inscription.",
         label: "Who holds the content",
         them: "OpenAI-managed hosting.",
       },
@@ -363,17 +377,20 @@ export const COMPETITORS: Competitor[] = [
         them: "Selected users, groups, workspace, or anyone. Enforced by OpenAI.",
       },
       {
-        bitplan: "Every version stays on chain at one origin.",
+        bitplan:
+          "Hosted versions share one ID. On-chain versions share one permanent origin.",
         label: "Versioning",
         them: "Saved versions and deployed versions, tied to git commits. Redeploy earlier ones.",
       },
       {
-        bitplan: "Impossible.",
+        bitplan:
+          "Hosted ciphertext can be removed with an authenticated request. On-chain versions cannot.",
         label: "Deletion",
         them: "Restrict access, or permanently delete the site.",
       },
       {
-        bitplan: "None. No terms, no account, ciphertext only.",
+        bitplan:
+          "No account. The service stores hosted ciphertext, never plaintext.",
         label: "Content licence",
         them: "You own it. OpenAI gets an irrevocable licence to host it, and you are the data controller.",
       },
@@ -393,7 +410,8 @@ export const COMPETITORS: Competitor[] = [
         them: "Not in the EEA, Switzerland, or UK at launch.",
       },
       {
-        bitplan: "Network fee per publish, about 1 satoshi per KB.",
+        bitplan:
+          "Hosted drafts cost no BSV. On-chain publishing pays the Bitcoin network fee.",
         label: "Price",
         them: "Plus, Pro, Business, Enterprise, or Edu plan. Not on Free.",
       },

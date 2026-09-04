@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   description:
-    "Publish encrypted HTML plans as 1Sat Ordinal inscriptions using the BRC-100 wallet interface.",
+    "Create encrypted HTML plans, keep them hosted while they change, or publish them as 1Sat Ordinals.",
   title: "Docs",
   twitter: { card: "summary_large_image" },
 };
@@ -16,12 +16,26 @@ export default function DocsIntroPage() {
     <>
       <h1>BitPlan</h1>
       <p>
-        The BitPlan CLI packages a self-contained HTML document and uses the
-        BRC-100 interface to ask your wallet to publish it as an encrypted 1Sat
-        Ordinal inscription. The package on npm is <code>bitplan</code>. Upload
-        it again to reinscribe the same satoshi. One origin outpoint identifies
-        the draft and its version history. This site is the viewer. It stores no
-        drafts server-side.
+        BitPlan turns one self-contained HTML file into an encrypted plan. Your
+        BRC-100 wallet holds the keys. While the plan is changing, bitplan.dev
+        can host its ciphertext at a private reader link. When it should be
+        permanent, publish the same encrypted plan as a 1Sat Ordinal. The
+        package on npm is <code>bitplan</code>.
+      </p>
+      <h2>Start with a hosted draft</h2>
+      <p>
+        This costs no BSV. The server stores encrypted bytes and cannot read the
+        plan. Anyone who gets the complete reader link can read it, so treat the
+        link like a password.
+      </p>
+      <div className="not-typeset mt-5">
+        <CommandCopy command="bunx bitplan upload ./plan.html --hosted --link" />
+      </div>
+      <h2>Publish on chain</h2>
+      <p>
+        Use <code>bitplan inscribe</code> when the draft is ready to become a
+        permanent 1Sat Ordinal. The hosted URL then points to the on-chain
+        origin.
       </p>
       <h2>BitPlan CLI setup</h2>
       <p>

@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   description:
-    "BitPlan is a CLI and a viewer for encrypted HTML plan documents on Bitcoin.",
+    "BitPlan is a CLI and viewer for encrypted hosted drafts and permanent 1Sat Ordinal plans.",
   title: "About",
 };
 
@@ -13,22 +13,21 @@ export default function AboutPage() {
       <div className="typeset">
         <h1>About</h1>
         <p>
-          BitPlan publishes encrypted HTML plan documents as 1Sat Ordinals on
-          Bitcoin SV. The CLI is the npm package <code>bitplan</code>. This
-          website is the viewer. It does not store drafts.
+          BitPlan creates encrypted HTML plans. Keep a working draft hosted as
+          ciphertext, then publish it as a 1Sat Ordinal when it should be
+          permanent. The CLI is the npm package <code>bitplan</code>.
         </p>
         <p>
-          A BRC-100 wallet on your machine owns the identity keys, encrypts,
-          signs, and publishes. Upload the same file again to reinscribe the
-          same satoshi. One origin outpoint is the draft and its version
-          history.
+          A BRC-100 wallet on your machine owns the identity keys and encrypts.
+          Hosted drafts need no BSV. On chain, the wallet signs and publishes;
+          each version reinscribes the same satoshi at one permanent origin.
         </p>
         <p>
           The product is two pieces: the npm CLI <code>bitplan</code>, and this
-          viewer. The CLI talks to a BRC-100 wallet on 127.0.0.1:3321, encrypts
-          HTML, and inscribes it. The viewer fetches ciphertext from 1Sat and
-          asks the same kind of wallet to decrypt. Neither piece is a hosted
-          notes app.
+          viewer. The CLI talks to a local BRC-100 wallet and encrypts the HTML.
+          The viewer loads ciphertext from hosted storage or 1Sat, then decrypts
+          it in the browser with a wallet or reader link. BitPlan is not a
+          general website host or notes app.
         </p>
         <p>
           Start with <Link href="/docs/cli-setup">BitPlan CLI</Link>, or read{" "}

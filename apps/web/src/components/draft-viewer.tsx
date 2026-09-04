@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, Copy, Info, Lock } from "lucide-react";
+import { Check, Cloud, Copy, Info, Lock } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { ShareDraftDialog } from "@/components/share-draft-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -130,11 +131,6 @@ export function viewerRequestKey(
   requestedVersion: number | null
 ): string {
   return `${originParam}:${requestedVersion ?? "latest"}`;
-}
-
-/** Decrypted header shows "Opened with a link" instead of share. */
-export function showsOpenedWithLinkLabel(openedWithLink?: boolean): boolean {
-  return openedWithLink === true;
 }
 
 function assertNever(value: never): never {
@@ -564,9 +560,13 @@ function ViewerHeader({ origin }: { origin?: string }) {
 
 function HostedLabel() {
   return (
-    <p className="text-muted-foreground text-xs">
-      Hosted by bitplan.dev, not on chain
-    </p>
+    <span
+      className="inline-flex size-7 shrink-0 items-center justify-center text-muted-foreground"
+      title="Hosted draft"
+    >
+      <Cloud aria-hidden className="size-4" />
+      <span className="sr-only">Hosted draft</span>
+    </span>
   );
 }
 
@@ -820,13 +820,37 @@ function DecryptedShare({
   openedWithLink?: boolean;
   origin: string;
 }) {
-  if (showsOpenedWithLinkLabel(openedWithLink)) {
-    return <p className="text-muted-foreground text-xs">Opened with a link</p>;
+  if (openedWithLink) {
+    return <ReaderLinkCopy />;
   }
   if (canPublish) {
     return <ShareDraftDialog origin={origin} />;
   }
   return null;
+}
+
+function ReaderLinkCopy() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch {
+      setCopied(false);
+      toast.error("Could not copy the reader link");
+    }
+  }, []);
+
+  return (
+    <Button onClick={handleCopy} size="sm" type="button" variant="ghost">
+      {copied ? <Check /> : <Copy />}
+      {copied ? "Copied" : "Copy link"}
+    </Button>
+  );
 }
 
 function OriginCopy({ origin }: { origin: string }) {

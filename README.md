@@ -1,23 +1,31 @@
 # BitPlan
 
-Publish private, versioned HTML plans on Bitcoin.
+Create private, versioned HTML plans. Keep them hosted while they change, then
+publish them on Bitcoin when they should be permanent.
 
 [Open BitPlan](https://bitplan.dev) · [Read the docs](https://bitplan.dev/docs) · [Install the CLI](https://www.npmjs.com/package/bitplan)
 
-BitPlan turns a self-contained HTML file into an encrypted 1Sat Ordinal
-inscription. BRC-100 is the interface BitPlan uses to ask your wallet to
-encrypt, sign, pay, and decrypt. Each new version moves the same satoshi
-forward, giving the plan one permanent origin.
+BitPlan turns a self-contained HTML file into an encrypted plan. BRC-100 is the
+interface BitPlan uses to ask your wallet to encrypt and decrypt. Hosted drafts
+store only ciphertext on bitplan.dev and cost no BSV. When a plan is ready, the
+wallet can publish that ciphertext as a 1Sat Ordinal. Each on-chain version
+moves the same satoshi forward, giving the plan one permanent origin.
 
 ## Quick start
 
 ```sh
 npx bitplan auth
-npx bitplan upload ./plan.html
+bunx bitplan upload ./plan.html --hosted --link
 ```
 
-The command prints a private BitPlan link. Open it in a browser, connect the
-authorized wallet, and read the plan.
+The command prints a reader link. Open it in a browser without connecting a
+wallet. Treat the complete link like a password: anyone who has it can read.
+
+Publish the latest hosted version on chain when it is ready:
+
+```sh
+bunx bitplan inscribe ./plan.html
+```
 
 ```sh
 npx bitplan list
@@ -31,15 +39,18 @@ npx bitplan version
 flowchart TD
     Plan[HTML plan] --> CLI[BitPlan CLI]
     CLI -->|Encrypt this plan| Wallet[BRC-100 wallet]
-    Wallet -->|Sign and publish| Bitcoin[Bitcoin]
+    Wallet --> Hosted[Encrypted hosted draft]
+    Wallet -->|Sign and publish| Bitcoin[1Sat Ordinal]
+    Hosted --> Site[bitplan.dev]
     Bitcoin --> OrdFS[OrdFS]
     OrdFS --> Site[bitplan.dev]
-    Site -->|Decrypt for this reader| Wallet
-    Wallet -->|Plaintext stays in the browser| Site
+    Site --> WalletOrLink[Wallet or reader link]
+    WalletOrLink -->|Decrypt in the browser| Plaintext[Plan]
 ```
 
-The CLI validates the HTML, then your wallet encrypts and publishes it. BitPlan
-loads the encrypted document through OrdFS and asks your wallet to decrypt it.
+The CLI validates the HTML, then your wallet encrypts it. BitPlan either keeps
+the sealed envelope in hosted storage or loads it through OrdFS after an
+on-chain publish. Decryption happens in the browser.
 
 Versions keep the same origin:
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   description:
-    "BitPlan does not keep a drafts database. Encrypted plans live on Bitcoin.",
+    "BitPlan stores hosted drafts as ciphertext and never receives plan plaintext or wallet keys.",
   title: "Privacy",
 };
 
@@ -12,10 +12,10 @@ export default function PrivacyPage() {
       <div className="typeset">
         <h1>Privacy</h1>
         <p>
-          BitPlan does not create accounts and does not keep a drafts database.
-          Encrypted plan documents are inscriptions on Bitcoin. This website
-          fetches public ciphertext from 1Sat and renders it in your browser
-          after your wallet decrypts it.
+          BitPlan does not create accounts. A hosted draft is a sealed envelope
+          stored as ciphertext. An on-chain plan is a 1Sat Ordinal inscription.
+          This website never receives plan plaintext; an authorized wallet or
+          reader link decrypts it in your browser.
         </p>
         <p>
           Wallet identity keys stay in your BRC-100 wallet. The CLI stores local

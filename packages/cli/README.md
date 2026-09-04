@@ -1,13 +1,13 @@
 # bitplan
 
-Publish plan documents to Bitcoin as 1Sat Ordinal inscriptions. Encrypted by
-default.
+Create encrypted HTML plans. Keep them hosted while they change, then publish
+them as 1Sat Ordinals when they should be permanent.
 
-The CLI validates a self-contained HTML document, encrypts it with standard
-`@bsv/sdk` and wallet operations, then uses the BRC-100 interface to ask the
-wallet to inscribe it on BSV. Upload the same file again and the wallet spends
-the current draft coin with a new inscription, so one origin outpoint identifies
-the draft and its version history.
+The CLI validates a self-contained HTML document and encrypts it with standard
+`@bsv/sdk` and wallet operations. A hosted draft stores the sealed envelope on
+bitplan.dev and costs no BSV. When the plan is ready, the BRC-100 wallet can
+publish it as a 1Sat Ordinal. On-chain updates spend the current draft coin with
+a new inscription, so one origin identifies the plan and its version history.
 
 ## Requirements
 
@@ -138,10 +138,10 @@ the decrypted HTML and its metadata, so `--meta` is not needed.
 
 `bitplan upload plan.html --hosted` seals the same envelope, then stores it on
 bitplan.dev instead of inscribing it. There is no transaction and no BSV. A
-wallet is still required for the keys. Re-uploading the same file writes a new
-hosted version. `bitplan inscribe <h_id|file>` puts the latest hosted version
-on the chain; `--all-versions` replays the whole history. After inscribe, the
-hosted viewer URL redirects to the chain origin.
+wallet is still required to create and update the plan. Re-uploading the same
+file writes a new hosted version. `bitplan inscribe <h_id|file>` puts the latest
+hosted version on the chain; `--all-versions` replays the whole history. After
+inscribe, the hosted viewer URL redirects to the chain origin.
 
 ```sh
 npx bitplan upload ./plan.html --hosted
@@ -153,6 +153,10 @@ npx bitplan fetch https://bitplan.dev/d/h_xxxxxxxxxxxxxxxxxxxx
 `bitplan list` includes hosted drafts marked `(hosted, not on chain)`. Pass
 `--site-url` on `upload`, `inscribe`, and `fetch` to point at a different
 bitplan.dev origin.
+
+The hosted ID is a random locator, not a decryption key. bitplan.dev stores the
+ciphertext and public envelope header. The separate write secret stays in the
+CLI's local state; the server stores only its hash.
 
 The CLI stores optional config and file-to-origin mappings in `~/.bitplan`.
 
@@ -228,7 +232,7 @@ encryption or publishing rather than assuming consent.
 secp256k1 key whose public half is an ordinary reader slot and whose private
 half travels in the viewer URL fragment. Later versions keep the same link
 until you publish with `--private`. `bitplan fetch` can open that URL without
-a wallet.
+a wallet. Anyone with the complete link can read, so treat it like a password.
 
 ```sh
 npx bitplan upload ./plan.html --link

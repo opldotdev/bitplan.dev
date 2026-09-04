@@ -19,13 +19,14 @@ Learned the hard way over five drafts of one plan.
 3. **Copy must actually work.** Try `navigator.clipboard.writeText` first,
    then `document.execCommand("copy")` on a selection, then select-all so the
    reader can copy by hand. Say which one happened on the button.
-4. **Decisions are questions, not prose.** Each question has a one-line reason
-   it matters, two to four options, one marked Recommended, an Unsure option,
-   and every option states its consequence in plain words.
-5. **The response block is the deliverable.** It names the plan and draft
-   number, the origin, one line per decision, and free-text notes. The reader
-   pastes it back to the agent. Keep the labels stable across drafts so
-   answers to draft 4 still parse against draft 5.
+4. **Open decisions are questions.** Ask only when a real unresolved choice
+   changes the work. Each question has a one-line reason it matters, two to
+   four options, one marked Recommended, an Unsure option, and a plain-language
+   consequence for every option. Never manufacture a questionnaire.
+5. **The handoff is the deliverable.** If there are open decisions, end with a
+   response block that names the plan, draft number, origin, each answer, and
+   notes. If the choices are settled, end with a copyable implementation brief
+   containing the repository, scope, constraints, and done conditions.
 6. **Plain English.** Explain a protocol the first time it appears. No
    version numbers in the names of things people use. Short sentences.
 7. **Theme-aware.** Light and dark through `prefers-color-scheme`, colors

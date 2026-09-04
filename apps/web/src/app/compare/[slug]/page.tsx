@@ -63,11 +63,11 @@ export default async function CompareCompetitorPage({
         <h2>What BitPlan is</h2>
         <p>
           BitPlan is a CLI and a viewer. The CLI asks a BRC-100 wallet on your
-          machine to encrypt a self-contained HTML plan and inscribe it as a
-          1Sat Ordinal. Uploading the same file again reinscribes the same
-          satoshi, so one origin holds every version. The viewer at bitplan.dev
-          fetches ciphertext and asks your wallet to decrypt it. No account, no
-          drafts database.
+          machine to encrypt a self-contained HTML plan. You can keep the
+          ciphertext hosted while the plan changes, then publish it as a 1Sat
+          Ordinal when it should be permanent. The viewer decrypts in the
+          browser with an authorized wallet or reader link. There is no BitPlan
+          account and the server never receives plaintext.
         </p>
 
         <h2>Side by side</h2>
@@ -116,11 +116,11 @@ export default async function CompareCompetitorPage({
         <h2>Moving a plan to BitPlan</h2>
         <p>
           BitPlan takes the same self-contained HTML file these tools do. Save
-          the page, then run <code>npx bitplan auth</code> once and{" "}
-          <code>npx bitplan upload ./plan.html</code>. External scripts and
-          forms are rejected at upload, and the viewer runs inline scripts with
-          no network access, so pages that call out to an API need a static pass
-          first. Documents over 5 MB need to be split.
+          the page, then run <code>bunx bitplan auth</code> once and{" "}
+          <code>bunx bitplan upload ./plan.html --hosted --link</code>. External
+          scripts and forms are rejected at upload, and the viewer runs inline
+          scripts with no network access, so pages that call out to an API need
+          a static pass first. Documents over 5 MB need to be split.
         </p>
 
         <h2>Sources</h2>
