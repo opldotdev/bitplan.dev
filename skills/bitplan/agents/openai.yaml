@@ -1,0 +1,4 @@
+interface:
+  display_name: "BitPlan"
+  short_description: "Create encrypted plans with your wallet"
+  default_prompt: "Use $bitplan to create or update an encrypted, versioned plan with my BRC-100 wallet."
