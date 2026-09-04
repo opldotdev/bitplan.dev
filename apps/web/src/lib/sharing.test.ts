@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { buildShareInstructions, parseIdentityKeys } from "./sharing";
+import {
+  buildReaderLinkInstructions,
+  buildShareInstructions,
+  parseIdentityKeys,
+} from "./sharing";
 
 const READER_A =
   "02C6047F9441ED7D6D3045406E95C07CD85C778E4B8CEF3CA7ABAC09B95C709EE5";
@@ -32,6 +36,17 @@ describe("sharing instructions", () => {
     expect(instructions).toContain("notifies 1Sat for ORDFS capture");
     expect(instructions).toContain("Do not use --private");
     expect(instructions).toContain("BRC-100 wallet");
+  });
+
+  test("builds hosted reader-link instructions without identity keys", () => {
+    const instructions = buildReaderLinkInstructions("h_example");
+
+    expect(instructions).toContain(
+      "npx bitplan upload ./plan.html --draft h_example --link"
+    );
+    expect(instructions).toContain("locally saved publishing secret");
+    expect(instructions).toContain("#k=");
+    expect(instructions).not.toContain("--share-with");
   });
 
   test("rejects compressed-looking values that are not canonical curve points", () => {
