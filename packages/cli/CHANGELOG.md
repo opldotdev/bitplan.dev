@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.17
+
+### Fixed
+
+- `bitplan fetch <plan> --version <n>` now fetches the requested plan version
+  instead of printing the CLI version and exiting.
+
 ## 0.0.15
 
 ### Added

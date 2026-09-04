@@ -13,6 +13,14 @@
   and do not present the current 1Sat wallet-storage server as a compatible
   BitPlan fallback.
 
+## 0.0.17 — 2026-09-04
+
+### Fixed
+
+- Keep a hosted plan's reader key in the browser URL when the plan moves to
+  the chain, so the same link still opens without a wallet.
+- Make `bitplan fetch <plan> --version <n>` fetch the requested plan version.
+
 ## 0.0.16 — 2026-09-04
 
 ### Added
