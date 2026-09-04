@@ -108,8 +108,10 @@ export async function findCoinByOrigin(
 	origin: string,
 ): Promise<BitplanCoin> {
 	const wanted = toOrdinalOutpoint(origin)
-	const coins = await listBitplanCoins(wallet, { limit: 1000 })
-	const match = coins.find((coin) => coin.origin === wanted)
+	const match = await searchBitplanCoins(
+		wallet,
+		(coin) => coin.origin === wanted,
+	)
 	if (!match) {
 		throw new CliError(
 			[
@@ -238,6 +240,47 @@ export async function publishVersion(
 	}
 }
 
+/** Target searches page through the basket; `bitplan list` stays bounded. */
+const SEARCH_PAGE_SIZE = 1000
+
+async function searchBitplanCoins(
+	wallet: WalletInterface,
+	predicate: (coin: BitplanCoin) => boolean,
+): Promise<BitplanCoin | null> {
+	let offset = 0
+	const seen = new Set<string>()
+	while (true) {
+		const result = await wallet.listOutputs({
+			basket: ORDINALS_BASKET,
+			tags: [TYPE_TAG],
+			tagQueryMode: 'all',
+			includeTags: true,
+			includeCustomInstructions: true,
+			limit: SEARCH_PAGE_SIZE,
+			offset,
+		})
+		const outputs = result.outputs ?? []
+		if (outputs.length === 0) return null
+		const seenBefore = seen.size
+		for (const output of outputs) {
+			seen.add(output.outpoint)
+			const coin = toCoin(output)
+			if (coin && predicate(coin)) return coin
+		}
+		if (seen.size === seenBefore) return null
+		const nextOffset = offset + outputs.length
+		if (
+			!Number.isSafeInteger(result.totalOutputs) ||
+			result.totalOutputs < 0 ||
+			nextOffset >= result.totalOutputs ||
+			!Number.isSafeInteger(nextOffset)
+		) {
+			return null
+		}
+		offset = nextOffset
+	}
+}
+
 /**
  * Where the 1-sat output landed.
  *
@@ -250,9 +293,10 @@ async function locateCoinOutpoint(
 	txid: string,
 ): Promise<string> {
 	try {
-		const coins = await listBitplanCoins(wallet, { limit: 1000 })
-		const match = coins.find(
-			(coin) => splitOutpoint(coin.outpoint).txid === txid.toLowerCase(),
+		const wanted = txid.toLowerCase()
+		const match = await searchBitplanCoins(
+			wallet,
+			(coin) => splitOutpoint(coin.outpoint).txid === wanted,
 		)
 		if (match) return match.outpoint
 	} catch {

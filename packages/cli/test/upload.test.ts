@@ -92,6 +92,7 @@ if (!CHILD_RUN) {
 	}
 
 	let calls: Calls
+	let eventOrder: string[]
 	let knownByFile: DraftRecord | undefined
 	let knownByOrigin: DraftRecord | undefined
 	let genesisError: Error | undefined
@@ -126,6 +127,7 @@ if (!CHILD_RUN) {
 	mock.module('../src/wallet.js', () => ({
 		connectWallet: async (url: string | undefined) => {
 			calls.connectWallet.push(url)
+			eventOrder?.push('connectWallet')
 			return { wallet, url: url ?? 'http://wallet.test' }
 		},
 		identityKey: async () => {
@@ -282,14 +284,20 @@ if (!CHILD_RUN) {
 		stateSaveError = undefined
 		config = { shareWith: [] }
 		ordfsContent = undefined
+		eventOrder = []
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bitplan-upload-test-'))
 		htmlFile = path.join(tempDir, 'plan.html')
 		fs.writeFileSync(
 			htmlFile,
 			'<!doctype html><html><title>Upload orchestration</title></html>',
 		)
-		spyOn(console, 'log').mockImplementation(() => {})
-		spyOn(console, 'warn').mockImplementation(() => {})
+		spyOn(console, 'log').mockImplementation(() => {
+			eventOrder.push('log')
+		})
+		spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+			const text = String(args[0] ?? '')
+			eventOrder.push(text.includes('--new') ? 'new-warning' : 'warn')
+		})
 	})
 
 	afterEach(() => {
@@ -337,6 +345,90 @@ if (!CHILD_RUN) {
 				keyID: 'new-draft-key',
 				description: 'A fresh draft',
 			})
+		})
+
+		test('--new warns that it replaces the local binding without deleting the old plan', async () => {
+			knownByFile = existingRecord()
+
+			await uploadCommand(htmlFile, { new: true, yes: true })
+
+			const warnings = warnCalls().join('\n')
+			expect(warnings).toContain(ORIGIN)
+			expect(warnings).toMatch(/not deleted/i)
+			expect(warnings).toMatch(/recoverable/i)
+			expect(warnings).not.toMatch(
+				/deleted forever|overwritten on chain|inaccessible/i,
+			)
+			expect(calls.genesis).toHaveLength(1)
+			expect(calls.saves[0]?.record.origin).toBe(GENESIS_OUTPOINT)
+		})
+
+		test('--new warning precedes wallet connection and publish confirmation', async () => {
+			knownByFile = existingRecord()
+
+			await uploadCommand(htmlFile, { new: true, yes: true })
+
+			const warnIndex = eventOrder.indexOf('new-warning')
+			const connectIndex = eventOrder.indexOf('connectWallet')
+			const firstLogIndex = eventOrder.indexOf('log')
+			expect(warnIndex).toBeGreaterThanOrEqual(0)
+			expect(connectIndex).toBeGreaterThanOrEqual(0)
+			expect(firstLogIndex).toBeGreaterThanOrEqual(0)
+			expect(warnIndex).toBeLessThan(connectIndex)
+			expect(warnIndex).toBeLessThan(firstLogIndex)
+			expect(calls.genesis).toHaveLength(1)
+		})
+
+		test('--new without an existing binding warns about nothing', async () => {
+			await uploadCommand(htmlFile, { new: true, yes: true })
+
+			const relevant = warnCalls().filter((warning) =>
+				/--new|not deleted|recoverable/i.test(warning),
+			)
+			expect(relevant).toEqual([])
+		})
+
+		test('updating the existing plan warns about nothing', async () => {
+			knownByFile = existingRecord()
+
+			await uploadCommand(htmlFile, { yes: true })
+
+			const relevant = warnCalls().filter((warning) =>
+				/--new|not deleted|recoverable/i.test(warning),
+			)
+			expect(relevant).toEqual([])
+		})
+
+		test('--new still requires confirmation when --yes is missing', async () => {
+			expect(process.stdin.isTTY).not.toBe(true)
+			knownByFile = existingRecord()
+
+			await expect(uploadCommand(htmlFile, { new: true })).rejects.toThrow(
+				'Re-run with --yes',
+			)
+
+			expect(warnCalls().join('\n')).toContain(ORIGIN)
+			expect(calls.genesis).toEqual([])
+			expect(calls.saves).toEqual([])
+		})
+
+		test('--json --new keeps stdout to one JSON result and warns on stderr', async () => {
+			knownByFile = existingRecord()
+
+			await uploadCommand(htmlFile, { new: true, json: true, yes: true })
+
+			expect(console.log).toHaveBeenCalledTimes(1)
+			const printed = String(logCalls()[0])
+			expect(printed).not.toContain(ORIGIN)
+			expect(JSON.parse(printed)).toMatchObject({
+				published: true,
+				kind: 'draft',
+				origin: GENESIS_OUTPOINT,
+			})
+			const warnings = warnCalls().join('\n')
+			expect(warnings).toContain(ORIGIN)
+			expect(warnings).toMatch(/not deleted/i)
+			expect(warnings).toMatch(/recoverable/i)
 		})
 
 		test('an existing draft publishes a version and preserves its description', async () => {
@@ -919,5 +1011,17 @@ if (!CHILD_RUN) {
 			title: 'Existing draft',
 			description: 'Keep this description',
 		}
+	}
+
+	function logCalls(): string[] {
+		return (
+			console.log as unknown as { mock: { calls: Array<[unknown]> } }
+		).mock.calls.map((args) => String(args[0]))
+	}
+
+	function warnCalls(): string[] {
+		return (
+			console.warn as unknown as { mock: { calls: Array<[unknown]> } }
+		).mock.calls.map((args) => String(args[0]))
 	}
 }

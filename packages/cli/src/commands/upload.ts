@@ -166,6 +166,16 @@ export async function uploadCommand(
 	}
 	const plaintext: DraftPlaintext = { meta, html }
 
+	// A --new publish for an already-bound file replaces only the local
+	// file-to-origin binding; the old chain plan stays where it was. Emitted
+	// before any wallet I/O so a connection/unlock prompt or failure can
+	// never come first.
+	if (options.new && known?.origin) {
+		console.warn(
+			`Warning: --new will connect ${resolvedFile} to a new draft. It replaces the local link to ${known.origin}; that plan is not deleted and remains recoverable using its origin.`,
+		)
+	}
+
 	const { wallet, url } = await connectWallet(options.walletUrl)
 
 	// Resolve what we are updating before showing the confirmation, so the

@@ -13,6 +13,13 @@
   and do not present the current 1Sat wallet-storage server as a compatible
   BitPlan fallback.
 
+### Fixed
+
+- Search every wallet-output page when BitPlan needs to find a plan, instead
+  of stopping after the first 1,000 results.
+- Warn before `--new` connects an existing file to a different draft. The
+  earlier plan is not deleted and remains available by its origin.
+
 ## 0.0.16 — 2026-09-04
 
 ### Added
