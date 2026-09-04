@@ -5,6 +5,16 @@ publish them on Bitcoin when they should be permanent.
 
 [Open BitPlan](https://bitplan.dev) · [Read the docs](https://bitplan.dev/docs) · [Install the CLI](https://www.npmjs.com/package/bitplan)
 
+Install the agent skill directly from its owning repository:
+
+```sh
+npx skills add opldotdev/bitplan.dev --skill bitplan -g
+```
+
+The repository also includes native plugin manifests for Claude Code, Codex,
+and Grok. Marketplace installations therefore load this canonical skill rather
+than a copied version maintained by another plugin.
+
 BitPlan turns a self-contained HTML file into an encrypted plan. BRC-100 is the
 interface BitPlan uses to ask your wallet to encrypt and decrypt. Hosted drafts
 store only ciphertext on bitplan.dev and cost no BSV. When a plan is ready, the
@@ -118,6 +128,10 @@ bun run build
 Compatibility tests open CLI-produced envelopes with the website
 implementation. Wallet and network boundaries use mocks, so the automated
 suite never publishes a transaction.
+
+BitPlan prefers a BRC-100 wallet already installed by the user. A future 1Sat
+CLI headless-wallet bridge is tracked separately; today's `1sat serve wallet`
+endpoint is a wallet-storage service and is not a BitPlan wallet endpoint.
 
 Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
 

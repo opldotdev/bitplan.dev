@@ -1,0 +1,28 @@
+{
+	"name": "bitplan",
+	"version": "0.2.1",
+	"description": "Create and share encrypted, versioned HTML plans with a BRC-100 wallet.",
+	"author": {
+		"name": "OPL",
+		"url": "https://github.com/opldotdev"
+	},
+	"homepage": "https://bitplan.dev/docs/agents",
+	"repository": "https://github.com/opldotdev/bitplan.dev",
+	"license": "MIT",
+	"keywords": ["agents", "bitplan", "brc-100", "bsv", "encryption"],
+	"skills": "./skills/",
+	"interface": {
+		"displayName": "BitPlan",
+		"shortDescription": "Encrypted plans owned by your wallet.",
+		"longDescription": "Create, review, host, version, share, and publish encrypted HTML plans through a BRC-100 wallet.",
+		"developerName": "OPL",
+		"category": "Productivity",
+		"capabilities": ["Skills"],
+		"websiteURL": "https://bitplan.dev",
+		"defaultPrompt": [
+			"Create an encrypted BitPlan for this project.",
+			"Update my existing BitPlan draft.",
+			"Share a BitPlan with another wallet."
+		]
+	}
+}

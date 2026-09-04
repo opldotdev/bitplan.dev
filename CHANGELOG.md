@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Package the canonical BitPlan skill as a Claude Code, Codex, and Grok plugin
+  so external catalogs can install it without copying the skill.
+
+### Changed
+
+- Document the wallet selection contract: prefer an existing BRC-100 wallet
+  and do not present the current 1Sat wallet-storage server as a compatible
+  BitPlan fallback.
+
 ## 0.0.17 — 2026-09-04
 
 ### Added
