@@ -6,6 +6,8 @@
 
 - Package the canonical BitPlan skill as a Claude Code, Codex, and Grok plugin
   so external catalogs can install it without copying the skill.
+- Wire Lisa’s accepted BitPlan emblem into the Codex plugin as `composerIcon`
+  and `logo` (`assets/icon.png` and `assets/logo.png`, same 512×512 bytes).
 
 ### Changed
 

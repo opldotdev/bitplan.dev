@@ -6,12 +6,12 @@ description: >
   or update a plan, share one with a person or team, create a private reader
   link, move a hosted draft on chain, or explain bitplan.dev.
 metadata:
-  version: "0.2.1"
+  version: "0.2.2"
 ---
 
 # BitPlan
 
-**Skill version: 0.2.1**
+**Skill version: 0.2.2**
 
 BitPlan turns one self-contained HTML file into an encrypted living plan. A
 BRC-100 wallet owns the keys. A draft can stay hosted as ciphertext while it

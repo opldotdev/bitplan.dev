@@ -125,4 +125,29 @@ describe("agent pages", () => {
     expect(metadataVersion).toBe(manifests[0].version);
     expect(visibleVersion).toBe(manifests[0].version);
   });
+
+  test("Codex plugin ships identical 512×512 logo and composer icon", async () => {
+    const repoRoot = resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../.."
+    );
+    const manifest = JSON.parse(
+      await readFile(resolve(repoRoot, ".codex-plugin/plugin.json"), "utf8")
+    ) as {
+      interface?: { composerIcon?: string; logo?: string };
+    };
+    expect(manifest.interface?.composerIcon).toBe("./assets/icon.png");
+    expect(manifest.interface?.logo).toBe("./assets/logo.png");
+
+    const logo = await readFile(resolve(repoRoot, "assets/logo.png"));
+    const icon = await readFile(resolve(repoRoot, "assets/icon.png"));
+    expect(logo.equals(icon)).toBe(true);
+    expect(logo[0]).toBe(0x89);
+    expect(logo[1]).toBe(0x50);
+    expect(logo[2]).toBe(0x4e);
+    expect(logo[3]).toBe(0x47);
+    const view = new DataView(logo.buffer, logo.byteOffset, logo.byteLength);
+    expect(view.getUint32(16)).toBe(512);
+    expect(view.getUint32(20)).toBe(512);
+  });
 });
