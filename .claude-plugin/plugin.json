@@ -9,12 +9,6 @@
 	"homepage": "https://bitplan.dev/docs/agents",
 	"repository": "https://github.com/opldotdev/bitplan.dev",
 	"license": "MIT",
-	"keywords": [
-		"agents",
-		"bitplan",
-		"brc-100",
-		"bsv",
-		"encryption"
-	],
+	"keywords": ["agents", "bitplan", "brc-100", "bsv", "encryption"],
 	"skills": "./skills/"
 }
