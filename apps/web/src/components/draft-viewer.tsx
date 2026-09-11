@@ -25,6 +25,12 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { type DraftsWallet, walletOwnsDraft } from "@/lib/drafts";
 import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
@@ -375,29 +381,47 @@ async function viewForFoundDraft(
   };
 }
 
-function VersionPill({
-  version,
-  current,
+function VersionSelect({
+  currentVersion,
+  latestVersion,
   onVersion,
 }: {
-  version: number;
-  current: boolean;
+  currentVersion: number;
+  latestVersion: number;
   onVersion: (version: number) => void;
 }) {
-  const handleClick = useCallback(
-    () => onVersion(version),
-    [onVersion, version]
+  const handleValueChange = useCallback(
+    (value: string) => {
+      onVersion(Number(value));
+    },
+    [onVersion]
   );
+  const versions = Array.from(
+    { length: latestVersion },
+    (_, i) => latestVersion - i
+  );
+
   return (
-    <Button
-      aria-current={current ? "page" : undefined}
-      onClick={handleClick}
-      size="xs"
-      type="button"
-      variant={current ? "secondary" : "ghost"}
-    >
-      v{version}
-    </Button>
+    <Select onValueChange={handleValueChange} value={String(currentVersion)}>
+      <SelectTrigger
+        aria-label={
+          currentVersion === latestVersion
+            ? `Version ${currentVersion}, latest`
+            : `Version ${currentVersion} of ${latestVersion}`
+        }
+        className="shrink-0"
+        size="sm"
+      >
+        v{currentVersion}
+      </SelectTrigger>
+      <SelectContent align="start" position="popper">
+        {versions.map((version) => (
+          <SelectItem key={version} value={String(version)}>
+            {version === latestVersion ? `v${version} · latest` : `v${version}`}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -775,7 +799,6 @@ function DecryptedView({
   origin: string;
 }) {
   const { title } = plaintext.meta;
-  const versions = Array.from({ length: latestVersion }, (_, i) => i + 1);
 
   useEffect(() => {
     const genericTitle = document.title;
@@ -790,16 +813,11 @@ function DecryptedView({
       <header className="flex shrink-0 items-center gap-3 border-border border-b px-4 py-2">
         <Wordmark />
         {isHostedId(origin) ? <HostedLabel /> : null}
-        <div className="flex flex-wrap gap-1">
-          {versions.map((version) => (
-            <VersionPill
-              current={version === currentVersion}
-              key={version}
-              onVersion={onVersion}
-              version={version}
-            />
-          ))}
-        </div>
+        <VersionSelect
+          currentVersion={currentVersion}
+          latestVersion={latestVersion}
+          onVersion={onVersion}
+        />
         {title ? (
           <p className="min-w-0 flex-1 truncate text-muted-foreground text-sm">
             {title}
