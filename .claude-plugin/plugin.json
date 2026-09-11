@@ -1,6 +1,6 @@
 {
 	"name": "bitplan",
-	"version": "0.2.2",
+	"version": "0.2.3",
 	"description": "Create and share encrypted, versioned HTML plans with a BRC-100 wallet.",
 	"author": {
 		"name": "OPL",
@@ -9,6 +9,12 @@
 	"homepage": "https://bitplan.dev/docs/agents",
 	"repository": "https://github.com/opldotdev/bitplan.dev",
 	"license": "MIT",
-	"keywords": ["agents", "bitplan", "brc-100", "bsv", "encryption"],
+	"keywords": [
+		"agents",
+		"bitplan",
+		"brc-100",
+		"bsv",
+		"encryption"
+	],
 	"skills": "./skills/"
 }
