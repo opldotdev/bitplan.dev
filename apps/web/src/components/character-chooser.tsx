@@ -34,6 +34,17 @@ export function CharacterChooser({
 }) {
   const [profile, setProfile] = useState<CollaboratorProfile | null>(null);
   const [storageIssue, setStorageIssue] = useState(false);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    // Pointer events inside the sandboxed plan do not bubble to Radix.
+    // Focusing that frame (or leaving the window) should dismiss this menu.
+    const dismiss = () => setOpen(false);
+    window.addEventListener("blur", dismiss);
+    return () => window.removeEventListener("blur", dismiss);
+  }, [open]);
   const [nameDraft, setNameDraft] = useState("");
   const [previewCharacter, setPreviewCharacter] = useState<Character | null>(
     null
@@ -138,7 +149,7 @@ export function CharacterChooser({
     previewCharacter ?? profile?.character ?? "Choose a character";
 
   return (
-    <Popover>
+    <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
         <Button
           aria-label={
