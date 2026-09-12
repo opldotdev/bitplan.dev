@@ -23,13 +23,42 @@ export interface WalletConnection {
 
 const WALLET_TIMEOUT_MS = 45_000
 const WALLET_RESPONSE_MAX_BYTES = 4 * 1024 * 1024
-const WALLET_TRANSACTION_RESPONSE_MAX_BYTES = 32 * 1024 * 1024
+// BRC-100 encodes BEEF byte arrays as decimal JSON numbers (up to four JSON
+// bytes per binary byte). Version publishing also returns the source chain.
+// Keep those RPCs bounded without rejecting ordinary near-limit plans.
+const WALLET_BEEF_RESPONSE_MAX_BYTES = 256 * 1024 * 1024
 
-function walletResponseLimit(input: string | URL | Request): number {
+function walletResponseLimit(
+	input: string | URL | Request,
+	init?: RequestInit,
+): number {
 	const path = input instanceof Request ? input.url : input.toString()
 	const method = new URL(path).pathname.split('/').at(-1)
-	return method === 'createAction' || method === 'signAction'
-		? WALLET_TRANSACTION_RESPONSE_MAX_BYTES
+	let args: Record<string, unknown> | null = null
+	if (typeof init?.body === 'string') {
+		try {
+			const parsed: unknown = JSON.parse(init.body)
+			if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+				args = parsed as Record<string, unknown>
+			}
+		} catch {
+			// HTTPWalletJSON always sends JSON; malformed custom calls keep the low cap.
+		}
+	}
+	const options =
+		args?.options &&
+		typeof args.options === 'object' &&
+		!Array.isArray(args.options)
+			? (args.options as Record<string, unknown>)
+			: null
+	const returnsBeef =
+		((method === 'createAction' || method === 'signAction') &&
+			options?.returnTXIDOnly !== true) ||
+		(method === 'listOutputs' &&
+			(args?.include === 'entire transactions' ||
+				args?.includeEntireTransactions === true))
+	return returnsBeef
+		? WALLET_BEEF_RESPONSE_MAX_BYTES
 		: WALLET_RESPONSE_MAX_BYTES
 }
 
@@ -39,7 +68,7 @@ const walletHttpClient = (async (
 ) =>
 	fetchBoundedResponse(input, init, {
 		label: 'Wallet response',
-		maxBytes: walletResponseLimit(input),
+		maxBytes: walletResponseLimit(input, init),
 		timeoutMs: WALLET_TIMEOUT_MS,
 	})) as unknown as typeof fetch
 

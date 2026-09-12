@@ -83,6 +83,10 @@ function installGeometryBridge(collaboration: boolean) {
   // Replacing or navigating the document can only destroy this endpoint; an
   // untrusted replacement never receives authenticated activity authority.
   const addTrustedListener = EventTarget.prototype.addEventListener;
+  const readEventTrusted = Object.getOwnPropertyDescriptor(
+    Event.prototype,
+    "isTrusted"
+  )?.get;
   const startPort = MessagePort.prototype.start;
   const postPortMessage = MessagePort.prototype.postMessage;
   const readMessageData = Object.getOwnPropertyDescriptor(
@@ -103,6 +107,8 @@ function installGeometryBridge(collaboration: boolean) {
   let lastPointer = 0;
   const send = (type: string, payload: unknown) =>
     postPortMessage.call(bridgePort, { payload, type });
+  const trustedActivity = (event: Event) =>
+    readEventTrusted?.call(event) === true;
   const clamp = (n: number) => Math.max(0, Math.min(1, n));
   const selectedText = () =>
     window.getSelection?.()?.toString().slice(0, 32_000) ?? "";
@@ -262,6 +268,9 @@ function installGeometryBridge(collaboration: boolean) {
   window.addEventListener("resize", geometry);
   window.addEventListener("load", geometry);
   document.addEventListener("contextmenu", (event) => {
+    if (!trustedActivity(event)) {
+      return;
+    }
     event.preventDefault();
     send("click", {
       anchor: anchorFor(event.target, event.clientX, event.clientY),
@@ -275,6 +284,9 @@ function installGeometryBridge(collaboration: boolean) {
     });
   });
   document.addEventListener("pointermove", (event) => {
+    if (!trustedActivity(event)) {
+      return;
+    }
     if (performance.now() - lastPointer < 250) {
       return;
     }
@@ -288,7 +300,7 @@ function installGeometryBridge(collaboration: boolean) {
     document.addEventListener(
       type,
       (event) => {
-        if (event.button === 2) {
+        if (!trustedActivity(event) || event.button === 2) {
           return; // Right clicks are recorded by contextmenu, even when its native menu is prevented.
         }
         send("click", {
@@ -299,7 +311,11 @@ function installGeometryBridge(collaboration: boolean) {
     );
   }
   document.addEventListener("keydown", (event) => {
-    if (event.shiftKey && event.key === "F10") {
+    if (
+      trustedActivity(event) &&
+      event.shiftKey &&
+      event.key === "F10"
+    ) {
       event.preventDefault();
       const rect = document.activeElement?.getBoundingClientRect();
       const x = rect?.left ?? 24;

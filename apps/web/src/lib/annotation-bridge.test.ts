@@ -61,6 +61,17 @@ test("click anchors round-trip over a private port, including blank space", asyn
     }
   }
   const element = new Element();
+  const trustedEvents = new WeakSet<object>();
+  class TestEvent {
+    get isTrusted() {
+      return trustedEvents.has(this);
+    }
+  }
+  const trustedEvent = <T extends object>(value: T) => {
+    const event = Object.assign(new TestEvent(), value);
+    trustedEvents.add(event);
+    return event;
+  };
   let parentPort: MessagePort | undefined;
   const parent = {
     postMessage(
@@ -81,6 +92,7 @@ test("click anchors round-trip over a private port, including blank space", asyn
       querySelectorAll: () => [element],
     },
     Element,
+    Event: TestEvent,
     EventTarget,
     innerHeight: 600,
     innerWidth: 800,
@@ -104,7 +116,39 @@ test("click anchors round-trip over a private port, including blank space", asyn
   const port = parentPort as MessagePort;
   port.addEventListener("message", (event) => messages.push(event.data));
   port.start();
-  handlers.get("click")?.({ clientX: 140, clientY: 120, target: element });
+  let syntheticContextPrevented = false;
+  for (const [name, event] of [
+    ["click", { button: 0, clientX: 1, clientY: 1, target: element }],
+    ["auxclick", { button: 0, clientX: 1, clientY: 1, target: element }],
+    ["pointermove", { clientX: 1, clientY: 1, target: element }],
+    [
+      "contextmenu",
+      {
+        clientX: 1,
+        clientY: 1,
+        preventDefault() {
+          syntheticContextPrevented = true;
+        },
+        target: element,
+      },
+    ],
+    [
+      "keydown",
+      {
+        key: "F10",
+        preventDefault() {},
+        shiftKey: true,
+      },
+    ],
+  ] as const) {
+    handlers.get(name)?.(event);
+  }
+  await flushMessages();
+  expect(messages).toEqual([]);
+  expect(syntheticContextPrevented).toBe(false);
+  handlers.get("click")?.(
+    trustedEvent({ clientX: 140, clientY: 120, target: element })
+  );
   await flushMessages();
   const anchor = messages.at(-1)?.payload.anchor;
   expect(messages.at(-1)?.type).toBe("click");
@@ -129,21 +173,25 @@ test("click anchors round-trip over a private port, including blank space", asyn
   };
   await locate(anchor);
   expect(messages.at(-1)?.payload[0].position).toEqual({ x: 70, y: 0 });
-  handlers.get("click")?.({ clientX: 10, clientY: 60, target: null });
+  handlers.get("click")?.(
+    trustedEvent({ clientX: 10, clientY: 60, target: null })
+  );
   await flushMessages();
   const blank = messages.at(-1)?.payload.anchor;
   context.scrollY = 50;
   await locate(blank);
   expect(messages.at(-1)?.payload[0].position).toEqual({ x: 10, y: 10 });
   const before = messages.length;
-  handlers.get("contextmenu")?.({
-    clientX: 70,
-    clientY: 0,
-    preventDefault() {
-      // The bridge intentionally suppresses the native context menu.
-    },
-    target: element,
-  });
+  handlers.get("contextmenu")?.(
+    trustedEvent({
+      clientX: 70,
+      clientY: 0,
+      preventDefault() {
+        // The bridge intentionally suppresses the native context menu.
+      },
+      target: element,
+    })
+  );
   await flushMessages();
   expect(messages.slice(before).map((message) => message.type)).toEqual([
     "click",
@@ -151,12 +199,14 @@ test("click anchors round-trip over a private port, including blank space", asyn
   ]);
   expect(messages.at(-1)?.payload.selection).toBe("Selected paragraph");
   const afterContext = messages.length;
-  handlers.get("auxclick")?.({
-    button: 2,
-    clientX: 70,
-    clientY: 0,
-    target: element,
-  });
+  handlers.get("auxclick")?.(
+    trustedEvent({
+      button: 2,
+      clientX: 70,
+      clientY: 0,
+      target: element,
+    })
+  );
   expect(messages.length).toBe(afterContext);
   port.postMessage({
     payload: { x: 70, y: 0 },

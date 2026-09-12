@@ -45,21 +45,54 @@ describe('wallet HTTP response bounds', () => {
 		expect(fetchMock.mock.calls[0]?.[1]?.redirect).toBe('error')
 	})
 
-	test('allows payload-sized create and sign responses', async () => {
-		spyOn(globalThis, 'fetch').mockImplementation(
-			(async () =>
-				new Response('{}', {
-					headers: { 'content-length': String(4 * 1024 * 1024 + 1) },
-				})) as unknown as typeof fetch,
+	test('allows payload-sized BEEF-bearing responses', async () => {
+		const beef = new Array(1024 * 1024 + 1).fill(255)
+		const listBody = JSON.stringify({ BEEF: beef, outputs: [] })
+		expect(new TextEncoder().encode(listBody).byteLength).toBeGreaterThan(
+			4 * 1024 * 1024,
 		)
+		spyOn(globalThis, 'fetch').mockImplementation((async (
+			input: string | URL | Request,
+		) => {
+			const method = new URL(input.toString()).pathname.split('/').at(-1)
+			if (method === 'listOutputs') return new Response(listBody)
+			return new Response('{}', {
+				headers: { 'content-length': String(40 * 1024 * 1024) },
+			})
+		}) as unknown as typeof fetch)
 		const wallet = createWallet('https://wallet.example') as unknown as {
 			substrate: {
 				createAction: (args: object) => Promise<unknown>
+				listOutputs: (args: object) => Promise<{ BEEF: ArrayLike<number> }>
 				signAction: (args: object) => Promise<unknown>
 			}
 		}
+		const result = await wallet.substrate.listOutputs({
+			include: 'entire transactions',
+		})
+		expect(result.BEEF.length).toBe(beef.length)
 		await expect(wallet.substrate.createAction({})).resolves.toEqual({})
 		await expect(wallet.substrate.signAction({})).resolves.toEqual({})
+	})
+
+	test('keeps ordinary and TXID-only wallet responses at the low cap', async () => {
+		spyOn(globalThis, 'fetch').mockResolvedValue(
+			new Response('{}', {
+				headers: { 'content-length': String(4 * 1024 * 1024 + 1) },
+			}),
+		)
+		const wallet = createWallet('https://wallet.example') as unknown as {
+			substrate: {
+				listOutputs: (args: object) => Promise<unknown>
+				signAction: (args: object) => Promise<unknown>
+			}
+		}
+		await expect(wallet.substrate.listOutputs({})).rejects.toThrow(
+			'Wallet response exceeds',
+		)
+		await expect(
+			wallet.substrate.signAction({ options: { returnTXIDOnly: true } }),
+		).rejects.toThrow('Wallet response exceeds')
 	})
 
 	test('rejects an oversized wallet RPC response', async () => {
