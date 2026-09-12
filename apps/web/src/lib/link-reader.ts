@@ -14,8 +14,9 @@ export function readerOnlyUrl(value: string): string {
   const url = new URL(value);
   const source = new URLSearchParams(url.hash.slice(1));
   const fragment = new URLSearchParams();
-  if (source.getAll("k").length === 1 && parseLinkFragment(url.href)) {
-    fragment.set("k", source.get("k")!);
+  const key = source.get("k");
+  if (source.getAll("k").length === 1 && key && parseLinkFragment(url.href)) {
+    fragment.set("k", key);
   }
   url.hash = fragment.toString();
   return url.href;

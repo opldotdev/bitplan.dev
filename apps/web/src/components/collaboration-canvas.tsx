@@ -9,10 +9,13 @@ import {
   Type,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import { ContextMenu } from "radix-ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AnnotationCard } from "@/components/annotation-card";
+import { AnnotationImagePicker } from "@/components/annotation-image-picker";
+import { AnnotationOnboarding } from "@/components/annotation-onboarding";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +25,8 @@ import {
 } from "@/components/ui/dialog";
 import { registerWebMcpTool } from "@/components/webmcp-tools";
 import { withAnnotationBridge } from "@/lib/annotation-bridge";
+import { annotationInputAction } from "@/lib/annotation-input";
+import { annotationLink } from "@/lib/annotation-link";
 import { annotationCardOffset } from "@/lib/annotation-position";
 import {
   type Annotation,
@@ -41,6 +46,65 @@ import type { CollaborationState } from "@/lib/use-collaboration";
 const center: AnnotationAnchor = { point: { x: 0.5, y: 0.1 } };
 const menuItem =
   "flex cursor-default items-center gap-1 rounded-sm px-2 py-2 text-sm outline-none data-highlighted:bg-muted data-disabled:opacity-50 [&_svg]:size-4";
+const CONTEXT_LINK = /^(https?:\/\/|mailto:|#)/i;
+type AnnotationMode = "text" | "html" | "image";
+
+function contentFor(
+  mode: AnnotationMode,
+  text: string,
+  image: string | null
+): AnnotationContent {
+  if (mode === "html") {
+    if (!text.trim()) {
+      throw new Error("Write something first.");
+    }
+    return { html: text, type: "html" };
+  }
+  if (mode === "image") {
+    if (!image) {
+      throw new Error("Choose an image first.");
+    }
+    return { alt: text, dataUrl: image, type: "image" };
+  }
+  if (!text.trim()) {
+    throw new Error("Write something first.");
+  }
+  return { text, type: "text" };
+}
+
+function annotationInputLabel(mode: AnnotationMode): string {
+  if (mode === "html") {
+    return "Annotation HTML";
+  }
+  if (mode === "image") {
+    return "Image description";
+  }
+  return "Comment";
+}
+
+function AnnotationAttachmentStatus({
+  item,
+  target,
+  position: annotationPosition,
+}: {
+  item: Annotation;
+  target: DocumentTarget;
+  position: { x: number; y: number } | null | undefined;
+}) {
+  if (!sameDocumentTarget(item.target, target)) {
+    return (
+      <p className="text-muted-foreground text-xs">
+        Attached to earlier content in version {item.target.version}. This note
+        has not been moved.
+      </p>
+    );
+  }
+  if (annotationPosition === null) {
+    return <p className="text-muted-foreground text-xs">Needs reattachment</p>;
+  }
+  return null;
+}
+
 const position = (value: unknown): value is { x: number; y: number } =>
   !!value &&
   typeof value === "object" &&
@@ -53,6 +117,7 @@ const position = (value: unknown): value is { x: number; y: number } =>
   Math.abs(value.x) < 100_000 &&
   Math.abs(value.y) < 100_000;
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: this component is the single orchestration boundary for iframe geometry and encrypted annotation UI state
 export function CollaborationCanvas({
   html,
   title,
@@ -73,7 +138,7 @@ export function CollaborationCanvas({
   const [anchor, setAnchor] = useState<AnnotationAnchor>(center);
   const [contextLink, setContextLink] = useState<string | null>(null);
   const [contextSelection, setContextSelection] = useState("");
-  const [mode, setMode] = useState<"text" | "html" | "image">("text");
+  const [mode, setMode] = useState<AnnotationMode>("text");
   const [text, setText] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -154,79 +219,77 @@ export function CollaborationCanvas({
   useEffect(() => {
     locate();
   }, [targetsJson, documentHtml]);
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the private-port receiver validates each supported message shape before updating UI state
   function received(event: MessageEvent) {
-      try {
-        if (event.data.type === "context") {
-          const payload = event.data.payload;
-          if (!(position(payload) && "anchor" in payload)) {
-            return;
-          }
-          setAnchor(parseAnchor(payload.anchor));
-          setContextSelection(
-            "selection" in payload &&
-              typeof payload.selection === "string" &&
-              payload.selection.length <= 32_000
-              ? payload.selection
-              : ""
-          );
-          setContextLink(
-            "href" in payload &&
-              typeof payload.href === "string" &&
-              payload.href.length <= 8192 &&
-              /^(https?:\/\/|mailto:|#)/i.test(payload.href)
-              ? payload.href
-              : null
-          );
-          const bounds = frame.current?.getBoundingClientRect();
-          if (
-            bounds &&
-            payload.x >= 0 &&
-            payload.y >= 0 &&
-            payload.x <= bounds.width &&
-            payload.y <= bounds.height
-          ) {
-            trigger.current?.dispatchEvent(
-              new MouseEvent("contextmenu", {
-                bubbles: true,
-                clientX: bounds.left + payload.x,
-                clientY: bounds.top + payload.y,
-              })
-            );
-          }
-        } else if (
-          event.data.type === "pointer" ||
-          event.data.type === "click"
-        ) {
-          roomRef.current.moveCursor(
-            parseAnchor(event.data.payload?.anchor),
-            event.data.type === "click"
-          );
-        } else if (
-          event.data.type === "positions" &&
-          Array.isArray(event.data.payload) &&
-          event.data.payload.length <= 1600
-        ) {
-          const next: Record<string, { x: number; y: number } | null> = {};
-          for (const row of event.data.payload) {
-            if (
-              typeof row?.id === "string" &&
-              row.id.length <= 160 &&
-              (row.position === null || position(row.position))
-            ) {
-              next[row.id] = row.position;
-            }
-          }
-          setPositions(next);
+    try {
+      if (event.data.type === "context") {
+        const { payload } = event.data;
+        if (!(position(payload) && "anchor" in payload)) {
+          return;
         }
-      } catch {
-        /* Reject malformed messages from the untrusted document. */
+        setAnchor(parseAnchor(payload.anchor));
+        setContextSelection(
+          "selection" in payload &&
+            typeof payload.selection === "string" &&
+            payload.selection.length <= 32_000
+            ? payload.selection
+            : ""
+        );
+        setContextLink(
+          "href" in payload &&
+            typeof payload.href === "string" &&
+            payload.href.length <= 8192 &&
+            CONTEXT_LINK.test(payload.href)
+            ? payload.href
+            : null
+        );
+        const bounds = frame.current?.getBoundingClientRect();
+        if (
+          bounds &&
+          payload.x >= 0 &&
+          payload.y >= 0 &&
+          payload.x <= bounds.width &&
+          payload.y <= bounds.height
+        ) {
+          trigger.current?.dispatchEvent(
+            new MouseEvent("contextmenu", {
+              bubbles: true,
+              clientX: bounds.left + payload.x,
+              clientY: bounds.top + payload.y,
+            })
+          );
+        }
+      } else if (event.data.type === "pointer" || event.data.type === "click") {
+        roomRef.current.moveCursor(
+          parseAnchor(event.data.payload?.anchor),
+          event.data.type === "click"
+        );
+      } else if (
+        event.data.type === "positions" &&
+        Array.isArray(event.data.payload) &&
+        event.data.payload.length <= 1600
+      ) {
+        const next: Record<string, { x: number; y: number } | null> = {};
+        for (const row of event.data.payload) {
+          if (
+            typeof row?.id === "string" &&
+            row.id.length <= 160 &&
+            (row.position === null || position(row.position))
+          ) {
+            next[row.id] = row.position;
+          }
+        }
+        setPositions(next);
       }
+    } catch {
+      /* Reject malformed messages from the untrusted document. */
+    }
   }
 
   useEffect(() => {
     function acceptGeometryPort(event: MessageEvent) {
       const currentFrame = frame.current;
-      const port = event.ports[0];
+      const [port] = event.ports;
       if (
         event.source !== currentFrame?.contentWindow ||
         event.data?.type !== "bitplan-geometry-ready/1" ||
@@ -362,23 +425,18 @@ export function CollaborationCanvas({
   }, [room.connection]);
 
   async function save() {
+    if (busy) {
+      return;
+    }
     setBusy(true);
     try {
-      const content: AnnotationContent =
-        mode === "html"
-          ? { html: text, type: "html" }
-          : mode === "image" && image
-            ? { alt: text, dataUrl: image, type: "image" }
-            : { text, type: "text" };
-      if (mode === "image" && !image) {
-        throw new Error("Choose an image first.");
-      }
-      if (mode !== "image" && !text.trim()) {
-        throw new Error("Write something first.");
-      }
+      const content = contentFor(mode, text, image);
       await room.saveAnnotation(content, anchor);
       setText("");
       setImage(null);
+      if (mode === "text") {
+        setPanel(false);
+      }
     } catch (failure) {
       toast.error(
         failure instanceof Error
@@ -405,6 +463,7 @@ export function CollaborationCanvas({
   }
   async function saveInline() {
     if (
+      busy ||
       !inline ||
       (inline.kind === "image" ? !inline.image : !inline.text.trim())
     ) {
@@ -434,6 +493,35 @@ export function CollaborationCanvas({
       setBusy(false);
     }
   }
+
+  function handleInlineKeyDown(
+    event: React.KeyboardEvent<HTMLTextAreaElement>
+  ) {
+    if (!inline) {
+      return;
+    }
+    if (inline.kind !== "image") {
+      const action = annotationInputAction(event);
+      if (!action) {
+        return;
+      }
+      event.preventDefault();
+      if (busy) {
+        return;
+      }
+      if (action === "cancel") {
+        setInline(null);
+      } else {
+        void saveInline();
+      }
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      void saveInline();
+    }
+  }
+
   function editDocument() {
     setEditor({ html: currentHtml, revision: room.documentRevision });
     setEditError(null);
@@ -460,6 +548,7 @@ export function CollaborationCanvas({
 
   return (
     <>
+      {room.connection ? <AnnotationOnboarding /> : null}
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild disabled={!room.connection}>
           <div
@@ -477,13 +566,13 @@ export function CollaborationCanvas({
               event.preventDefault();
               const bounds = frame.current?.getBoundingClientRect();
               if (bounds) {
-              geometryPort.current?.postMessage({
-                payload: {
-                  x: event.clientX - bounds.left,
-                  y: event.clientY - bounds.top,
-                },
-                type: "point",
-              });
+                geometryPort.current?.postMessage({
+                  payload: {
+                    x: event.clientX - bounds.left,
+                    y: event.clientY - bounds.top,
+                  },
+                  type: "point",
+                });
               }
             }}
             ref={trigger}
@@ -498,10 +587,7 @@ export function CollaborationCanvas({
                 title={title}
               />
             ) : null}
-            <div
-              aria-label="Annotation positions"
-              className="pointer-events-none absolute inset-0 overflow-hidden"
-            >
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
               {targets
                 .filter((item) => !item.id.startsWith("cursor-"))
                 .map((item) => {
@@ -557,81 +643,75 @@ export function CollaborationCanvas({
                   </AnnotationCard>
                 );
               })}
-              {room.cursors.map((cursor) => {
-                const point = positions[`cursor-${cursor.sessionId}`];
-                const profile = room.profiles[cursor.participantId];
-                if (!profile) {
-                  return null;
-                }
-                const width = frame.current?.clientWidth ?? 0;
-                const height = frame.current?.clientHeight ?? 0;
-                const current = sameDocumentTarget(
-                  cursor.target,
-                  room.activeTarget
-                );
-                if (!current) {
-                  return null;
-                }
-                const active = cursorIsActive(
-                  cursor.online,
-                  cursor.updatedAt,
-                  activityTime
-                );
-                const onPage =
-                  current &&
-                  point &&
-                  point.x >= 0 &&
-                  point.y >= 0 &&
-                  point.x < width &&
-                  point.y < height;
-                const hue =
-                  [...cursor.sessionId].reduce(
-                    (sum, char) => sum + char.charCodeAt(0),
-                    0
-                  ) % 360;
-                return (
-                  <div
-                    className="absolute flex max-w-64 items-center gap-1 text-xs"
-                    data-collaborator-location={cursor.sessionId}
-                    key={cursor.sessionId}
-                    style={{
-                      color: `hsl(${hue} 70% 65%)`,
-                      left: onPage
-                        ? Math.max(0, Math.min(point.x, width - 180))
-                        : 8,
-                      top: onPage
-                        ? Math.max(0, Math.min(point.y, height - 40))
-                        : 8 + room.cursors.indexOf(cursor) * 32,
-                    }}
-                    title={`Last location: ${new Date(cursor.updatedAt).toLocaleString()} · ${cursor.clickCount} clicks`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={active ? "" : "invisible"}
+              {room.cursors
+                .filter((cursor) =>
+                  sameDocumentTarget(cursor.target, room.activeTarget)
+                )
+                .map((cursor) => {
+                  const point = positions[`cursor-${cursor.sessionId}`];
+                  const profile = room.profiles[cursor.participantId];
+                  if (!profile) {
+                    return null;
+                  }
+                  const width = frame.current?.clientWidth ?? 0;
+                  const height = frame.current?.clientHeight ?? 0;
+                  const active = cursorIsActive(
+                    cursor.online,
+                    cursor.updatedAt,
+                    activityTime
+                  );
+                  const onPage =
+                    point &&
+                    point.x >= 0 &&
+                    point.y >= 0 &&
+                    point.x < width &&
+                    point.y < height;
+                  const hue =
+                    [...cursor.sessionId].reduce(
+                      (sum, char) => sum + char.charCodeAt(0),
+                      0
+                    ) % 360;
+                  return (
+                    <div
+                      className="absolute flex max-w-64 items-center gap-1 text-xs"
+                      data-collaborator-location={cursor.sessionId}
+                      key={cursor.sessionId}
+                      style={{
+                        color: `hsl(${hue} 70% 65%)`,
+                        left: onPage
+                          ? Math.max(0, Math.min(point.x, width - 180))
+                          : 8,
+                        top: onPage
+                          ? Math.max(0, Math.min(point.y, height - 40))
+                          : 8 + room.cursors.indexOf(cursor) * 32,
+                      }}
+                      title={`Last location: ${new Date(cursor.updatedAt).toLocaleString()} · ${cursor.clickCount} clicks`}
                     >
-                      ↖
-                    </span>
-                    <img
-                      alt=""
-                      className="size-6 rounded-full border-2"
-                      height={24}
-                      referrerPolicy="no-referrer"
-                      src={characterPortrait(profile.character)}
-                      width={24}
-                    />
-                    <span className="rounded bg-background px-1 py-0.5">
-                      {profile.name}
-                      {cursor.kind === "agent" ? " · Agent" : ""} ·{" "}
-                      {cursor.online ? "connected" : "last seen"}
-                      {current
-                        ? onPage
-                          ? ""
-                          : " · offscreen"
-                        : " · earlier version"}
-                    </span>
-                  </div>
-                );
-              })}
+                      <span
+                        aria-hidden="true"
+                        className={active ? "" : "invisible"}
+                      >
+                        ↖
+                      </span>
+                      <Image
+                        alt=""
+                        className="shrink-0 rounded-full border-2"
+                        height={24}
+                        referrerPolicy="no-referrer"
+                        src={characterPortrait(profile.character)}
+                        style={{ height: 24, width: 24 }}
+                        unoptimized
+                        width={24}
+                      />
+                      <span className="rounded bg-background px-1 py-0.5">
+                        {profile.name}
+                        {cursor.kind === "agent" ? " · Agent" : ""} ·{" "}
+                        {cursor.online ? "connected" : "last seen"}
+                        {onPage ? "" : " · offscreen"}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
             {earlierCursors.length > 0 ? (
               <details
@@ -645,14 +725,16 @@ export function CollaborationCanvas({
                   {earlierCursors.slice(0, 4).map((cursor) => {
                     const profile = room.profiles[cursor.participantId];
                     return profile ? (
-                      <img
+                      <Image
                         alt={profile.name}
-                        className="size-6 rounded-full border-2 border-background"
+                        className="shrink-0 rounded-full border-2 border-background"
                         height={24}
                         key={cursor.sessionId}
                         referrerPolicy="no-referrer"
                         src={characterPortrait(profile.character)}
+                        style={{ height: 24, width: 24 }}
                         title={profile.name}
+                        unoptimized
                         width={24}
                       />
                     ) : null;
@@ -689,16 +771,17 @@ export function CollaborationCanvas({
               >
                 {inline.kind === "image" ? (
                   <>
-                    <ImageUpload
-                      onLoad={(image) =>
+                    <AnnotationImagePicker
+                      onLoad={(dataUrl) =>
                         setInline((value) =>
-                          value ? { ...value, image } : null
+                          value ? { ...value, image: dataUrl } : null
                         )
                       }
                     />
                     {inline.image ? (
+                      /* biome-ignore lint/performance/noImgElement lint/correctness/useImageSize: encrypted data URLs need their natural dimensions for an undistorted preview */
                       <img
-                        alt="Image preview"
+                        alt="Selected preview"
                         className="max-h-40 max-w-full"
                         src={inline.image}
                       />
@@ -719,46 +802,47 @@ export function CollaborationCanvas({
                       value ? { ...value, text: event.target.value } : null
                     )
                   }
-                  onKeyDown={(event) => {
-                    if (
-                      (event.ctrlKey || event.metaKey) &&
-                      event.key === "Enter"
-                    ) {
-                      event.preventDefault();
-                      void saveInline();
-                    }
-                  }}
+                  onKeyDown={handleInlineKeyDown}
                   placeholder={
                     inline.kind === "image"
                       ? "Describe the image…"
                       : "Write an annotation…"
                   }
+                  readOnly={busy}
                   ref={inlineInput}
                   value={inline.text}
                 />
-                <div className="flex justify-end gap-2">
-                  <Button
-                    disabled={busy}
-                    onClick={() => setInline(null)}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    disabled={
-                      busy ||
-                      (inline.kind === "image"
-                        ? !inline.image
-                        : !inline.text.trim())
-                    }
-                    size="sm"
-                    type="submit"
-                  >
-                    {busy ? "Saving…" : "Save"}
-                  </Button>
-                </div>
+                {inline.kind === "image" ? (
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      disabled={busy}
+                      onClick={() => setInline(null)}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      disabled={
+                        busy ||
+                        (inline.kind === "image"
+                          ? !inline.image
+                          : !inline.text.trim())
+                      }
+                      size="sm"
+                      type="submit"
+                    >
+                      {busy ? "Saving…" : "Save"}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs" role="status">
+                    {busy
+                      ? "Saving…"
+                      : "Enter to save · Shift+Enter for a new line · Esc to cancel"}
+                  </p>
+                )}
               </form>
             ) : null}
             {room.connection ? (
@@ -811,7 +895,7 @@ export function CollaborationCanvas({
                       published on chain
                     </p>
                   ) : null}
-                  <div
+                  <section
                     aria-label="Collaborators"
                     className="flex flex-wrap gap-2"
                   >
@@ -820,18 +904,20 @@ export function CollaborationCanvas({
                         className="flex items-center gap-1 text-xs"
                         key={id}
                       >
-                        <img
+                        <Image
                           alt=""
-                          className="size-5 rounded-full"
+                          className="shrink-0 rounded-full"
                           height={20}
                           referrerPolicy="no-referrer"
                           src={characterPortrait(profile.character)}
+                          style={{ height: 20, width: 20 }}
+                          unoptimized
                           width={20}
                         />
                         {profile.name}
                       </span>
                     ))}
-                  </div>
+                  </section>
                   {room.annotations.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
                       Right-click anywhere on the plan to leave a note. Or add
@@ -851,18 +937,11 @@ export function CollaborationCanvas({
                         </span>
                         <span>{item.status}</span>
                       </div>
-                      {sameDocumentTarget(item.target, room.activeTarget) ? (
-                        positions[item.id] === null ? (
-                          <p className="text-muted-foreground text-xs">
-                            Needs reattachment
-                          </p>
-                        ) : null
-                      ) : (
-                        <p className="text-muted-foreground text-xs">
-                          Attached to earlier content in version{" "}
-                          {item.target.version}. This note has not been moved.
-                        </p>
-                      )}
+                      <AnnotationAttachmentStatus
+                        item={item}
+                        position={positions[item.id]}
+                        target={room.activeTarget}
+                      />
                       <AnnotationBody content={item.content} />
                       {item.participantId === room.connection?.participantId ? (
                         <Button
@@ -897,30 +976,56 @@ export function CollaborationCanvas({
                       <option value="image">Image</option>
                     </select>
                   </label>
-                  {mode === "image" ? <ImageUpload onLoad={setImage} /> : null}
+                  {mode === "image" ? (
+                    <AnnotationImagePicker onLoad={setImage} />
+                  ) : null}
                   <textarea
-                    aria-label={
-                      mode === "html"
-                        ? "Annotation HTML"
-                        : mode === "image"
-                          ? "Image description"
-                          : "Comment"
-                    }
+                    aria-label={annotationInputLabel(mode)}
                     className="min-h-24 w-full resize-y rounded-md border bg-background p-2 text-sm"
                     maxLength={mode === "html" ? 200_000 : 32_000}
                     onChange={(event) => setText(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (mode !== "text") {
+                        return;
+                      }
+                      const action = annotationInputAction(event);
+                      if (!action) {
+                        return;
+                      }
+                      event.preventDefault();
+                      if (busy) {
+                        return;
+                      }
+                      if (action === "cancel") {
+                        setPanel(false);
+                      } else if (text.trim()) {
+                        void save();
+                      }
+                    }}
                     placeholder={
                       mode === "html" ? "<p>Your HTML…</p>" : "Leave a note…"
                     }
+                    readOnly={busy}
                     value={text}
                   />
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground text-xs">
                       Hosted only · no transaction
                     </span>
-                    <Button disabled={busy} size="sm" type="submit">
-                      {busy ? "Saving…" : "Add"}
-                    </Button>
+                    {mode === "text" ? (
+                      <span
+                        className="text-muted-foreground text-xs"
+                        role="status"
+                      >
+                        {busy
+                          ? "Saving…"
+                          : "Enter to save · Shift+Enter for newline"}
+                      </span>
+                    ) : (
+                      <Button disabled={busy} size="sm" type="submit">
+                        {busy ? "Saving…" : "Add"}
+                      </Button>
+                    )}
                   </div>
                 </form>
               </aside>
@@ -1062,10 +1167,25 @@ export function CollaborationCanvas({
 
 function AnnotationBody({ content }: { content: AnnotationContent }) {
   if (content.type === "text") {
+    const href = annotationLink(content.text);
+    if (href) {
+      return (
+        <a
+          className="block break-words underline underline-offset-4"
+          href={href}
+          referrerPolicy="no-referrer"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          {content.text}
+        </a>
+      );
+    }
     return <p className="whitespace-pre-wrap break-words">{content.text}</p>;
   }
   if (content.type === "image") {
     return (
+      /* biome-ignore lint/performance/noImgElement lint/correctness/useImageSize: encrypted annotation images need their natural dimensions to preserve arbitrary aspect ratios */
       <img
         alt={content.alt}
         className="h-auto w-full rounded"
@@ -1097,52 +1217,5 @@ function AnnotationBody({ content }: { content: AnnotationContent }) {
         />
       ))}
     </svg>
-  );
-}
-
-function ImageUpload({ onLoad }: { onLoad: (dataUrl: string) => void }) {
-  return (
-    <label className="block space-y-1 text-xs">
-      Image or SVG
-      <input
-        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.svg"
-        aria-label="Annotation image"
-        className="w-full text-xs"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (!file) {
-            return;
-          }
-          if (file.size > 170_000) {
-            toast.error("Use an image smaller than 170 KB.");
-            event.target.value = "";
-            return;
-          }
-          const reader = new FileReader();
-          reader.onload = () => {
-            try {
-              const content = parseAnnotationContent({
-                alt: "",
-                dataUrl: reader.result,
-                type: "image",
-              });
-              if (content.type === "image") {
-                onLoad(content.dataUrl);
-              }
-            } catch (error) {
-              toast.error(
-                error instanceof Error ? error.message : "Unsupported image."
-              );
-            }
-          };
-          reader.onerror = () => toast.error("Could not read image.");
-          reader.readAsDataURL(file);
-        }}
-        type="file"
-      />
-      <span className="text-muted-foreground">
-        Embedded and encrypted · up to 170 KB
-      </span>
-    </label>
   );
 }

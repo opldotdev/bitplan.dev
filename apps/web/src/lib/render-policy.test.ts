@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { RENDER_POLICY, withRenderPolicy } from "./render-policy";
+import {
+  RENDER_BASE_URL,
+  RENDER_POLICY,
+  withRenderPolicy,
+} from "./render-policy";
 
 describe("withRenderPolicy", () => {
   test("places the policy before every byte of plan markup", () => {
@@ -29,6 +33,16 @@ describe("withRenderPolicy", () => {
         out.indexOf("https://attacker.test")
       );
     }
+  });
+
+  test("pins srcdoc to a fragment-free base before untrusted markup", () => {
+    const attackerBase = '<base href="https://attacker.test/#stolen">';
+    const out = withRenderPolicy(`${attackerBase}<p>Plan</p>`);
+    const trustedBase = `<base href="${RENDER_BASE_URL}">`;
+
+    expect(RENDER_BASE_URL).not.toContain("#");
+    expect(out.indexOf(trustedBase)).toBeLessThan(out.indexOf(attackerBase));
+    expect(RENDER_POLICY).toContain("base-uri https://bitplan.dev");
   });
 
   test("denies network and forms while allowing inline scripts", () => {

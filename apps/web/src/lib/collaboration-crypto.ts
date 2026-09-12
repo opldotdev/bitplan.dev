@@ -1,9 +1,11 @@
 /** Hosted room transport encryption. Existing BPLN inscription framing is unchanged. */
 const encoder = new TextEncoder();
 const SECRET = /^[A-Za-z0-9_-]{43}$/;
+const FRAGMENT_PREFIX = /^#/;
+const ROOM_ID = /^[a-zA-Z0-9]{20,64}$/;
 
-function base64(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
+function base64(value: Uint8Array): string {
+  return btoa(String.fromCharCode(...value))
     .replaceAll("+", "-")
     .replaceAll("/", "_")
     .replaceAll("=", "");
@@ -115,14 +117,14 @@ export async function decryptRoomValue(
 export function collaborationFragment(
   hash: string
 ): { roomId: string; secret: string } | null {
-  const params = new URLSearchParams(hash.replace(/^#/, ""));
+  const params = new URLSearchParams(hash.replace(FRAGMENT_PREFIX, ""));
   const roomId = params.get("room");
   const secret = params.get("collab");
   if (!(roomId || secret)) {
     return null;
   }
   if (
-    !(roomId && /^[a-zA-Z0-9]{20,64}$/.test(roomId)) ||
+    !(roomId && ROOM_ID.test(roomId)) ||
     params.getAll("room").length !== 1 ||
     params.getAll("collab").length !== 1
   ) {

@@ -33,6 +33,7 @@ function installGeometryBridge(collaboration: boolean) {
   for (const type of ["click", "auxclick"] as const) {
     document.addEventListener(
       type,
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: native link handling keeps validation, local anchors, and popup hardening in one captured callback
       (event) => {
         const link =
           event.target instanceof Element
@@ -56,9 +57,7 @@ function installGeometryBridge(collaboration: boolean) {
           } catch {
             // A literal percent sign may be part of the author's element ID.
           }
-          if (!id) {
-            window.scrollTo({ top: 0, left: 0 });
-          } else {
+          if (id) {
             const destination = document.getElementById(id);
             destination?.scrollIntoView({ block: "start" });
             if (destination) {
@@ -67,6 +66,8 @@ function installGeometryBridge(collaboration: boolean) {
               }
               destination.focus({ preventScroll: true });
             }
+          } else {
+            window.scrollTo({ left: 0, top: 0 });
           }
           return;
         }
@@ -211,6 +212,7 @@ function installGeometryBridge(collaboration: boolean) {
       );
     });
   }
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one private-port dispatcher validates each message shape before changing bridge state
   function receive(data: unknown) {
     if (!(data && typeof data === "object" && "type" in data)) {
       return;
@@ -311,11 +313,7 @@ function installGeometryBridge(collaboration: boolean) {
     );
   }
   document.addEventListener("keydown", (event) => {
-    if (
-      trustedActivity(event) &&
-      event.shiftKey &&
-      event.key === "F10"
-    ) {
+    if (trustedActivity(event) && event.shiftKey && event.key === "F10") {
       event.preventDefault();
       const rect = document.activeElement?.getBoundingClientRect();
       const x = rect?.left ?? 24;

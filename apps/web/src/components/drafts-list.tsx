@@ -305,7 +305,8 @@ export function DraftsList() {
   const generation = useRef(0);
 
   const bootWallet = useCallback(async (wallet: DraftsWallet) => {
-    const run = ++generation.current;
+    generation.current += 1;
+    const run = generation.current;
     const isCurrent = () => generation.current === run;
     const update = (patch: Partial<Extract<ListState, { phase: "loaded" }>>) =>
       setState((current) =>
@@ -323,13 +324,13 @@ export function DraftsList() {
       wallet,
     });
     const [coins, hosted] = await Promise.all([
-      listWalletDrafts(wallet).then((coins) => {
-        update({ coins });
-        return coins;
+      listWalletDrafts(wallet).then((loadedCoins) => {
+        update({ coins: loadedCoins });
+        return loadedCoins;
       }),
-      loadHosted(wallet).then((hosted) => {
-        update({ hosted: hosted.entries });
-        return hosted;
+      loadHosted(wallet).then((loadedHosted) => {
+        update({ hosted: loadedHosted.entries });
+        return loadedHosted;
       }),
     ]);
     if (!isCurrent()) {
@@ -381,12 +382,13 @@ export function DraftsList() {
     boot();
     return () => {
       cancelled = true;
-      generation.current++;
+      generation.current += 1;
     };
   }, [bootWallet]);
 
   const retryCatalog = useCallback(async () => {
-    const run = ++generation.current;
+    generation.current += 1;
+    const run = generation.current;
     const isCurrent = () => generation.current === run;
     setState((current) => {
       if (current.phase !== "loaded") {

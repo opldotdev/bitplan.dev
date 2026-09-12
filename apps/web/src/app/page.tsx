@@ -72,6 +72,42 @@ export default function Home() {
 
           <SkillInstall />
 
+          <details
+            className="rounded-md border bg-background/80 p-4 text-left"
+            id="add-your-bot"
+          >
+            <summary className="cursor-pointer font-medium">
+              Add your bot
+            </summary>
+            <p className="mt-3 text-muted-foreground text-sm">
+              Give Grok or another bot its own decryption identity. Copy this
+              prompt to your bot; only its public key comes back to you.
+            </p>
+            <p className="mt-3 select-all rounded border p-3 text-sm">
+              Use your operator-approved local wallet tooling to create or reuse
+              a dedicated BitPlan reader identity. Inspect @1sat/cli help first.
+              Keep private keys and seeds inside secure wallet storage, never in
+              chat, model context, logs, or source control. Return only your
+              public identity key and a verified BRC-100 decryption method. If
+              that interface is unavailable, report the gap rather than building
+              an unauthenticated key server. After I add you and republish,
+              verify you can decrypt the new version and read its annotations
+              before proposing revisions.
+            </p>
+            <p className="mt-3 text-muted-foreground text-sm">
+              On your publishing device, add the public key as a contact, add
+              that contact to your team, and publish a new version shared with
+              the team. This grants reading access—not ownership or publishing
+              permission.
+            </p>
+            <Link
+              className="mt-3 inline-block text-sm underline underline-offset-4"
+              href="/docs/agents#teams"
+            >
+              Contact and team commands
+            </Link>
+          </details>
+
           <div className="space-y-3 text-left">
             <p className="text-center text-muted-foreground text-sm">
               Then, with a BRC-100 wallet unlocked:

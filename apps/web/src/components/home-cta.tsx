@@ -19,6 +19,7 @@ function subscribeWallet(onStoreChange: () => void): () => void {
 }
 
 const serverSnapshot = () => false;
+const MOBILE_USER_AGENT = /Android|iPhone|iPad|iPod/i;
 
 /**
  * Hero call to action, keyed to wallet state. A BRC-100 substrate that
@@ -96,7 +97,7 @@ function WalletSuggestions() {
   const [mobile, setMobile] = useState(false);
   useEffect(() => {
     setMobile(
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      MOBILE_USER_AGENT.test(navigator.userAgent) ||
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
     );
   }, []);

@@ -53,6 +53,10 @@ for small tasks. Illustrative UI and future states must be labeled, and every
 visual needs readable labels, theme support, and a narrow-screen treatment.
 
 - `plan.html`: design plan with a decisions questionnaire and a response block.
+- `editorial.html`: magazine-style showcase with a serif hero, real raster
+  artwork, narrative column, reference margin, and dismissible local demo notes.
+  Replace the sample facts. Demo notes are document examples, never shared
+  contributions. Embed externally referenced artwork for archival delivery.
 - `proposal.html`: comprehensive visual proposal, adapted from the visual-proposal
   skill. Includes sticky section navigation, contextual human notes, a diagram,
   an evidence table, native detail disclosures, optional review panels,
@@ -100,8 +104,16 @@ The shared viewer provides the same annotation tools to every template after
 joining a collaboration room; do not embed another annotation UI in the HTML.
 Right-click opens a compact text/image toolbar, with Copy selected text and
 Copy link only when applicable. Text and image composers open at the chosen
-anchor. PNG, JPEG, WebP, GIF, and SVG uploads are embedded in encrypted notes
-(170 KB upload limit). SVG is rendered only as an image, never inline markup.
+anchor.
+Text composers have no submit button: Enter saves and closes, Shift+Enter adds
+a line, and Escape cancels. Failed saves retain the text; IME confirmation does
+not submit a note. Image uploads keep an explicit Save control.
+The image picker offers Photos, Stickers, and Draw. Raster files up to 20 MB
+are resized locally to fit 170 KB; SVG/GIF must already fit 170 KB. Draw supports
+pen, rectangle, ellipse, color, and lasso/move, then exports a transparent image.
+It is a picker drawing surface, not direct-on-document drawing or a persistent
+vector editor. Choose Use image, then save the annotation. Uploaded image bytes
+are embedded in encrypted notes. SVG is rendered as an image, never inline markup.
 Authors can resize their own cards by dragging the corner or using its arrow
 keys. Saved dimensions synchronize through Convex and survive reloads; they do
 not change the document anchor or create a transaction. Existing notes without
@@ -137,6 +149,14 @@ bun test packages/cli/test/proposal-template.test.ts
 ```
 
 ## Publishing
+
+Before rewriting a plan, read its latest document and accessible annotations
+together. Use notes and references as revision cues, not automatic authority.
+Record which feedback was incorporated, deferred, or needs clarification; retain
+note IDs, attribution, and original version targets. Recheck for new changes
+before publishing and state the review cutoff. A document-only fetch does not
+include overlays. Disclose unavailable annotations rather than claiming that
+all feedback was reviewed.
 
 ```sh
 npx bitplan upload docs/templates/plan.html --description "Draft 1"

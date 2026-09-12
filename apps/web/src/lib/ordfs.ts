@@ -4,6 +4,7 @@ import { toOrdinalOutpoint } from "@/lib/outpoint";
 import { SITE_URL } from "@/lib/site";
 
 const TRAILING_SLASHES = /\/+$/;
+const CONTENT_POINTER = /^[0-9a-f]{64}[._]\d+$/i;
 
 /**
  * Same-origin content proxy. A narrow Route Handler accepts only GET/HEAD for
@@ -68,7 +69,7 @@ function contentPointer(value: string | null): string | null {
   }
   if (
     !(
-      /^[0-9a-f]{64}[._]\d+$/i.test(value) &&
+      CONTENT_POINTER.test(value) &&
       Number.isSafeInteger(Number(value.slice(65)))
     )
   ) {

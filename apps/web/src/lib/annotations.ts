@@ -49,6 +49,8 @@ const ID = /^[a-zA-Z0-9_-]{1,128}$/;
 const ORIGIN = /^(?:[0-9a-f]{64}_\d+|h_[a-zA-Z0-9_-]{20})$/;
 const OUTPOINT = /^[0-9a-f]{64}_\d+$/;
 const HASH = /^[0-9a-f]{64}$/;
+const IMAGE_DATA_URL =
+  /^data:image\/(?:png|jpeg|webp|gif|svg\+xml);base64,[a-zA-Z0-9+/]+={0,2}$/;
 const MAX_TEXT = 32_000;
 export const MAX_ANNOTATION_BYTES = 1_048_576;
 
@@ -151,11 +153,7 @@ export function parseAnnotationContent(value: unknown): AnnotationContent {
     case "image": {
       const dataUrl = string(content.dataUrl, MAX_ANNOTATION_BYTES);
       // SVG must remain in an <img> image context, never inline DOM or an object.
-      if (
-        !/^data:image\/(?:png|jpeg|webp|gif|svg\+xml);base64,[a-zA-Z0-9+/]+={0,2}$/.test(
-          dataUrl
-        )
-      ) {
+      if (!IMAGE_DATA_URL.test(dataUrl)) {
         throw new Error("Use an embedded PNG, JPEG, WebP, GIF, or SVG image.");
       }
       return { alt: string(content.alt, 2000), dataUrl, type: "image" };
@@ -166,7 +164,11 @@ export function parseAnnotationContent(value: unknown): AnnotationContent {
       }
       let count = 0;
       const strokes = content.strokes.map((stroke) => {
-        if (!Array.isArray(stroke) || (count += stroke.length) > 10_000) {
+        if (!Array.isArray(stroke)) {
+          throw new Error("Invalid drawing stroke.");
+        }
+        count += stroke.length;
+        if (count > 10_000) {
           throw new Error("Drawing is too large.");
         }
         return stroke.map(point);

@@ -80,7 +80,7 @@ test("click anchors round-trip over a private port, including blank space", asyn
       ports: MessagePort[]
     ) {
       expect(message.type).toBe("bitplan-geometry-ready/1");
-      parentPort = ports[0];
+      [parentPort] = ports;
     },
   };
   const context = {
@@ -136,7 +136,9 @@ test("click anchors round-trip over a private port, including blank space", asyn
       "keydown",
       {
         key: "F10",
-        preventDefault() {},
+        preventDefault() {
+          // The synthetic event records no browser default behavior.
+        },
         shiftKey: true,
       },
     ],
@@ -245,16 +247,31 @@ test("reader-only plans open safe links natively and retain local anchors", () =
       addEventListener: (name: string, callback: (event: any) => void) =>
         handlers.set(name, callback),
       baseURI: "https://bitplan.dev/d/test",
-      getElementById: (id: string) => id === "section one" ? {
-        scrollIntoView() { scrolled = id; },
-        hasAttribute() { return false; },
-        setAttribute() {},
-        focus() { focused = true; },
-      } : null,
+      getElementById: (id: string) =>
+        id === "section one"
+          ? {
+              focus() {
+                focused = true;
+              },
+              hasAttribute() {
+                return false;
+              },
+              scrollIntoView() {
+                scrolled = id;
+              },
+              setAttribute() {
+                // The assertion only needs the method to exist.
+              },
+            }
+          : null,
     },
     Element,
     URL,
-    window: { scrollTo() { top = true; } },
+    window: {
+      scrollTo() {
+        top = true;
+      },
+    },
   };
   const script = bridgeScript(withAnnotationBridge("<head></head>", false));
   runInNewContext(script, context);

@@ -17,6 +17,9 @@ import {
 import { itemKind } from "./schema";
 
 const presence = new Presence(components.presence);
+const CAPABILITY = /^[A-Za-z0-9_-]{43}$/;
+const CIPHERTEXT = /^[A-Za-z0-9_-]{16}\.[A-Za-z0-9+/]+=*$/;
+const OPERATION_KEY = /^[a-zA-Z0-9_-]{1,128}$/;
 const limiter = new RateLimiter(components.rateLimiter, {
   create: { capacity: 5, kind: "token bucket", period: MINUTE, rate: 20 },
   cursor: { capacity: 10, kind: "token bucket", period: MINUTE, rate: 300 },
@@ -36,16 +39,13 @@ const itemValue = v.object({
 });
 
 function hash(proof: string): string {
-  if (!/^[A-Za-z0-9_-]{43}$/.test(proof)) {
+  if (!CAPABILITY.test(proof)) {
     throw new ConvexError("Invalid capability.");
   }
   return Utils.toHex(Hash.sha256(Array.from(new TextEncoder().encode(proof))));
 }
 function cipher(value: string, limit = 340_000) {
-  if (
-    value.length > limit ||
-    !/^[A-Za-z0-9_-]{16}\.[A-Za-z0-9+/]+=*$/.test(value)
-  ) {
+  if (value.length > limit || !CIPHERTEXT.test(value)) {
     throw new ConvexError("Invalid encrypted item.");
   }
 }
@@ -311,13 +311,14 @@ export const write = mutation({
     kind: itemKind,
     operationId: v.string(),
   },
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one transactional mutation keeps authorization, idempotency, revision checks, and counters atomic
   handler: async (ctx, args) => {
     const { room, session } = await sessionFor(ctx, args);
     cipher(args.ciphertext);
     if (
       !(
-        /^[a-zA-Z0-9_-]{1,128}$/.test(args.key) &&
-        /^[a-zA-Z0-9_-]{1,128}$/.test(args.operationId) &&
+        OPERATION_KEY.test(args.key) &&
+        OPERATION_KEY.test(args.operationId) &&
         Number.isSafeInteger(args.expectedRevision)
       ) ||
       args.expectedRevision < 0 ||
@@ -483,7 +484,7 @@ export const online = query({
 });
 export const disconnect = mutation({
   args: { sessionToken: v.string() },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => {
     if (args.sessionToken.length > 256) {
       throw new ConvexError("Invalid session token.");
     }

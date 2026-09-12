@@ -1,7 +1,8 @@
 "use client";
 
 import { UserRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,12 +12,17 @@ import {
 } from "@/components/ui/popover";
 import {
   CHARACTERS,
+  type Character,
   type CollaboratorProfile,
   characterPortrait,
   loadProfile,
   PROFILE_STORAGE_KEY,
   parseProfile,
 } from "@/lib/collaborator";
+
+function characterFromButton(button: HTMLButtonElement): Character {
+  return button.value as Character;
+}
 
 /** One navbar control. Character selection is a preference, never authentication. */
 export function CharacterChooser({
@@ -29,6 +35,10 @@ export function CharacterChooser({
   const [profile, setProfile] = useState<CollaboratorProfile | null>(null);
   const [storageIssue, setStorageIssue] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const [previewCharacter, setPreviewCharacter] = useState<Character | null>(
+    null
+  );
+  const displayNameId = useId();
   useEffect(() => {
     try {
       setProfile(loadProfile(localStorage));
@@ -56,8 +66,8 @@ export function CharacterChooser({
     }
   }, [profile, onChange]);
 
-  function choose(next: CollaboratorProfile) {
-    next = parseProfile(next);
+  const choose = useCallback((candidate: CollaboratorProfile) => {
+    const next = parseProfile(candidate);
     setProfile(next);
     try {
       localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(next));
@@ -65,9 +75,9 @@ export function CharacterChooser({
     } catch {
       setStorageIssue(true);
     }
-  }
+  }, []);
 
-  function saveName() {
+  const saveName = useCallback(() => {
     if (!profile) {
       return;
     }
@@ -76,7 +86,56 @@ export function CharacterChooser({
       return;
     }
     choose({ ...profile, name: nameDraft });
-  }
+  }, [choose, nameDraft, profile]);
+
+  const changeName = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setNameDraft(event.target.value);
+    },
+    []
+  );
+
+  const submitName = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        saveName();
+      }
+    },
+    [saveName]
+  );
+
+  const selectCharacter = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      const character = characterFromButton(event.currentTarget);
+      choose({
+        character,
+        name:
+          profile?.name && profile.name !== profile.character
+            ? profile.name
+            : character,
+      });
+    },
+    [choose, profile]
+  );
+
+  const showCharacter = useCallback(
+    (
+      event:
+        | React.FocusEvent<HTMLButtonElement>
+        | React.PointerEvent<HTMLButtonElement>
+    ) => {
+      setPreviewCharacter(characterFromButton(event.currentTarget));
+    },
+    []
+  );
+
+  const showSelectedCharacter = useCallback(() => {
+    setPreviewCharacter(null);
+  }, []);
+
+  const shownCharacter =
+    previewCharacter ?? profile?.character ?? "Choose a character";
 
   return (
     <Popover>
@@ -84,7 +143,7 @@ export function CharacterChooser({
         <Button
           aria-label={
             profile
-              ? `Your character: ${profile.character}`
+              ? `${profile.name}, ${profile.character}. Change profile`
               : "Choose your character"
           }
           className="shrink-0 rounded-full"
@@ -93,13 +152,15 @@ export function CharacterChooser({
           variant="ghost"
         >
           {profile ? (
-            <img
+            <Image
               alt=""
-              className="size-7 rounded-full object-cover"
-              height={28}
+              className="shrink-0 rounded-full object-cover"
+              height={26}
               referrerPolicy="no-referrer"
               src={characterPortrait(profile.character)}
-              width={28}
+              style={{ height: 26, width: 26 }}
+              unoptimized
+              width={26}
             />
           ) : (
             <UserRound />
@@ -110,60 +171,68 @@ export function CharacterChooser({
         align="end"
         className="max-h-[var(--radix-popover-content-available-height)] w-[640px] max-w-[calc(100vw-1rem)] overflow-y-auto p-3"
       >
-        <p className="font-medium">Your character</p>
-        <p className="text-muted-foreground text-xs">
-          From the bopen.ai roster. Used across your plans.
-        </p>
-        <div
-          aria-label="Roster characters"
-          className="grid grid-cols-5 gap-1 sm:grid-cols-8"
-        >
-          {CHARACTERS.map((character) => (
-            <Button
-              aria-label={character}
-              aria-pressed={profile?.character === character}
-              className="h-auto min-w-0 flex-col gap-0.5 p-1 text-[10px] aria-pressed:bg-muted aria-pressed:ring-1 aria-pressed:ring-ring"
-              key={character}
-              onClick={() =>
-                choose({
-                  character,
-                  name:
-                    profile?.name && profile.name !== profile.character
-                      ? profile.name
-                      : character,
-                })
-              }
-              type="button"
-              variant="ghost"
-            >
-              <img
-                alt=""
-                className="size-9 rounded-full object-cover"
-                height={36}
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                src={characterPortrait(character)}
-                width={36}
-              />
-              <span className="w-full truncate text-center">{character}</span>
-            </Button>
-          ))}
-        </div>
-        <label className="grid gap-1 border-t pt-3 text-xs">
-          Display name
+        <label className="grid gap-1.5" htmlFor={displayNameId}>
+          <span className="font-medium text-sm">Display name</span>
           <Input
+            className="h-11 text-base"
+            id={displayNameId}
             maxLength={80}
             onBlur={saveName}
-            onChange={(event) => setNameDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                saveName();
-              }
-            }}
+            onChange={changeName}
+            onKeyDown={submitName}
             value={nameDraft}
           />
+          <span className="text-muted-foreground text-xs">
+            Visible to collaborators across your plans.
+          </span>
         </label>
+        <div className="mt-3 border-t pt-3">
+          <div className="flex min-h-11 items-end justify-between gap-3">
+            <div>
+              <p className="text-muted-foreground text-xs">Character</p>
+              <p className="font-medium text-lg leading-tight">
+                {shownCharacter}
+              </p>
+            </div>
+            <p className="text-right text-muted-foreground text-xs">
+              Hover, focus, or tap a portrait
+            </p>
+          </div>
+          <fieldset className="mt-2 border-0 p-0">
+            <legend className="sr-only">Roster characters</legend>
+            <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-8">
+              {CHARACTERS.map((character) => (
+                <Button
+                  aria-label={character}
+                  aria-pressed={profile?.character === character}
+                  className="aspect-square h-auto min-w-0 rounded-md p-1 aria-pressed:bg-muted aria-pressed:ring-2 aria-pressed:ring-ring"
+                  key={character}
+                  onBlur={showSelectedCharacter}
+                  onClick={selectCharacter}
+                  onFocus={showCharacter}
+                  onPointerEnter={showCharacter}
+                  onPointerLeave={showSelectedCharacter}
+                  title={character}
+                  type="button"
+                  value={character}
+                  variant="ghost"
+                >
+                  <Image
+                    alt=""
+                    className="shrink-0 rounded-full object-cover"
+                    height={36}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    src={characterPortrait(character)}
+                    style={{ height: 36, width: 36 }}
+                    unoptimized
+                    width={36}
+                  />
+                </Button>
+              ))}
+            </div>
+          </fieldset>
+        </div>
         {storageIssue ? (
           <p className="text-muted-foreground text-xs" role="status">
             Browser storage is unavailable. This choice lasts for this tab only.

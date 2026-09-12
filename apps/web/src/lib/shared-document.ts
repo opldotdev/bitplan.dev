@@ -12,8 +12,8 @@ export async function sharedDocument(
   base: DocumentTarget,
   html: string
 ): Promise<SharedDocument> {
-  base = parseDocumentTarget(base);
-  if (!isHostedId(base.origin)) {
+  const parsedBase = parseDocumentTarget(base);
+  if (!isHostedId(parsedBase.origin)) {
     throw new Error("Live document editing currently requires a hosted plan.");
   }
   const bytes = new TextEncoder().encode(html);
@@ -24,7 +24,7 @@ export async function sharedDocument(
   const sha256 = Array.from(digest, (byte) =>
     byte.toString(16).padStart(2, "0")
   ).join("");
-  return { base, html, schema: "bitplan-document/1", sha256 };
+  return { base: parsedBase, html, schema: "bitplan-document/1", sha256 };
 }
 
 export async function parseSharedDocument(

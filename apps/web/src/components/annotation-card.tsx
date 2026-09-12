@@ -6,6 +6,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { Annotation } from "@/lib/annotations";
 
+function keyDelta(key: string, positive: string, negative: string): number {
+  if (key === positive) {
+    return 16;
+  }
+  if (key === negative) {
+    return -16;
+  }
+  return 0;
+}
+
 export function AnnotationCard({
   item,
   label,
@@ -52,7 +62,7 @@ export function AnnotationCard({
     <article
       aria-busy={saving}
       aria-label={label}
-      className="pointer-events-auto absolute flex max-w-[90%] flex-col rounded-md border bg-background p-2 pb-6 text-sm shadow-sm"
+      className={`pointer-events-auto absolute flex max-w-[90%] flex-col rounded-md border p-2 pb-6 text-sm ${item.content.type === "image" ? "border-transparent bg-transparent focus-within:border-border hover:border-border" : "bg-background shadow-sm"}`}
       data-annotation-anchor={item.id}
       ref={card}
       style={{ ...style, height: size?.height, width: size?.width ?? 224 }}
@@ -81,18 +91,8 @@ export function AnnotationCard({
             event.preventDefault();
             const rect = card.current.getBoundingClientRect();
             const next = clamp(
-              rect.width +
-                (event.key === "ArrowRight"
-                  ? 16
-                  : event.key === "ArrowLeft"
-                    ? -16
-                    : 0),
-              rect.height +
-                (event.key === "ArrowDown"
-                  ? 16
-                  : event.key === "ArrowUp"
-                    ? -16
-                    : 0)
+              rect.width + keyDelta(event.key, "ArrowRight", "ArrowLeft"),
+              rect.height + keyDelta(event.key, "ArrowDown", "ArrowUp")
             );
             setDraft(next);
             void persist(next);
@@ -117,6 +117,7 @@ export function AnnotationCard({
           }}
           onPointerMove={(event) => {
             const start = drag.current;
+            // biome-ignore lint/suspicious/noUnnecessaryConditions: the pointer ref changes across independent DOM events
             if (start) {
               setDraft(
                 clamp(
@@ -128,6 +129,7 @@ export function AnnotationCard({
           }}
           onPointerUp={(event) => {
             const start = drag.current;
+            // biome-ignore lint/suspicious/noUnnecessaryConditions: pointerup may arrive without a matching active drag
             if (!start) {
               return;
             }

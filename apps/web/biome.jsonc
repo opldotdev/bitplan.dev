@@ -3,6 +3,23 @@
   "root": true,
   "extends": ["ultracite/biome/core", "ultracite/biome/next"],
   "files": {
-    "includes": ["!src/components/ui", "!src/hooks/use-mobile.ts"]
+    "includes": [
+      // Standalone publishable documents have their own upload-policy and behavior tests.
+      "!!public/templates",
+      "!src/components/ui",
+      "!src/hooks/use-mobile.ts"
+    ]
+  },
+  "linter": {
+    "rules": {
+      "complexity": {
+        // Event handlers intentionally mark fire-and-forget UI work with `void`.
+        "noVoid": "off"
+      },
+      "performance": {
+        // Inline handlers are clearer here; no memoized child depends on their identity.
+        "noJsxPropsBind": "off"
+      }
+    }
   }
 }
