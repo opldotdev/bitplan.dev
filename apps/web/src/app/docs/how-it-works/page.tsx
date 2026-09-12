@@ -186,15 +186,16 @@ export default function HowItWorksPage() {
           bitplan.dev stores that ciphertext instead of writing it to the chain.
           You still need a wallet for the keys, but you do not need BSV.{" "}
           <code>bitplan inscribe</code> puts the draft on chain, and the hosted
-          link redirects to that origin forever. bitplan.dev sees only
-          ciphertext and the public envelope header.
+          link redirects to that origin forever. Stored draft objects contain
+          only ciphertext and the public envelope header.
         </p>
         <p>
           A hosted ID is a random 120-bit locator. It does not decrypt anything.
           A separate random 256-bit update secret stays in the CLI&apos;s local
-          state. The server stores only a hash of that secret and requires it
-          for every new version. Losing the local secret means that machine can
-          no longer update the hosted draft.
+          state. Update requests carry that bearer over HTTPS; the server stores
+          only its hash and requires the bearer for every new version. Losing
+          the local secret means that machine can no longer update the hosted
+          draft.
         </p>
       </section>
       <section id="reader-links">

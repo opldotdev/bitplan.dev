@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { CommandCopy } from "@/components/command-copy";
 import { HomeCta } from "@/components/home-cta";
+import { SkillInstall } from "@/components/skill-install";
 
 export const metadata: Metadata = {
   description:
@@ -57,64 +58,49 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="mx-auto w-full max-w-[42rem] space-y-10 px-6 py-16">
-        <section className="space-y-3">
-          <h2 className="font-medium text-lg tracking-tight">
-            Create with the BitPlan CLI
-          </h2>
-          <h3 className="font-medium text-sm">npm package bitplan</h3>
-          <p className="text-muted-foreground">
-            The CLI is published on the npm registry as bitplan. Run npx bitplan
-            auth, then create a hosted draft with bunx bitplan upload
-            ./plan.html --hosted --link. Your BRC-100 wallet protects the
-            identity keys. Hosted drafts cost no BSV. When the plan is ready,
-            the wallet can publish it as a 1Sat Ordinal.
-          </p>
-          <h3 className="font-medium text-sm">Auth</h3>
-          <CommandCopy command="npx bitplan auth" />
-          <p className="text-muted-foreground text-sm">
-            Needs a BRC-100 wallet on this machine, unlocked.
-          </p>
-        </section>
+      <section className="flex min-h-[100dvh] items-center justify-center px-6 py-16">
+        <div className="mx-auto w-full max-w-2xl space-y-8 text-center">
+          <div className="space-y-3">
+            <h2 className="font-heading font-semibold text-3xl tracking-tight md:text-4xl">
+              Teach your agent
+            </h2>
+            <p className="text-balance text-foreground/70 md:text-lg">
+              Install the skill once. Your agent writes, hosts, shares, and
+              publishes plans through your wallet.
+            </p>
+          </div>
 
-        <section className="space-y-3">
-          <h2 className="font-medium text-lg tracking-tight">
-            Open a BitPlan draft
-          </h2>
-          <h3 className="font-medium text-sm">Docs</h3>
-          <p className="text-muted-foreground">
-            BitPlan docs start at /docs. They explain the CLI, wallet flow,
-            encrypted envelope, and agent integration.
-          </p>
-          <h3 className="font-medium text-sm">Viewer</h3>
-          <p className="text-muted-foreground">
-            This site opens encrypted plans with an authorized wallet or reader
-            link. Hosted storage contains ciphertext, never plaintext or wallet
-            keys.
-          </p>
-        </section>
+          <SkillInstall />
 
-        <p className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-          <a
-            className="text-primary underline-offset-4 hover:underline"
-            href="https://www.npmjs.com/package/bitplan"
-          >
-            CLI on npm
-          </a>
-          <Link
-            className="text-primary underline-offset-4 hover:underline"
-            href="/docs/envelope"
-          >
-            Envelope spec
-          </Link>
-          <Link
-            className="text-primary underline-offset-4 hover:underline"
-            href="/docs/how-it-works"
-          >
-            How it works
-          </Link>
-        </p>
-      </div>
+          <div className="space-y-3 text-left">
+            <p className="text-center text-muted-foreground text-sm">
+              Then, with a BRC-100 wallet unlocked:
+            </p>
+            <CommandCopy command="npx bitplan auth" />
+          </div>
+
+          <p className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
+            <Link
+              className="text-primary underline-offset-4 hover:underline"
+              href="/docs"
+            >
+              Docs
+            </Link>
+            <Link
+              className="text-primary underline-offset-4 hover:underline"
+              href="/docs/how-it-works"
+            >
+              How it works
+            </Link>
+            <a
+              className="text-primary underline-offset-4 hover:underline"
+              href="https://www.npmjs.com/package/bitplan"
+            >
+              CLI on npm
+            </a>
+          </p>
+        </div>
+      </section>
     </main>
   );
 }

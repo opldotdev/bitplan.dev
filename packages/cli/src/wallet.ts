@@ -12,6 +12,7 @@
 import { HTTPWalletJSON, WalletClient, type WalletInterface } from '@bsv/sdk'
 import { DEFAULT_WALLET_URL, ORIGINATOR } from './constants.js'
 import { CliError } from './errors.js'
+import { assertSecureHttpUrl } from './http.js'
 import { readConfig } from './state.js'
 
 export interface WalletConnection {
@@ -36,6 +37,15 @@ export function resolveWalletUrl(override?: string): string {
  * wallet the user configured, or fail loudly.
  */
 export function createWallet(url: string): WalletInterface {
+	let endpoint: URL
+	try {
+		endpoint = new URL(url)
+	} catch {
+		throw new CliError(
+			`Invalid wallet URL: ${JSON.stringify(url)}. Expected an https URL or a loopback http URL.`,
+		)
+	}
+	assertSecureHttpUrl(endpoint, 'wallet')
 	return new WalletClient(
 		new HTTPWalletJSON(ORIGINATOR, url),
 		ORIGINATOR,

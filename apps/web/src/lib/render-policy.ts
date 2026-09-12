@@ -3,7 +3,8 @@
  *
  * Scripts on, network off. The frame has an opaque origin, so a plan cannot
  * reach bitplan.dev storage or the wallet. This policy closes what the sandbox
- * leaves open: no fetch, no forms, no nested frames, no navigation targets.
+ * leaves open: no fetch, no forms, no nested frames. User-activated external
+ * links open in separate tabs; section links scroll within the document.
  * Images and fonts may load from anywhere because most plan assets are
  * immutable on-chain files served by ORDFS gateways.
  */
@@ -21,14 +22,10 @@ export const RENDER_POLICY = [
 ].join("; ");
 
 const POLICY_TAG = `<meta http-equiv="Content-Security-Policy" content="${RENDER_POLICY}">`;
-const HEAD_OPEN = /<head(\s[^>]*)?>/i;
+const HTML5_DOCTYPE = /^<!doctype html\s*>/i;
 
-/** Insert the render policy as the first element of the document head. */
-export function withRenderPolicy(html: string): string {
-  const match = HEAD_OPEN.exec(html);
-  if (match) {
-    const at = match.index + match[0].length;
-    return `${html.slice(0, at)}${POLICY_TAG}${html.slice(at)}`;
-  }
-  return `${POLICY_TAG}${html}`;
+/** Put trusted controls before every byte of untrusted plan markup. */
+export function withRenderPolicy(html: string, trustedHead = ""): string {
+  const content = html.replace(HTML5_DOCTYPE, "");
+  return `<!doctype html>${POLICY_TAG}${trustedHead}${content}`;
 }

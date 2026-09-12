@@ -24,6 +24,8 @@ const OWNER_IDENTITY_KEY =
 	'0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
 const PREVIOUS_OWNER_IDENTITY_KEY =
 	'02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9'
+const ADOPTED_LINK_NOTE =
+	'Note: the adopted chain version had no reusable local link secret. A fresh reader link was added; all inherited readers remain authorized, including any earlier reader links. Use --private to remove all readers from a future version.'
 
 if (!CHILD_RUN) {
 	test('upload orchestration passes in an isolated module-mock process', () => {
@@ -97,6 +99,7 @@ if (!CHILD_RUN) {
 	let genesisError: Error | undefined
 	let identityKeyCalls = 0
 	let envelopeSenderIdentityKey = OWNER_IDENTITY_KEY
+	let adoptedReaders: string[]
 	let relayError: Error | undefined
 	let stateSaveError: Error | undefined
 	let policyFetchCalls: number
@@ -168,7 +171,7 @@ if (!CHILD_RUN) {
 				key: {
 					keyID: 'adopted-key',
 					senderIdentityKey: envelopeSenderIdentityKey,
-					sharedWith: ['adopted-reader'],
+					sharedWith: adoptedReaders,
 				},
 			},
 			plaintext: { meta: { description: 'Description from chain' } },
@@ -279,6 +282,7 @@ if (!CHILD_RUN) {
 		genesisError = undefined
 		identityKeyCalls = 0
 		envelopeSenderIdentityKey = OWNER_IDENTITY_KEY
+		adoptedReaders = ['adopted-reader']
 		relayError = undefined
 		stateSaveError = undefined
 		policyFetchCalls = 0
@@ -578,6 +582,80 @@ if (!CHILD_RUN) {
 			expect(calls.saves[0]?.record.shareWithRefs).toBeUndefined()
 		})
 
+		test('does not restore a stale local link removed from the chain tip', async () => {
+			const linkKey = '11'.repeat(32)
+			knownByFile = {
+				...existingRecord(),
+				latestOutpoint: `${'e'.repeat(64)}_0`,
+				linkKey,
+				sharedWith: [linkIdentityKey(linkKey)],
+			}
+			ordfsContent = {
+				bytes: Uint8Array.of(1, 2, 3),
+				contentType: 'application/x-bitplan',
+				origin: ORIGIN,
+				outpoint: VERSION_OUTPOINT,
+				sequence: 3,
+			}
+
+			await uploadCommand(htmlFile, { yes: true })
+
+			expect(calls.seals[0]?.sharedWith).toEqual(['adopted-reader'])
+			expect(calls.saves[0]?.record.linkKey).toBeUndefined()
+		})
+
+		test('keeps a known link secret when the adopted tip still authorizes it', async () => {
+			const linkKey = '11'.repeat(32)
+			const linkIdentity = linkIdentityKey(linkKey)
+			adoptedReaders = ['adopted-reader', linkIdentity]
+			knownByFile = {
+				...existingRecord(),
+				latestOutpoint: `${'e'.repeat(64)}_0`,
+				linkKey,
+				sharedWith: [linkIdentity],
+			}
+			ordfsContent = {
+				bytes: Uint8Array.of(1, 2, 3),
+				contentType: 'application/x-bitplan',
+				origin: ORIGIN,
+				outpoint: VERSION_OUTPOINT,
+				sequence: 3,
+			}
+
+			await uploadCommand(htmlFile, { yes: true })
+
+			expect(calls.seals[0]?.sharedWith).toEqual(adoptedReaders)
+			expect(calls.saves[0]?.record.linkKey).toBe(linkKey)
+		})
+
+		test('explicit --link mints a fresh key instead of reviving a stale one', async () => {
+			const staleLinkKey = '11'.repeat(32)
+			knownByFile = {
+				...existingRecord(),
+				latestOutpoint: `${'e'.repeat(64)}_0`,
+				linkKey: staleLinkKey,
+				sharedWith: [linkIdentityKey(staleLinkKey)],
+			}
+			ordfsContent = {
+				bytes: Uint8Array.of(1, 2, 3),
+				contentType: 'application/x-bitplan',
+				origin: ORIGIN,
+				outpoint: VERSION_OUTPOINT,
+				sequence: 3,
+			}
+
+			await uploadCommand(htmlFile, { link: true, yes: true })
+
+			const saved = calls.saves[0]?.record.linkKey
+			expect(saved).toMatch(/^[0-9a-f]{64}$/)
+			expect(saved).not.toBe(staleLinkKey)
+			expect(calls.seals[0]?.sharedWith).toEqual([
+				'adopted-reader',
+				linkIdentityKey(saved ?? ''),
+			])
+			expect(console.log).toHaveBeenCalledWith(ADOPTED_LINK_NOTE)
+		})
+
 		test('refuses a stale ORDFS tip before inheriting its readers', async () => {
 			knownByFile = {
 				...existingRecord(),
@@ -767,7 +845,7 @@ if (!CHILD_RUN) {
 				'          Anyone with this link can read this version and later versions that keep it.',
 			)
 			expect(console.log).toHaveBeenCalledWith(
-				'          Publish with --private to stop.',
+				'          Publish a future version with --private to stop carrying readers forward; existing versions stay readable.',
 			)
 		})
 
@@ -810,7 +888,7 @@ if (!CHILD_RUN) {
 			)
 		})
 
-		test('--link on an adopted draft with no local record mints a fresh link', async () => {
+		test('--link on an adopted draft adds a fresh link without claiming inherited readers were revoked', async () => {
 			ordfsContent = {
 				bytes: Uint8Array.of(1, 2, 3),
 				contentType: 'application/x-bitplan',
@@ -821,13 +899,35 @@ if (!CHILD_RUN) {
 
 			await uploadCommand(htmlFile, { draft: ORIGIN, link: true, yes: true })
 
-			expect(calls.saves[0]?.record.linkKey).toMatch(/^[0-9a-f]{64}$/)
-			expect(console.log).toHaveBeenCalledWith(
-				'Note: this draft had no local link secret; earlier links stop working on this version.',
-			)
+			const linkKey = calls.saves[0]?.record.linkKey
+			expect(linkKey).toMatch(/^[0-9a-f]{64}$/)
+			expect(calls.seals[0]?.sharedWith).toEqual([
+				'adopted-reader',
+				linkIdentityKey(linkKey ?? ''),
+			])
+			expect(console.log).toHaveBeenCalledWith(ADOPTED_LINK_NOTE)
 			expect(console.log).toHaveBeenCalledWith(
 				expect.stringMatching(/^Link: {5}https:\/\/bitplan\.dev\/d\/.*#k=/),
 			)
+		})
+
+		test('--json warns that an adopted link is additive', async () => {
+			ordfsContent = {
+				bytes: Uint8Array.of(1, 2, 3),
+				contentType: 'application/x-bitplan',
+				origin: ORIGIN,
+				outpoint: VERSION_OUTPOINT,
+				sequence: 3,
+			}
+
+			await uploadCommand(htmlFile, {
+				draft: ORIGIN,
+				json: true,
+				link: true,
+				yes: true,
+			})
+
+			expect(console.warn).toHaveBeenCalledWith(ADOPTED_LINK_NOTE)
 		})
 
 		test('--hosted on a chain draft is refused', async () => {

@@ -517,6 +517,26 @@ describe('catalog sync', () => {
 		expect(calls[0]?.method).toBe('GET')
 	})
 
+	test('rejects an oversized remote catalog before decryption or overwrite', async () => {
+		const { wallet, calls: walletCalls } = createFakeWallet()
+		const { calls } = mockFetch([
+			new Response('oversized', {
+				status: 200,
+				headers: {
+					'content-length': String(600 * 1024 + 1),
+					'content-type': CATALOG_CONTENT_TYPE,
+					'X-BitPlan-Catalog-Version': '1',
+				},
+			}),
+		])
+
+		await expect(
+			syncCatalog(wallet, { siteUrl: SITE, localEntries: [] }),
+		).rejects.toThrow(/Catalog response exceeds the 614400-byte limit/)
+		expect(calls).toHaveLength(1)
+		expect(walletCalls.decrypt).toHaveLength(0)
+	})
+
 	test('an undecryptable remote catalog aborts without an empty overwrite', async () => {
 		const { wallet } = createFakeWallet()
 		const { calls } = mockFetch([

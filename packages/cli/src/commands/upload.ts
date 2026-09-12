@@ -80,6 +80,9 @@ export interface UploadOptions {
 	json?: boolean
 }
 
+const ADOPTED_LINK_NOTE =
+	'Note: the adopted chain version had no reusable local link secret. A fresh reader link was added; all inherited readers remain authorized, including any earlier reader links. Use --private to remove all readers from a future version.'
+
 export async function uploadCommand(
 	file: string,
 	options: UploadOptions,
@@ -179,6 +182,7 @@ export async function uploadCommand(
 	let nextVersion: number | null
 	let previousRecipients: string[] = []
 	let fixedReaders = defaultRawReaders
+	let adoptedFromChain = false
 	if (hosted && targetOrigin) {
 		const local = targetLocal
 		if (!local?.hostedSecret) {
@@ -218,6 +222,7 @@ export async function uploadCommand(
 					]
 			resolvedNamedReaders = resolveNamedReaders(namedRefs, config)
 		} else {
+			adoptedFromChain = true
 			// Adopting a draft with no local history. The keyID it was sealed
 			// with lives in the header of the published envelope — that is why
 			// the header carries it in cleartext — and the version number comes
@@ -258,15 +263,24 @@ export async function uploadCommand(
 	if (options.link && options.private) {
 		throw new CliError('--link and --private cannot be used together.')
 	}
-	let linkKey = options.private ? undefined : targetLocal?.linkKey
+	const storedLinkKey = targetLocal?.linkKey
+	const storedLinkIdentity = storedLinkKey
+		? linkIdentityKey(storedLinkKey)
+		: undefined
+	let linkKey =
+		!options.private &&
+		storedLinkKey &&
+		storedLinkIdentity &&
+		sharedWith.includes(storedLinkIdentity)
+			? storedLinkKey
+			: undefined
 	if (options.link && !linkKey) linkKey = newLinkSecret()
 	const linkIdentity = linkKey ? linkIdentityKey(linkKey) : undefined
 	if (linkIdentity) sharedWith = [...new Set([...sharedWith, linkIdentity])]
-	const storedLinkIdentity = targetLocal?.linkKey
-		? linkIdentityKey(targetLocal.linkKey)
-		: undefined
 	const labeledLinkIdentity = linkIdentity ?? storedLinkIdentity
-	const adoptedWithoutLocalRecord = Boolean(targetOrigin && !targetLocal)
+	const adoptedWithFreshLink = Boolean(
+		options.link && adoptedFromChain && linkKey !== storedLinkKey,
+	)
 	if (sharedWith.length > MAX_SHARED_RECIPIENTS) {
 		throw new CliError(
 			`A shared draft supports at most ${MAX_SHARED_RECIPIENTS} recipient identities; got ${sharedWith.length}.`,
@@ -485,10 +499,8 @@ export async function uploadCommand(
 		: viewerUrl(published.origin)
 	const link = linkIdentity && linkKey ? linkUrl(viewer, linkKey) : null
 	if (options.json) {
-		if (options.link && adoptedWithoutLocalRecord) {
-			console.warn(
-				'Note: this draft had no local link secret; earlier links stop working on this version.',
-			)
+		if (adoptedWithFreshLink) {
+			console.warn(ADOPTED_LINK_NOTE)
 		}
 		console.log(
 			JSON.stringify(
@@ -518,17 +530,17 @@ export async function uploadCommand(
 		if (hosted) {
 			console.log(`Inscribe: bitplan inscribe ${published.origin}`)
 		}
-		if (options.link && adoptedWithoutLocalRecord) {
-			console.log(
-				'Note: this draft had no local link secret; earlier links stop working on this version.',
-			)
+		if (adoptedWithFreshLink) {
+			console.log(ADOPTED_LINK_NOTE)
 		}
 		if (link) {
 			console.log(`Link:     ${link}`)
 			console.log(
 				'          Anyone with this link can read this version and later versions that keep it.',
 			)
-			console.log('          Publish with --private to stop.')
+			console.log(
+				'          Publish a future version with --private to stop carrying readers forward; existing versions stay readable.',
+			)
 		}
 	}
 }

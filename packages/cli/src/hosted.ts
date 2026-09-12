@@ -8,6 +8,7 @@
 import { Buffer } from 'node:buffer'
 import { CONTENT_TYPE, HOSTED_API_URL, VIEWER_BASE_URL } from './constants.js'
 import { CliError } from './errors.js'
+import { assertSecureHttpUrl } from './http.js'
 
 export const HOSTED_ID = /^h_[A-Za-z0-9_-]{20}$/
 
@@ -64,17 +65,7 @@ function siteOrigin(siteUrl: string): string {
  * development origins: localhost, 127.0.0.1, or ::1.
  */
 export function assertHttpsSiteUrl(url: URL): void {
-	if (url.protocol === 'https:') return
-	if (url.protocol !== 'http:') {
-		throw new CliError(
-			`Invalid site URL ${JSON.stringify(url.toString())}: expected https.`,
-		)
-	}
-	const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
-	if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return
-	throw new CliError(
-		`Refusing cleartext http site URL for ${JSON.stringify(url.host)}: use https, or http only for localhost development.`,
-	)
+	assertSecureHttpUrl(url, 'site')
 }
 
 export async function createHostedDraft(

@@ -16,12 +16,17 @@
  * This is a read path only. Nothing here can produce a key or a signature.
  */
 
+import { MAX_INSCRIPTION_BYTES } from '@1sat/actions'
 import { DEFAULT_ORDFS_URL } from './constants.js'
 import { CliError } from './errors.js'
 import { hostedContentUrl, isHostedId, resolveSiteUrl } from './hosted.js'
+import { readBoundedResponseBody } from './http.js'
 import { toOrdinalOutpoint } from './outpoint.js'
 import { readConfig } from './state.js'
 import { errorMessage } from './wallet.js'
+
+const CONTENT_TIMEOUT_MS = 45_000
+const REDIRECT_BODY_BYTES = 16 * 1024
 
 export interface OrdfsContent {
 	bytes: Uint8Array
@@ -47,11 +52,21 @@ export function resolveOrdfsUrl(override?: string): string {
  */
 export async function fetchLatest(
 	origin: string,
-	options: { baseUrl?: string; seq?: number; siteUrl?: string } = {},
+	options: {
+		baseUrl?: string
+		seq?: number
+		siteUrl?: string
+		timeoutMs?: number
+	} = {},
 ): Promise<OrdfsContent> {
 	const seq = options.seq ?? -1
 	if (isHostedId(origin)) {
-		return fetchHostedContent(origin, seq, options.siteUrl)
+		return fetchHostedContent(
+			origin,
+			seq,
+			options.siteUrl,
+			options.timeoutMs ?? CONTENT_TIMEOUT_MS,
+		)
 	}
 
 	const base = resolveOrdfsUrl(options.baseUrl)
@@ -60,7 +75,9 @@ export async function fetchLatest(
 
 	let response: Response
 	try {
-		response = await fetch(url)
+		response = await fetch(url, {
+			signal: AbortSignal.timeout(options.timeoutMs ?? CONTENT_TIMEOUT_MS),
+		})
 	} catch (error) {
 		throw new CliError(
 			`Could not reach ORDFS at ${base}: ${errorMessage(error)}`,
@@ -78,14 +95,18 @@ export async function fetchLatest(
 		)
 	}
 
-	const buffer = await response.arrayBuffer()
+	const bytes = await readBoundedResponseBody(
+		response,
+		MAX_INSCRIPTION_BYTES,
+		'ORDFS content',
+	)
 	const sequenceHeader = response.headers.get('x-ord-seq')
 	const parsedSequence = sequenceHeader
 		? Number.parseInt(sequenceHeader, 10)
 		: Number.NaN
 
 	return {
-		bytes: new Uint8Array(buffer),
+		bytes,
 		contentType:
 			response.headers.get('content-type') ?? 'application/octet-stream',
 		outpoint: response.headers.get('x-outpoint'),
@@ -135,13 +156,14 @@ async function fetchHostedContent(
 	id: string,
 	seq: number,
 	siteUrl: string | undefined,
+	timeoutMs: number,
 ): Promise<OrdfsContent> {
 	const site = resolveSiteUrl(siteUrl ?? readConfig().siteUrl)
 	const url = hostedContentUrl(site, id, seq)
 
 	let response: Response
 	try {
-		response = await fetch(url)
+		response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
 	} catch (error) {
 		throw new CliError(
 			`Could not reach hosted content at ${site}: ${errorMessage(error)}`,
@@ -151,7 +173,14 @@ async function fetchHostedContent(
 	if (response.status === 410) {
 		let chainOrigin = 'the chain origin'
 		try {
-			const body = (await response.json()) as { origin?: unknown }
+			const bytes = await readBoundedResponseBody(
+				response,
+				REDIRECT_BODY_BYTES,
+				'Hosted redirect response',
+			)
+			const body = JSON.parse(new TextDecoder().decode(bytes)) as {
+				origin?: unknown
+			}
 			if (typeof body.origin === 'string' && body.origin.length > 0) {
 				chainOrigin = body.origin
 			}
@@ -171,14 +200,18 @@ async function fetchHostedContent(
 		)
 	}
 
-	const buffer = await response.arrayBuffer()
+	const bytes = await readBoundedResponseBody(
+		response,
+		MAX_INSCRIPTION_BYTES,
+		'Hosted content',
+	)
 	const sequenceHeader = response.headers.get('x-ord-seq')
 	const parsedSequence = sequenceHeader
 		? Number.parseInt(sequenceHeader, 10)
 		: Number.NaN
 
 	return {
-		bytes: new Uint8Array(buffer),
+		bytes,
 		contentType:
 			response.headers.get('content-type') ?? 'application/octet-stream',
 		outpoint: response.headers.get('x-outpoint') ?? id,

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-
+import { CharacterChooser } from "@/components/character-chooser";
+import { CollaborationCanvas } from "@/components/collaboration-canvas";
 import { HostedShareDialog } from "@/components/hosted-share-dialog";
 import { ShareDraftDialog } from "@/components/share-draft-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -37,14 +38,18 @@ import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
 import { EnvelopeAccessError, openEnvelope } from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
 import { isHostedId } from "@/lib/hosted-id";
-import { linkWallet, parseLinkFragment } from "@/lib/link-reader";
+import {
+  linkWallet,
+  parseLinkFragment,
+  readerOnlyUrl,
+} from "@/lib/link-reader";
 import {
   fetchOrdfsContent,
   type OrdfsContent,
   type OrdfsContentResult,
 } from "@/lib/ordfs";
 import { normalizeOrigin } from "@/lib/outpoint";
-import { withRenderPolicy } from "@/lib/render-policy";
+import { useCollaboration } from "@/lib/use-collaboration";
 import {
   clampVersion,
   parseVersionQuery,
@@ -540,7 +545,9 @@ export function DraftViewer() {
         return;
       }
       const query = version === view.draft.latestVersion ? "" : `?v=${version}`;
-      router.replace(`/d/${view.draft.origin}${query}`, { scroll: false });
+      router.replace(`/d/${view.draft.origin}${query}${window.location.hash}`, {
+        scroll: false,
+      });
     },
     [router, view]
   );
@@ -562,6 +569,7 @@ export function DraftViewer() {
         onVersion={handleVersion}
         openedWithLink={view.openedWithLink}
         origin={view.draft.origin}
+        outpoint={view.draft.content.outpoint}
         plaintext={view.plaintext}
       />
     );
@@ -789,6 +797,7 @@ function DecryptedView({
   latestVersion,
   onVersion,
   origin,
+  outpoint,
 }: {
   canPublish: boolean;
   openedWithLink?: boolean;
@@ -797,8 +806,16 @@ function DecryptedView({
   latestVersion: number;
   onVersion: (version: number) => void;
   origin: string;
+  outpoint: string | null;
 }) {
   const { title } = plaintext.meta;
+  const target = {
+    origin,
+    sha256: plaintext.meta.fileSha256,
+    version: currentVersion,
+    ...(!isHostedId(origin) && outpoint ? { outpoint } : {}),
+  };
+  const collaboration = useCollaboration(target);
 
   useEffect(() => {
     const genericTitle = document.title;
@@ -809,8 +826,8 @@ function DecryptedView({
   }, [title]);
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="flex shrink-0 items-center gap-3 border-border border-b px-4 py-2">
+    <div className="flex h-dvh min-h-0 flex-col">
+      <header className="flex shrink-0 items-center gap-2 border-border border-b px-2 py-2 sm:gap-3 sm:px-4">
         <Wordmark />
         {isHostedId(origin) ? <HostedLabel /> : null}
         <VersionSelect
@@ -821,6 +838,14 @@ function DecryptedView({
         {title ? (
           <p className="min-w-0 flex-1 truncate text-muted-foreground text-sm">
             {title}
+            {collaboration.contributorCount > 1 ? (
+              <span
+                className="ml-2 text-xs"
+                title="Multiple people have contributed to this plan"
+              >
+                · Collaborative
+              </span>
+            ) : null}
           </p>
         ) : (
           <div className="flex-1" />
@@ -832,14 +857,61 @@ function DecryptedView({
             origin={origin}
           />
           <MetaInfo meta={plaintext.meta} />
+          <CharacterChooser onChange={collaboration.updateProfile}>
+            <div className="border-t pt-2">
+              {collaboration.connection ? (
+                <>
+                  <p className="text-muted-foreground text-xs" role="status">
+                    {collaboration.online
+                      ? "Connected · encrypted collaboration"
+                      : "Reconnecting…"}
+                  </p>
+                  <Button
+                    className="mt-2 w-full"
+                    onClick={() => {
+                      void navigator.clipboard
+                        .writeText(window.location.href)
+                        .then(
+                          () =>
+                            toast.success("Collaboration invitation copied"),
+                          () => toast.error("Could not copy invitation")
+                        );
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Copy collaboration invitation
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  className="w-full"
+                  disabled={
+                    !collaboration.configured || collaboration.connecting
+                  }
+                  onClick={() => void collaboration.start()}
+                  size="sm"
+                  variant="outline"
+                >
+                  {collaboration.connecting
+                    ? "Connecting…"
+                    : "Start collaboration"}
+                </Button>
+              )}
+              {collaboration.error ? (
+                <p className="mt-2 text-destructive text-xs" role="alert">
+                  {collaboration.error}
+                </p>
+              ) : null}
+            </div>
+          </CharacterChooser>
           <ThemeToggle />
         </div>
       </header>
-      <iframe
-        allow="clipboard-write"
-        className="min-h-0 w-full flex-1 border-0 bg-background"
-        sandbox="allow-scripts"
-        srcDoc={withRenderPolicy(plaintext.html)}
+      <CollaborationCanvas
+        html={plaintext.html}
+        room={collaboration}
+        target={target}
         title={title ?? "Draft"}
       />
     </div>
@@ -872,7 +944,7 @@ function ReaderLinkCopy() {
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(readerOnlyUrl(window.location.href));
       setCopied(true);
       window.setTimeout(() => {
         setCopied(false);
@@ -884,9 +956,15 @@ function ReaderLinkCopy() {
   }, []);
 
   return (
-    <Button onClick={handleCopy} size="sm" type="button" variant="ghost">
+    <Button
+      aria-label={copied ? "Copied" : "Copy link"}
+      onClick={handleCopy}
+      size="icon-sm"
+      title={copied ? "Copied" : "Copy link"}
+      type="button"
+      variant="ghost"
+    >
       {copied ? <Check /> : <Copy />}
-      {copied ? "Copied" : "Copy link"}
     </Button>
   );
 }

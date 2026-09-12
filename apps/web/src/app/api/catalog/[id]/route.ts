@@ -1,4 +1,5 @@
 import { jsonApiError } from "@/lib/api-error";
+import { readBoundedRequestBody } from "@/lib/bounded-request-body";
 import { CATALOG_CONTENT_TYPE, isCatalogId } from "@/lib/catalog-id";
 import {
   CatalogAuthError,
@@ -11,7 +12,6 @@ import {
   readCatalogVersion,
 } from "@/lib/catalog-store";
 
-const DIGITS = /^\d+$/;
 const BASE_VERSION = /^(?:0|[1-9]\d*)$/;
 
 interface RouteContext {
@@ -76,9 +76,9 @@ export async function PUT(
     return invalidBaseVersion();
   }
 
-  const ciphertext = await readCiphertext(request);
-  if (ciphertext instanceof Response) {
-    return ciphertext;
+  const ciphertext = await readBoundedRequestBody(request, MAX_CATALOG_BYTES);
+  if (!ciphertext) {
+    return tooLarge();
   }
 
   try {
@@ -125,62 +125,8 @@ function parseBaseVersion(value: string | null): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
-async function readCiphertext(
-  request: Request
-): Promise<Uint8Array | Response> {
-  const claimed = parseLength(request.headers.get("content-length"));
-  if (claimed !== null && claimed > MAX_CATALOG_BYTES) {
-    return tooLarge();
-  }
-  if (!request.body) {
-    const bytes = new Uint8Array(await request.arrayBuffer());
-    if (bytes.byteLength > MAX_CATALOG_BYTES) {
-      return tooLarge();
-    }
-    return bytes;
-  }
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      // biome-ignore lint/performance/noAwaitInLoops: sequential reads enforce size bound
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-      if (!value) {
-        continue;
-      }
-      total += value.byteLength;
-      if (total > MAX_CATALOG_BYTES) {
-        await reader.cancel().catch(() => undefined);
-        return tooLarge();
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return bytes;
-}
-
 function mediaType(value: string | null): string {
   return value?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-}
-
-function parseLength(value: string | null): number | null {
-  if (!(value && DIGITS.test(value))) {
-    return null;
-  }
-  const length = Number(value);
-  return Number.isSafeInteger(length) ? length : null;
 }
 
 function invalidId(): Response {

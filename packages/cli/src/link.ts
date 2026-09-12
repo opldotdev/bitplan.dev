@@ -46,13 +46,14 @@ export function parseLinkFragment(input: string): string | null {
 		}
 	}
 	if (candidate.startsWith('#')) candidate = candidate.slice(1)
-	if (!candidate.startsWith('k=')) return null
-
-	const encoded = candidate.slice(2)
-	if (!encoded) return null
+	const params = new URLSearchParams(candidate)
+	if (params.getAll('k').length !== 1) return null
+	const encoded = params.get('k')
+	if (!encoded || !/^[A-Za-z0-9_-]{43}$/.test(encoded)) return null
 	try {
 		const bytes = Buffer.from(encoded, 'base64url')
-		if (bytes.length !== 32) return null
+		if (bytes.length !== 32 || bytes.toString('base64url') !== encoded)
+			return null
 		return bytes.toString('hex')
 	} catch {
 		return null

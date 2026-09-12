@@ -107,7 +107,9 @@ export default function CommandsPage() {
       </p>
       <p>
         <code>--link</code>: Add a reader link anyone can open; kept on later
-        versions until --private.
+        versions until --private. When adopting without local state, a new link
+        is additive because earlier link slots cannot be distinguished from
+        other inherited readers.
       </p>
       <p>
         <code>--hosted</code> stores the sealed envelope on bitplan.dev instead

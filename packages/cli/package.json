@@ -43,6 +43,7 @@
 	},
 	"dependencies": {
 		"@1sat/actions": "0.0.200",
+		"@1sat/templates": "0.0.32",
 		"@bsv/sdk": "^2.4.2",
 		"commander": "^15.0.0",
 		"parse5": "^8.0.1"

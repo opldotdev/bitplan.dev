@@ -81,6 +81,7 @@ const HEADER: EnvelopeHeader = {
   v: 2,
 };
 const TXID = "a".repeat(64);
+const HOSTED = `h_${"A".repeat(20)}`;
 const BITPLAN_CONTENT_TYPE = "application/x-bitplan";
 
 function envelope(): Uint8Array {
@@ -155,6 +156,18 @@ describe("POST /api/hosted", () => {
     expect(response.status).toBe(401);
     expect(await response.json()).toMatchObject({ error: "missing-secret" });
   });
+
+  test("rejects an oversized chunked body before buffering it", async () => {
+    const { request, wasCancelled } = oversizedHostedRequest(
+      "https://bitplan.dev/api/hosted"
+    );
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(413);
+    expect(wasCancelled()).toBe(true);
+    expect(put).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /api/hosted/{id}", () => {
@@ -190,7 +203,110 @@ describe("POST /api/hosted/{id}", () => {
       error: "version-conflict",
     });
   });
+
+  test("rejects an oversized chunked version before buffering it", async () => {
+    const created = await POST(
+      new Request("https://bitplan.dev/api/hosted", {
+        body: envelope(),
+        headers: {
+          authorization: bearer(secret()),
+          "content-type": BITPLAN_CONTENT_TYPE,
+        },
+        method: "POST",
+      })
+    );
+    const { id } = (await created.json()) as { id: string };
+    const writesBefore = put.mock.calls.length;
+    const { request, wasCancelled } = oversizedHostedRequest(
+      `https://bitplan.dev/api/hosted/${id}`,
+      { "x-bitplan-base-version": "1" }
+    );
+
+    const response = await idRoute.POST(request, context(id));
+
+    expect(response.status).toBe(413);
+    expect(wasCancelled()).toBe(true);
+    expect(put.mock.calls).toHaveLength(writesBefore);
+  });
 });
+
+describe("PATCH /api/hosted/{id}", () => {
+  test("rejects oversized chunked JSON before storage access", async () => {
+    const { request, wasCancelled } = oversizedPatchRequest(
+      `https://bitplan.dev/api/hosted/${HOSTED}`
+    );
+
+    const response = await idRoute.PATCH(request, context(HOSTED));
+
+    expect(response.status).toBe(413);
+    expect(wasCancelled()).toBe(true);
+    expect(get).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+});
+
+function oversizedHostedRequest(
+  url: string,
+  headers: Record<string, string> = {}
+): { request: Request; wasCancelled: () => boolean } {
+  const chunk = new Uint8Array(64 * 1024);
+  let cancelled = false;
+  let pulls = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    cancel() {
+      cancelled = true;
+    },
+    pull(controller) {
+      pulls += 1;
+      if (pulls > 100) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(chunk);
+    },
+  });
+  return {
+    request: new Request(url, {
+      body: stream as BodyInit,
+      duplex: "half",
+      headers: {
+        authorization: bearer(secret()),
+        "content-type": BITPLAN_CONTENT_TYPE,
+        ...headers,
+      },
+      method: "POST",
+    } as RequestInit),
+    wasCancelled: () => cancelled,
+  };
+}
+
+function oversizedPatchRequest(url: string): {
+  request: Request;
+  wasCancelled: () => boolean;
+} {
+  const chunk = new TextEncoder().encode(`{"origin":"${"a".repeat(8192)}"}`);
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    cancel() {
+      cancelled = true;
+    },
+    start(controller) {
+      controller.enqueue(chunk);
+    },
+  });
+  return {
+    request: new Request(url, {
+      body: stream as BodyInit,
+      duplex: "half",
+      headers: {
+        authorization: bearer(secret()),
+        "content-type": "application/json",
+      },
+      method: "PATCH",
+    } as RequestInit),
+    wasCancelled: () => cancelled,
+  };
+}
 
 describe("hosted content proxy", () => {
   test("returns 410 with the chain origin after inscribe", async () => {

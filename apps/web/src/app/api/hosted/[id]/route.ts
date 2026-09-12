@@ -1,4 +1,5 @@
 import { jsonApiError } from "@/lib/api-error";
+import { readBoundedRequestBody } from "@/lib/bounded-request-body";
 import {
   appendHostedVersion,
   HostedAuthError,
@@ -14,7 +15,7 @@ import { BITPLAN_CONTENT_TYPE } from "@/lib/ordfs";
 import { toOrdinalOutpoint } from "@/lib/outpoint";
 
 const MAX_ENVELOPE_BYTES = 5 * 1024 * 1024 + 256 * 1024;
-const DIGITS = /^\d+$/;
+const MAX_PATCH_BODY_BYTES = 4 * 1024;
 const BASE_VERSION = /^(?:0|[1-9]\d*)$/;
 
 interface RouteContext {
@@ -131,18 +132,21 @@ export async function PATCH(
     );
   }
 
+  const parsed = await readPatchBody(request);
+  if (parsed instanceof Response) {
+    return parsed;
+  }
   let origin: string;
   try {
-    const body: unknown = await request.json();
     if (
-      !body ||
-      typeof body !== "object" ||
-      !("origin" in body) ||
-      typeof body.origin !== "string"
+      !parsed ||
+      typeof parsed !== "object" ||
+      !("origin" in parsed) ||
+      typeof parsed.origin !== "string"
     ) {
       return invalidOrigin();
     }
-    origin = toOrdinalOutpoint(body.origin);
+    origin = toOrdinalOutpoint(parsed.origin);
   } catch {
     return invalidOrigin();
   }
@@ -202,27 +206,25 @@ function writeError(error: unknown): Response {
 }
 
 async function readEnvelope(request: Request): Promise<Uint8Array | Response> {
-  const claimed = parseLength(request.headers.get("content-length"));
-  if (claimed !== null && claimed > MAX_ENVELOPE_BYTES) {
-    return tooLarge();
+  return (
+    (await readBoundedRequestBody(request, MAX_ENVELOPE_BYTES)) ?? tooLarge()
+  );
+}
+
+async function readPatchBody(request: Request): Promise<unknown | Response> {
+  const bytes = await readBoundedRequestBody(request, MAX_PATCH_BODY_BYTES);
+  if (!bytes) {
+    return patchTooLarge();
   }
-  const bytes = new Uint8Array(await request.arrayBuffer());
-  if (bytes.byteLength > MAX_ENVELOPE_BYTES) {
-    return tooLarge();
+  try {
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    return null;
   }
-  return bytes;
 }
 
 function mediaType(value: string | null): string {
   return value?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-}
-
-function parseLength(value: string | null): number | null {
-  if (!(value && DIGITS.test(value))) {
-    return null;
-  }
-  const length = Number(value);
-  return Number.isSafeInteger(length) ? length : null;
 }
 
 function notFound(): Response {
@@ -286,6 +288,15 @@ function tooLarge(): Response {
     "too-large",
     "Envelope is larger than the hosted limit.",
     "Keep the sealed envelope under 5 MB plus framing."
+  );
+}
+
+function patchTooLarge(): Response {
+  return jsonApiError(
+    413,
+    "too-large",
+    "Inscribe metadata is too large.",
+    'Send only { "origin": "<txid>_<vout>" }.'
   );
 }
 

@@ -23,6 +23,7 @@ import type { SecurityLevel, WalletInterface, WalletProtocol } from '@bsv/sdk'
 import { CATALOG_CONTENT_TYPE } from './constants.js'
 import { CliError } from './errors.js'
 import { assertHttpsSiteUrl, isHostedId } from './hosted.js'
+import { readBoundedResponseBody } from './http.js'
 import { isOutpoint } from './outpoint.js'
 import type { DraftRecord, DraftsFile } from './state.js'
 
@@ -57,6 +58,8 @@ export function isCatalogId(value: string): boolean {
 export const CATALOG_SCHEMA_VERSION = 1
 export const CATALOG_MAX_ENTRIES = 1000
 export const CATALOG_MAX_PLAINTEXT_BYTES = 512 * 1024
+const CATALOG_MAX_CIPHERTEXT_BYTES = 600 * 1024
+const CATALOG_TIMEOUT_MS = 45_000
 export const CATALOG_MAX_TITLE_CHARS = 512
 export const CATALOG_MAX_DESCRIPTION_CHARS = 1000
 export const CATALOG_MAX_REPO_HOST_CHARS = 253
@@ -560,7 +563,10 @@ async function getRemoteCatalog(
 	const url = catalogApiUrl(siteUrl, id)
 	let response: Response
 	try {
-		response = await fetchImpl(url, { method: 'GET' })
+		response = await fetchImpl(url, {
+			method: 'GET',
+			signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
+		})
 	} catch (error) {
 		throw new CliError(
 			`Could not reach the catalog API at ${url}: ${errorMessage(error)}`,
@@ -580,7 +586,11 @@ async function getRemoteCatalog(
 			'Catalog API returned an invalid catalog version. Local data is unchanged.',
 		)
 	}
-	const bytes = new Uint8Array(await response.arrayBuffer())
+	const bytes = await readBoundedResponseBody(
+		response,
+		CATALOG_MAX_CIPHERTEXT_BYTES,
+		'Catalog response',
+	)
 	let catalog: Catalog
 	try {
 		catalog = await decryptCatalog(wallet, bytes)

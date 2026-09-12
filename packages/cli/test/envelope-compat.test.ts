@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { PrivateKey, ProtoWallet } from '@bsv/sdk'
-
+import {
+	type CreateActionArgs,
+	PrivateKey,
+	ProtoWallet,
+	Script,
+	type WalletInterface,
+} from '@bsv/sdk'
 import { openEnvelope as openWebEnvelope } from '../../../apps/web/src/lib/envelope'
 import {
 	type DraftPlaintext,
@@ -8,6 +13,7 @@ import {
 	parseEnvelope,
 	sealEnvelope,
 } from '../src/envelope.js'
+import { publishBatch } from '../src/ordinals.js'
 
 const PLAINTEXT: DraftPlaintext = {
 	html: '<!doctype html><title>Cross-reader fixture</title>',
@@ -28,6 +34,47 @@ const PLAINTEXT: DraftPlaintext = {
 }
 
 describe('CLI and website envelope compatibility', () => {
+	test('both batch outputs still decrypt through the unchanged website reader', async () => {
+		const owner = new ProtoWallet(new PrivateKey(31))
+		const reader = new ProtoWallet(new PrivateKey(32))
+		const identity = (await reader.getPublicKey({ identityKey: true }))
+			.publicKey
+		const payloads = [
+			PLAINTEXT,
+			{ ...PLAINTEXT, html: '<title>Annotation fixture</title>' },
+		]
+		const envelopes = await Promise.all(
+			payloads.map((payload, index) =>
+				sealEnvelope(owner, payload, `batch-stream-${index}`, [identity]),
+			),
+		)
+		let args: CreateActionArgs | undefined
+		const wallet = {
+			getPublicKey: owner.getPublicKey.bind(owner),
+			createAction: async (value: CreateActionArgs) => {
+				args = value
+				return { txid: 'e'.repeat(64) }
+			},
+		} as unknown as WalletInterface
+		await publishBatch(
+			wallet,
+			envelopes.map((envelope) => ({ envelope })),
+		)
+		for (const [index, output] of args!.outputs!.entries()) {
+			const pushed = Script.fromHex(output.lockingScript).chunks.find(
+				(chunk) =>
+					chunk.data &&
+					Buffer.from(chunk.data).equals(Buffer.from(envelopes[index]!)),
+			)
+			expect(pushed).toBeDefined()
+			const opened = await openWebEnvelope(
+				reader,
+				Uint8Array.from(pushed!.data!),
+			)
+			expect(opened.plaintext).toEqual(payloads[index]!)
+		}
+	})
+
 	test('the website opens private and shared envelopes produced by the CLI', async () => {
 		const owner = new ProtoWallet(new PrivateKey(21))
 		const recipient = new ProtoWallet(new PrivateKey(22))

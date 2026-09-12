@@ -1,4 +1,5 @@
 import { jsonApiError } from "@/lib/api-error";
+import { readBoundedRequestBody } from "@/lib/bounded-request-body";
 import {
   createHosted,
   HostedUnavailableError,
@@ -8,7 +9,6 @@ import {
 import { BITPLAN_CONTENT_TYPE } from "@/lib/ordfs";
 
 const MAX_ENVELOPE_BYTES = 5 * 1024 * 1024 + 256 * 1024;
-const DIGITS = /^\d+$/;
 
 export async function POST(request: Request): Promise<Response> {
   const secret = hostedSecretFromAuthorization(
@@ -61,27 +61,13 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 async function readEnvelope(request: Request): Promise<Uint8Array | Response> {
-  const claimed = parseLength(request.headers.get("content-length"));
-  if (claimed !== null && claimed > MAX_ENVELOPE_BYTES) {
-    return tooLarge();
-  }
-  const bytes = new Uint8Array(await request.arrayBuffer());
-  if (bytes.byteLength > MAX_ENVELOPE_BYTES) {
-    return tooLarge();
-  }
-  return bytes;
+  return (
+    (await readBoundedRequestBody(request, MAX_ENVELOPE_BYTES)) ?? tooLarge()
+  );
 }
 
 function mediaType(value: string | null): string {
   return value?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-}
-
-function parseLength(value: string | null): number | null {
-  if (!(value && DIGITS.test(value))) {
-    return null;
-  }
-  const length = Number(value);
-  return Number.isSafeInteger(length) ? length : null;
 }
 
 function tooLarge(): Response {

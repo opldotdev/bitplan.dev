@@ -6,6 +6,7 @@ import {
   chainOriginsForDetails,
   classifyChainFailure,
   LoadedDrafts,
+  loadChainDetails,
   walletIdentityKey,
 } from "@/components/drafts-list";
 import type { CatalogEntry } from "@/lib/catalog-client";
@@ -178,8 +179,8 @@ describe("catalog detail origins", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.plan.source).toBe("chain");
     expect(rows[0]?.plan.origin).toBe(CATALOG_ORIGIN);
-    // Without details yet the row is retryable, never dropped.
-    expect(rows[0]?.detail).toEqual({ status: "retryable" });
+    // Pending rows retain a loading state, not a false failure.
+    expect(rows[0]?.detail).toEqual({ status: "loading" });
   });
 });
 
@@ -244,15 +245,18 @@ describe("LoadedDrafts behavior", () => {
     expect(markup).not.toContain("No drafts in this wallet yet");
   });
 
-  test("catalog-only inscribed rows stay retryable until details load", () => {
+  test("known encrypted rows animate until details load", () => {
     const markup = loadedMarkup({
       catalog: { state: "ready" },
       coins: [],
       details: {},
       hosted: [inscribedEntry()],
     });
-    expect(markup).toContain("Could not load this plan");
-    expect(markup).toContain("Retry");
+    expect(markup).toContain('aria-label="Loading plan"');
+    expect(markup).toContain('data-pending="true"');
+    expect(markup).toContain("Opening encrypted plan");
+    expect(markup).not.toContain('data-slot="skeleton"');
+    expect(markup).not.toContain("Could not load this plan");
     expect(markup).not.toContain("No drafts in this wallet yet");
   });
 
@@ -286,4 +290,46 @@ describe("LoadedDrafts behavior", () => {
     expect(markup).toContain("Unsupported or invalid format");
     expect(markup).not.toContain("Unsupported old format");
   });
+});
+
+test("publishes completed chain rows before the next download finishes", async () => {
+  const originalFetch = globalThis.fetch;
+  let finishSecond!: (response: Response) => void;
+  let firstDelivered!: () => void;
+  const first = new Promise<void>((resolve) => {
+    firstDelivered = resolve;
+  });
+  const second = new Promise<Response>((resolve) => {
+    finishSecond = resolve;
+  });
+  const delivered: string[] = [];
+  globalThis.fetch = ((url: string) =>
+    url.includes(WALLET_ORIGIN)
+      ? Promise.resolve(new Response(null, { status: 404 }))
+      : second) as typeof fetch;
+  try {
+    const pending = loadChainDetails(
+      stubWallet,
+      [WALLET_ORIGIN, CATALOG_ORIGIN],
+      (origin) => {
+        delivered.push(origin);
+        firstDelivered();
+      }
+    );
+    await first;
+    expect(delivered).toEqual([WALLET_ORIGIN]);
+    const markup = loadedMarkup({
+      catalog: { state: "ready" },
+      coins: [{ origin: CATALOG_ORIGIN, outpoint: CATALOG_ORIGIN }],
+      details: {},
+      hosted: [catalogEntry()],
+    });
+    expect(markup).toContain("Hosted plan");
+    expect(markup).toContain('aria-label="Loading plan"');
+    finishSecond(new Response(null, { status: 404 }));
+    await pending;
+    expect(delivered).toEqual([WALLET_ORIGIN, CATALOG_ORIGIN]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

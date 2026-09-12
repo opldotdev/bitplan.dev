@@ -155,6 +155,33 @@ describe('hosted fetchLatest', () => {
 			HOSTED,
 		)
 	})
+
+	test('bounds hosted bodies and attaches a finite timeout', async () => {
+		const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
+			new Response(Uint8Array.of(1), {
+				headers: { 'content-length': '999999999' },
+			}),
+		)
+		await expect(fetchLatest(HOSTED, { siteUrl: SITE })).rejects.toThrow(
+			'Hosted content exceeds',
+		)
+		expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal)
+	})
+
+	test('times out a stalled hosted request', async () => {
+		spyOn(globalThis, 'fetch').mockImplementation(
+			((_input, init) =>
+				new Promise((_resolve, reject) => {
+					init?.signal?.addEventListener('abort', () => {
+						reject(init.signal?.reason)
+					})
+				})) as typeof fetch,
+		)
+
+		await expect(
+			fetchLatest(HOSTED, { siteUrl: SITE, timeoutMs: 1 }),
+		).rejects.toThrow('Could not reach hosted content')
+	})
 })
 
 function headerValue(

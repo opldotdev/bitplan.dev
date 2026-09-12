@@ -15,3 +15,7 @@ apps/web/public/audio/ui/.picker/
 wallet.db
 wallet.db-shm
 wallet.db-wal
+plans/
+docs/*-draft.md
+apps/web/.agents/
+apps/web/.claude/

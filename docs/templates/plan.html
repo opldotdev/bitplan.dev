@@ -134,7 +134,7 @@ Origin: ORIGIN OUTPOINT OR "unpublished"
     // Copy with three fallbacks. The viewer runs plans with scripts on and
     // network off; older viewers run them with scripts off, in which case the
     // CSS-filled block above is still selectable by hand.
-    (function () {
+    (() => {
       var btn = document.getElementById('copy');
       var out = document.getElementById('out');
       var notes = document.getElementById('notes');
@@ -148,7 +148,7 @@ Origin: ORIGIN OUTPOINT OR "unpublished"
       }
       function say(label, ms) {
         btn.textContent = label;
-        setTimeout(function () { btn.textContent = 'Copy my decisions'; }, ms || 1500);
+        setTimeout(() => { btn.textContent = 'Copy my decisions'; }, ms || 1500);
       }
       function selectBlock() {
         var range = document.createRange();
@@ -172,10 +172,10 @@ Origin: ORIGIN OUTPOINT OR "unpublished"
         return ok;
       }
 
-      btn.addEventListener('click', function () {
+      btn.addEventListener('click', () => {
         var value = text();
-        var done = function () { say('Copied'); };
-        var fallback = function () {
+        var done = () => { say('Copied'); };
+        var fallback = () => {
           if (legacyCopy(value)) { done(); return; }
           selectBlock();
           hint.textContent = 'Clipboard is blocked here. The block is selected: press Ctrl+C or Cmd+C.';

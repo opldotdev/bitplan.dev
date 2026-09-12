@@ -7,7 +7,7 @@ import {
   openEnvelope,
   sealEnvelope,
 } from "./envelope";
-import { linkWallet, parseLinkFragment } from "./link-reader";
+import { linkWallet, parseLinkFragment, readerOnlyUrl } from "./link-reader";
 
 const PLAINTEXT: DraftPlaintext = {
   html: "<!doctype html><title>Link plan</title><p>hello</p>",
@@ -66,6 +66,25 @@ describe("parseLinkFragment", () => {
     expect(parseLinkFragment("")).toBeNull();
     expect(parseLinkFragment("#")).toBeNull();
     expect(parseLinkFragment("https://bitplan.dev/d/abc")).toBeNull();
+  });
+});
+
+describe("readerOnlyUrl", () => {
+  test("preserves reader access and version without sharing collaboration authority", () => {
+    const key = toBase64Url(bytesOfLength(32));
+    expect(
+      readerOnlyUrl(
+        `https://bitplan.dev/d/example?v=1#k=${key}&room=room&collab=secret&client=agent`
+      )
+    ).toBe(`https://bitplan.dev/d/example?v=1#k=${key}`);
+    expect(
+      readerOnlyUrl(
+        `https://bitplan.dev/d/example#k=${key}&k=${key}&collab=secret`
+      )
+    ).toBe("https://bitplan.dev/d/example");
+    expect(
+      readerOnlyUrl("https://bitplan.dev/d/example#room=room&collab=secret")
+    ).toBe("https://bitplan.dev/d/example");
   });
 });
 

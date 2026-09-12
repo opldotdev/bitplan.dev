@@ -31,6 +31,17 @@ const PLAINTEXT: DraftPlaintext = {
 }
 
 describe('reader links', () => {
+	test('collaboration fragments preserve reader access and reject ambiguous keys', () => {
+		const secret = newLinkSecret()
+		const fragment = linkFragment(secret)
+		expect(
+			parseLinkFragment(
+				`https://bitplan.dev/d/test#room=test&${fragment}&collab=secret&client=agent`,
+			),
+		).toBe(secret)
+		expect(parseLinkFragment(`#${fragment}&${fragment}`)).toBeNull()
+		expect(parseLinkFragment(`#${fragment}!`)).toBeNull()
+	})
 	test('round-trips a secret through the fragment', () => {
 		const secret = newLinkSecret()
 		expect(secret).toMatch(/^[0-9a-f]{64}$/)
