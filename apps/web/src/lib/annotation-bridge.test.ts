@@ -31,15 +31,15 @@ test("parser-confusing plan markup cannot precede the policy or bridge", () => {
   ]) {
     const secured = withAnnotationBridge(html);
     expect(secured.indexOf("Content-Security-Policy")).toBeLessThan(
-      secured.indexOf("bitplan-geometry/1")
+      secured.indexOf("bitplan-geometry-connect/1")
     );
-    expect(secured.indexOf("bitplan-geometry/1")).toBeLessThan(
+    expect(secured.indexOf("bitplan-geometry-connect/1")).toBeLessThan(
       secured.indexOf("https://attacker.test")
     );
   }
 });
 
-test("click anchors round-trip across scroll and resize, including blank space", () => {
+test("click anchors round-trip over a private port, including blank space", async () => {
   const handlers = new Map<string, (event: unknown) => void>();
   const messages: { type: string; payload: any }[] = [];
   let rect = {
@@ -61,9 +61,16 @@ test("click anchors round-trip across scroll and resize, including blank space",
     }
   }
   const element = new Element();
-  const parent = {
-    postMessage: (message: (typeof messages)[number]) => messages.push(message),
-  };
+  const parentChannel = new MessageChannel();
+  const parent = parentChannel.port1;
+  const bridgeChannel = new MessageChannel();
+  bridgeChannel.port2.addEventListener("message", (event) =>
+    messages.push(event.data)
+  );
+  bridgeChannel.port2.start();
+  const frameWindow = Object.assign(new EventTarget(), {
+    getSelection: () => ({ toString: () => "Selected paragraph" }),
+  });
   const context = {
     document: {
       addEventListener: (name: string, callback: (event: unknown) => void) =>
@@ -73,35 +80,51 @@ test("click anchors round-trip across scroll and resize, including blank space",
       querySelectorAll: () => [element],
     },
     Element,
+    Event,
+    EventTarget,
     innerHeight: 600,
     innerWidth: 800,
+    MessageEvent,
+    MessagePort,
     parent,
     performance: { now: () => 1000 },
     requestAnimationFrame: (callback: () => void) => callback(),
     scrollX: 0,
     scrollY: 0,
-    window: {
-      addEventListener: (name: string, callback: (event: unknown) => void) =>
-        handlers.set(`window:${name}`, callback),
-      getSelection: () => ({ toString: () => "Selected paragraph" }),
-    },
+    window: frameWindow,
   };
   const script = bridgeScript(withAnnotationBridge("<head></head>"));
   runInNewContext(script, context);
+  let leakedPort = false;
+  frameWindow.addEventListener(
+    "message",
+    () => {
+      leakedPort = true;
+    },
+    true
+  );
+  frameWindow.dispatchEvent(
+    new MessageEvent("message", {
+      data: { type: "bitplan-geometry-connect/1" },
+      ports: [bridgeChannel.port1],
+      source: parent,
+    })
+  );
+  expect(leakedPort).toBe(false);
   handlers.get("click")?.({ clientX: 140, clientY: 120, target: element });
+  await flushMessages();
   const anchor = messages.at(-1)?.payload.anchor;
   expect(messages.at(-1)?.type).toBe("click");
   expect(anchor.point).toEqual({ x: 0.25, y: 0.25 });
-  const locate = (value: unknown) =>
-    handlers.get("window:message")?.({
-      data: {
-        channel: "bitplan-geometry/1",
-        payload: [{ anchor: value, id: "note" }],
-        type: "anchors",
-      },
-      source: parent,
+  const locate = async (value: unknown) => {
+    bridgeChannel.port2.postMessage({
+      payload: [{ anchor: value, id: "note" }],
+      type: "anchors",
     });
-  locate(anchor);
+    await flushMessages();
+    await flushMessages();
+  };
+  await locate(anchor);
   expect(messages.at(-1)?.payload[0].position).toEqual({ x: 140, y: 120 });
   rect = {
     bottom: 120,
@@ -111,12 +134,13 @@ test("click anchors round-trip across scroll and resize, including blank space",
     top: -40,
     width: 200,
   };
-  locate(anchor);
+  await locate(anchor);
   expect(messages.at(-1)?.payload[0].position).toEqual({ x: 70, y: 0 });
   handlers.get("click")?.({ clientX: 10, clientY: 60, target: null });
+  await flushMessages();
   const blank = messages.at(-1)?.payload.anchor;
   context.scrollY = 50;
-  locate(blank);
+  await locate(blank);
   expect(messages.at(-1)?.payload[0].position).toEqual({ x: 10, y: 10 });
   const before = messages.length;
   handlers.get("contextmenu")?.({
@@ -127,6 +151,7 @@ test("click anchors round-trip across scroll and resize, including blank space",
     },
     target: element,
   });
+  await flushMessages();
   expect(messages.slice(before).map((message) => message.type)).toEqual([
     "click",
     "context",
@@ -140,17 +165,23 @@ test("click anchors round-trip across scroll and resize, including blank space",
     target: element,
   });
   expect(messages.length).toBe(afterContext);
-  handlers.get("window:message")?.({
-    data: {
-      channel: "bitplan-geometry/1",
-      payload: { x: 70, y: 0 },
-      type: "point",
-    },
-    source: parent,
+  bridgeChannel.port2.postMessage({
+    payload: { x: 70, y: 0 },
+    type: "point",
   });
+  await flushMessages();
+  await flushMessages();
   expect(messages.at(-1)?.payload.anchor.point).toEqual({ x: 0.25, y: 0.25 });
   expect(messages.at(-1)?.type).toBe("context");
+  bridgeChannel.port1.close();
+  bridgeChannel.port2.close();
+  parentChannel.port1.close();
+  parentChannel.port2.close();
 });
+
+function flushMessages(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 test("reader-only plans open safe links natively and retain local anchors", () => {
   const handlers = new Map<string, (event: any) => void>();

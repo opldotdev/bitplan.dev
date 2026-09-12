@@ -65,6 +65,8 @@ export function CollaborationCanvas({
   room: CollaborationState;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
+  const connectedFrame = useRef<HTMLIFrameElement | null>(null);
+  const geometryPort = useRef<MessagePort | null>(null);
   const trigger = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState(false);
   const [anchor, setAnchor] = useState<AnnotationAnchor>(center);
@@ -126,14 +128,10 @@ export function CollaborationCanvas({
   const targetsJson = JSON.stringify(targets);
 
   function locate() {
-    frame.current?.contentWindow?.postMessage(
-      {
-        channel: "bitplan-geometry/1",
-        payload: JSON.parse(targetsJson),
-        type: "anchors",
-      },
-      "*"
-    );
+    geometryPort.current?.postMessage({
+      payload: JSON.parse(targetsJson),
+      type: "anchors",
+    });
   }
   function cardTransform(
     point: { x: number; y: number },
@@ -153,14 +151,7 @@ export function CollaborationCanvas({
   useEffect(() => {
     locate();
   }, [targetsJson, documentHtml]);
-  useEffect(() => {
-    function received(event: MessageEvent) {
-      if (
-        event.source !== frame.current?.contentWindow ||
-        event.data?.channel !== "bitplan-geometry/1"
-      ) {
-        return;
-      }
+  function received(event: MessageEvent) {
       try {
         if (event.data.type === "context") {
           const payload = event.data.payload;
@@ -227,10 +218,35 @@ export function CollaborationCanvas({
       } catch {
         /* Reject malformed messages from the untrusted document. */
       }
+  }
+
+  function connectGeometry() {
+    const currentFrame = frame.current;
+    if (!(currentFrame && connectedFrame.current !== currentFrame)) {
+      return;
     }
-    window.addEventListener("message", received);
-    return () => window.removeEventListener("message", received);
-  }, []);
+    connectedFrame.current = currentFrame;
+    geometryPort.current?.close();
+    const channel = new MessageChannel();
+    geometryPort.current = channel.port1;
+    channel.port1.addEventListener("message", received);
+    channel.port1.start();
+    currentFrame.contentWindow?.postMessage(
+      { type: "bitplan-geometry-connect/1" },
+      "*",
+      [channel.port2]
+    );
+    locate();
+  }
+
+  useEffect(
+    () => () => {
+      geometryPort.current?.close();
+      geometryPort.current = null;
+      connectedFrame.current = null;
+    },
+    []
+  );
 
   useEffect(() => {
     if (!room.connection) {
@@ -244,7 +260,7 @@ export function CollaborationCanvas({
           annotations: roomRef.current.annotations,
           collaborators: roomRef.current.profiles,
           cursor: roomRef.current.sequence,
-          documentRevision: roomRef.current.documentDraft?.revision ?? 0,
+          documentRevision: roomRef.current.documentRevision,
           html: htmlRef.current,
           locations: roomRef.current.cursors,
           online: roomRef.current.online,
@@ -454,24 +470,21 @@ export function CollaborationCanvas({
               event.preventDefault();
               const bounds = frame.current?.getBoundingClientRect();
               if (bounds) {
-                frame.current?.contentWindow?.postMessage(
-                  {
-                    channel: "bitplan-geometry/1",
-                    payload: {
-                      x: event.clientX - bounds.left,
-                      y: event.clientY - bounds.top,
-                    },
-                    type: "point",
-                  },
-                  "*"
-                );
+              geometryPort.current?.postMessage({
+                payload: {
+                  x: event.clientX - bounds.left,
+                  y: event.clientY - bounds.top,
+                },
+                type: "point",
+              });
               }
             }}
             ref={trigger}
           >
             <iframe
               className="absolute inset-0 h-full w-full border-0 bg-background"
-              onLoad={locate}
+              key={documentHtml}
+              onLoad={connectGeometry}
               ref={frame}
               sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
               srcDoc={documentHtml}

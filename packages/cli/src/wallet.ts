@@ -12,7 +12,7 @@
 import { HTTPWalletJSON, WalletClient, type WalletInterface } from '@bsv/sdk'
 import { DEFAULT_WALLET_URL, ORIGINATOR } from './constants.js'
 import { CliError } from './errors.js'
-import { assertSecureHttpUrl } from './http.js'
+import { assertSecureHttpUrl, fetchBoundedResponse } from './http.js'
 import { readConfig } from './state.js'
 
 export interface WalletConnection {
@@ -20,6 +20,19 @@ export interface WalletConnection {
 	url: string
 	version: string
 }
+
+const WALLET_TIMEOUT_MS = 45_000
+const WALLET_RESPONSE_MAX_BYTES = 4 * 1024 * 1024
+
+const walletHttpClient = (async (
+	input: string | URL | Request,
+	init?: RequestInit,
+) =>
+	fetchBoundedResponse(input, init, {
+		label: 'Wallet response',
+		maxBytes: WALLET_RESPONSE_MAX_BYTES,
+		timeoutMs: WALLET_TIMEOUT_MS,
+	})) as unknown as typeof fetch
 
 /** Endpoint to use: `--wallet-url`, then `~/.bitplan/config.json`, then the default. */
 export function resolveWalletUrl(override?: string): string {
@@ -47,7 +60,7 @@ export function createWallet(url: string): WalletInterface {
 	}
 	assertSecureHttpUrl(endpoint, 'wallet')
 	return new WalletClient(
-		new HTTPWalletJSON(ORIGINATOR, url),
+		new HTTPWalletJSON(ORIGINATOR, url, walletHttpClient),
 		ORIGINATOR,
 	) as WalletInterface
 }

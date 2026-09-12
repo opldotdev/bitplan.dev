@@ -23,7 +23,11 @@ import type { SecurityLevel, WalletInterface, WalletProtocol } from '@bsv/sdk'
 import { CATALOG_CONTENT_TYPE } from './constants.js'
 import { CliError } from './errors.js'
 import { assertHttpsSiteUrl, isHostedId } from './hosted.js'
-import { readBoundedResponseBody } from './http.js'
+import {
+	readBoundedResponseBody,
+	readBoundedResponseText,
+	withTimeoutSignal,
+} from './http.js'
 import { isOutpoint } from './outpoint.js'
 import type { DraftRecord, DraftsFile } from './state.js'
 
@@ -60,6 +64,7 @@ export const CATALOG_MAX_ENTRIES = 1000
 export const CATALOG_MAX_PLAINTEXT_BYTES = 512 * 1024
 const CATALOG_MAX_CIPHERTEXT_BYTES = 600 * 1024
 const CATALOG_TIMEOUT_MS = 45_000
+const CATALOG_WRITE_RESPONSE_MAX_BYTES = 64 * 1024
 export const CATALOG_MAX_TITLE_CHARS = 512
 export const CATALOG_MAX_DESCRIPTION_CHARS = 1000
 export const CATALOG_MAX_REPO_HOST_CHARS = 253
@@ -627,6 +632,7 @@ async function putRemoteCatalog(
 				'X-BitPlan-Base-Version': String(baseVersion),
 			},
 			body: Buffer.from(body),
+			signal: withTimeoutSignal(CATALOG_TIMEOUT_MS),
 		})
 	} catch (error) {
 		throw new CliError(
@@ -645,8 +651,15 @@ async function putRemoteCatalog(
 	}
 	let parsed: unknown
 	try {
-		parsed = JSON.parse(await response.text())
-	} catch {
+		parsed = JSON.parse(
+			await readBoundedResponseText(
+				response,
+				CATALOG_WRITE_RESPONSE_MAX_BYTES,
+				'Catalog sync response',
+			),
+		)
+	} catch (error) {
+		if (error instanceof CliError) throw error
 		throw new CliError('Catalog API returned a response that was not JSON.')
 	}
 	if (!isRecord(parsed)) {

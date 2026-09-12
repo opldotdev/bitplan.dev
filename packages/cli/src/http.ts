@@ -2,6 +2,11 @@ import { CliError } from './errors.js'
 
 const LENGTH = /^\d+$/
 
+export type FetchLike = (
+	input: string | URL | Request,
+	init?: RequestInit,
+) => Promise<Response>
+
 /** Require TLS except for the local wallet/development loopback endpoints. */
 export function assertSecureHttpUrl(url: URL, label: string): void {
 	if (url.protocol === 'https:') return
@@ -15,6 +20,15 @@ export function assertSecureHttpUrl(url: URL, label: string): void {
 	throw new CliError(
 		`Refusing cleartext http ${label} URL for ${JSON.stringify(url.host)}: use https, or http only for localhost development.`,
 	)
+}
+
+/** Preserve a caller cancellation signal while enforcing a finite deadline. */
+export function withTimeoutSignal(
+	timeoutMs: number,
+	signal?: AbortSignal | null,
+): AbortSignal {
+	const timeout = AbortSignal.timeout(timeoutMs)
+	return signal ? AbortSignal.any([signal, timeout]) : timeout
 }
 
 /** Stream a response into a bounded buffer, including chunked/decompressed data. */
@@ -64,4 +78,38 @@ export async function readBoundedResponseBody(
 		reader.releaseLock()
 	}
 	return bytes.subarray(0, total)
+}
+
+/** Decode a bounded response as UTF-8 without calling the unbounded text/json helpers. */
+export async function readBoundedResponseText(
+	response: Response,
+	maxBytes: number,
+	label: string,
+): Promise<string> {
+	return new TextDecoder().decode(
+		await readBoundedResponseBody(response, maxBytes, label),
+	)
+}
+
+/** Adapt a third-party fetch transport to a bounded, timed response. */
+export async function fetchBoundedResponse(
+	input: string | URL | Request,
+	init: RequestInit | undefined,
+	options: { label: string; maxBytes: number; timeoutMs: number },
+	fetchImpl: FetchLike = globalThis.fetch,
+): Promise<Response> {
+	const response = await fetchImpl(input, {
+		...init,
+		signal: withTimeoutSignal(options.timeoutMs, init?.signal),
+	})
+	const bytes = await readBoundedResponseBody(
+		response,
+		options.maxBytes,
+		options.label,
+	)
+	return new Response(Uint8Array.from(bytes).buffer, {
+		headers: response.headers,
+		status: response.status,
+		statusText: response.statusText,
+	})
 }

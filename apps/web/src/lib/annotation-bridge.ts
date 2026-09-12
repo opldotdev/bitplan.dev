@@ -11,22 +11,6 @@ export function withAnnotationBridge(
 }
 
 function installGeometryBridge(collaboration: boolean) {
-  const channel = "bitplan-geometry/1";
-  let anchors: {
-    id: string;
-    anchor: {
-      elementId?: string;
-      quote?: { exact: string };
-      point: { x: number; y: number };
-    };
-  }[] = [];
-  let scheduled = false;
-  let lastPointer = 0;
-  const send = (type: string, payload: unknown) =>
-    parent.postMessage({ channel, payload, type }, "*");
-  const clamp = (n: number) => Math.max(0, Math.min(1, n));
-  const selectedText = () =>
-    window.getSelection?.()?.toString().slice(0, 32_000) ?? "";
   function linkFor(target: EventTarget | null) {
     const link = target instanceof Element ? target.closest("a[href]") : null;
     const href = link?.getAttribute("href")?.trim();
@@ -95,6 +79,44 @@ function installGeometryBridge(collaboration: boolean) {
   if (!collaboration) {
     return;
   }
+  // A MessagePort is transferred by the trusted parent after this script has
+  // registered its capture listener. Untrusted plan scripts never receive the
+  // port, so they cannot forge cursor or click activity as this participant.
+  const addTrustedListener = EventTarget.prototype.addEventListener;
+  const stopImmediately = Event.prototype.stopImmediatePropagation;
+  const startPort = MessagePort.prototype.start;
+  const postPortMessage = MessagePort.prototype.postMessage;
+  const readMessageData = Object.getOwnPropertyDescriptor(
+    MessageEvent.prototype,
+    "data"
+  )?.get;
+  const readMessagePorts = Object.getOwnPropertyDescriptor(
+    MessageEvent.prototype,
+    "ports"
+  )?.get;
+  const readMessageSource = Object.getOwnPropertyDescriptor(
+    MessageEvent.prototype,
+    "source"
+  )?.get;
+  let bridgePort: MessagePort | null = null;
+  let anchors: {
+    id: string;
+    anchor: {
+      elementId?: string;
+      quote?: { exact: string };
+      point: { x: number; y: number };
+    };
+  }[] = [];
+  let scheduled = false;
+  let lastPointer = 0;
+  const send = (type: string, payload: unknown) => {
+    if (bridgePort) {
+      postPortMessage.call(bridgePort, { payload, type });
+    }
+  };
+  const clamp = (n: number) => Math.max(0, Math.min(1, n));
+  const selectedText = () =>
+    window.getSelection?.()?.toString().slice(0, 32_000) ?? "";
   function anchorFor(target: EventTarget | null, x: number, y: number) {
     const element =
       target instanceof Element
@@ -194,12 +216,18 @@ function installGeometryBridge(collaboration: boolean) {
       );
     });
   }
-  window.addEventListener("message", (event) => {
-    if (event.source !== parent || event.data?.channel !== channel) {
+  function receive(data: unknown) {
+    if (!(data && typeof data === "object" && "type" in data)) {
       return;
     }
-    if (event.data.type === "point") {
-      const { x, y } = event.data.payload ?? {};
+    if (data.type === "point") {
+      const payload = "payload" in data ? data.payload : undefined;
+      const point =
+        payload && typeof payload === "object"
+          ? (payload as { x?: unknown; y?: unknown })
+          : {};
+      const x = typeof point.x === "number" ? point.x : Number.NaN;
+      const y = typeof point.y === "number" ? point.y : Number.NaN;
       if (
         !(Number.isFinite(x) && Number.isFinite(y)) ||
         x < 0 ||
@@ -221,15 +249,48 @@ function installGeometryBridge(collaboration: boolean) {
       return;
     }
     if (
-      event.data.type !== "anchors" ||
-      !Array.isArray(event.data.payload) ||
-      event.data.payload.length > 1600
+      data.type !== "anchors" ||
+      !("payload" in data && Array.isArray(data.payload)) ||
+      data.payload.length > 1600
     ) {
       return;
     }
-    anchors = event.data.payload;
+    anchors = data.payload;
     geometry();
-  });
+  }
+  addTrustedListener.call(
+    window,
+    "message",
+    (rawEvent: Event) => {
+      const event = rawEvent as MessageEvent;
+      const source = readMessageSource?.call(event);
+      const data = readMessageData?.call(event);
+      if (
+        source !== parent ||
+        data?.type !== "bitplan-geometry-connect/1"
+      ) {
+        return;
+      }
+      stopImmediately.call(event);
+      const port = readMessagePorts?.call(event)?.[0] as
+        | MessagePort
+        | undefined;
+      if (!(port && !bridgePort)) {
+        port?.close();
+        return;
+      }
+      bridgePort = port;
+      addTrustedListener.call(
+        port,
+        "message",
+        (rawPortEvent: Event) =>
+          receive(readMessageData?.call(rawPortEvent as MessageEvent)),
+        true
+      );
+      startPort.call(port);
+    },
+    true
+  );
   window.addEventListener("scroll", geometry, true);
   window.addEventListener("resize", geometry);
   window.addEventListener("load", geometry);

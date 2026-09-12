@@ -89,6 +89,7 @@ describe('hosted HTTP', () => {
 		expect(headerValue(init, 'content-type')).toBe('application/x-bitplan')
 		expect(headerValue(init, 'authorization')).toBe(hostedAuthHeader(SECRET))
 		expect(Buffer.from(init?.body as Uint8Array)).toEqual(Buffer.from(ENVELOPE))
+		expect(init?.signal).toBeInstanceOf(AbortSignal)
 	})
 
 	test('appends a version with X-Bitplan-Base-Version', async () => {
@@ -130,6 +131,28 @@ describe('hosted HTTP', () => {
 			appendHostedVersion(SITE, HOSTED, SECRET, ENVELOPE, 3),
 		).rejects.toThrow(
 			'Another publish updated this hosted draft (now version 4). Fetch it, merge, and publish again.',
+		)
+	})
+
+	test('rejects oversized success and error responses before JSON parsing', async () => {
+		spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+			new Response('x', {
+				status: 201,
+				headers: { 'content-length': String(64 * 1024 + 1) },
+			}),
+		)
+		await expect(createHostedDraft(SITE, SECRET, ENVELOPE)).rejects.toThrow(
+			'Hosted API response exceeds',
+		)
+
+		spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+			new Response('x', {
+				status: 500,
+				headers: { 'content-length': String(16 * 1024 + 1) },
+			}),
+		)
+		await expect(createHostedDraft(SITE, SECRET, ENVELOPE)).rejects.toThrow(
+			'Hosted API error response exceeds',
 		)
 	})
 })
