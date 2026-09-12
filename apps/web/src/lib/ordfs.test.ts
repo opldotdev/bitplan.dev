@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-
+import { parseDocumentTarget } from "./annotations";
 import { frameEnvelope } from "./envelope";
 import {
   BITPLAN_CONTENT_TYPE,
@@ -48,6 +48,38 @@ afterEach(() => {
 });
 
 describe("fetchOrdfsContent", () => {
+  test("normalizes gateway dot outpoints for exact annotation version targets and metadata", async () => {
+    const headers = {
+      "content-type": BITPLAN_CONTENT_TYPE,
+      "x-ord-seq": "2",
+      "x-origin": `${TXID}.0`,
+      "x-outpoint": `${"b".repeat(64)}.2`,
+    };
+    const result = await resultFrom(respond(envelopeBytes(), { headers }));
+    if (result.state !== "found") {
+      throw new Error("Expected content");
+    }
+    const outpoint = `${"b".repeat(64)}_2`;
+    expect(
+      parseDocumentTarget({
+        origin: result.content.origin,
+        outpoint: result.content.outpoint,
+        sha256: TXID,
+        version: 3,
+      }).outpoint
+    ).toBe(outpoint);
+    globalThis.fetch = (() =>
+      Promise.resolve(new Response(null, { headers }))) as typeof fetch;
+    expect((await fetchOrdfsMeta(ORIGIN, -1))?.outpoint).toBe(outpoint);
+    const malformed = await resultFrom(
+      respond(envelopeBytes(), {
+        headers: { ...headers, "x-outpoint": `${TXID}.2garbage` },
+      })
+    );
+    expect(
+      malformed.state === "found" && malformed.content.outpoint
+    ).toBeNull();
+  });
   test("returns validated BitPlan envelope content", async () => {
     const response = respond(envelopeBytes(), {
       headers: {

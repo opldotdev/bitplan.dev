@@ -266,7 +266,7 @@ describe('state store', () => {
 		expect(() => readConfig(file)).toThrow(/shareWith/)
 	})
 
-	test('no key material is ever written', () => {
+	test('records without capabilities write only public metadata', () => {
 		saveDraftRecord('/plans/one.html', RECORD, draftsFile)
 		const raw = fs.readFileSync(draftsFile, 'utf8')
 		// keyID is a label the wallet derives against, never a key.

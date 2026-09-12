@@ -17,6 +17,48 @@ current 1-sat output and puts the next envelope on its replacement. Holding the
 coin authorizes publishing; holding an encryption relationship authorizes
 reading. Those are separate capabilities.
 
+One transaction may contain multiple BitPlan ordinal outputs. Each output
+contains its own independently sealed envelope with the same `BPLN` framing,
+wire version `0x02`, cipher, and reader-key wrapping. Output count does not
+change the envelope format or require a reader migration. Seal each payload
+normally with its stream's key ID and intended recipients; do not reuse a
+payload encryption key between outputs.
+
+The publishing wrapper accepts already-sealed bytes and returns an origin and
+outpoint for each output. Existing ordinal inputs and replacement outputs stay
+in matching order, followed by any new ordinals. A document-to-annotation
+relationship belongs in encrypted application content, not the envelope
+header. A same-transaction relationship must use an agreed output reference,
+not embed the transaction's own ID before signing. The native annotation
+schema and its viewer integration remain separate work.
+
+### Annotation recovery contract (proposed, not implemented)
+
+An annotation payload must bind the document's stable origin, exact version
+outpoint, and SHA-256 of its original UTF-8 HTML. In a combined transaction,
+use a same-transaction output index plus that hash, then resolve and verify
+the outpoint from the signed transaction. Each output needs its own recipient
+slots, including any intended reader-link identity. Neither batch publishing
+nor these application references require changing the envelope.
+
+Checkpoints need previous stream references and exact known heads to replay
+their published view without the hosted database. All required content must
+be embedded or available through immutable references with hashes. Replay
+must expose missing records, validate receipts, and distinguish causal order
+from client timestamps.
+
+Known-head manifests do not discover unknown new streams. Complete discovery
+requires a separately verified index and a stated coverage boundary; arbitrary
+MAP fields are not automatically indexed. A public grouping tag would expose
+transaction correlation and requires an explicit privacy decision. The current
+MAP above contains no such tag.
+
+An application parent reference is not ordinal ownership or author approval.
+Profile labels are attribution claims unless independently signed. A receipt
+must match the actual transaction outputs; broadcast acceptance alone is not
+mining confirmation. Failed hosted registration must retry that receipt,
+not create a second inscription.
+
 ## Binary frame
 
 The bitplan envelope is a container, not an encryption algorithm. Its framing

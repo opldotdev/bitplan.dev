@@ -137,6 +137,8 @@ interface FetchCall {
 	method: string
 	headers: Record<string, string>
 	body: Uint8Array | null
+	redirect: RequestRedirect | undefined
+	signal: AbortSignal | null | undefined
 }
 
 function mockFetch(script: Response[]): {
@@ -171,7 +173,14 @@ function mockFetch(script: Response[]): {
 		} else if (Buffer.isBuffer(init?.body)) {
 			body = new Uint8Array(init.body)
 		}
-		calls.push({ url, method, headers, body })
+		calls.push({
+			url,
+			method,
+			headers,
+			body,
+			redirect: init?.redirect,
+			signal: init?.signal,
+		})
 		const next = responses.shift()
 		if (!next) throw new Error('fetch script exhausted')
 		return next
@@ -517,6 +526,26 @@ describe('catalog sync', () => {
 		expect(calls[0]?.method).toBe('GET')
 	})
 
+	test('rejects an oversized remote catalog before decryption or overwrite', async () => {
+		const { wallet, calls: walletCalls } = createFakeWallet()
+		const { calls } = mockFetch([
+			new Response('oversized', {
+				status: 200,
+				headers: {
+					'content-length': String(600 * 1024 + 1),
+					'content-type': CATALOG_CONTENT_TYPE,
+					'X-BitPlan-Catalog-Version': '1',
+				},
+			}),
+		])
+
+		await expect(
+			syncCatalog(wallet, { siteUrl: SITE, localEntries: [] }),
+		).rejects.toThrow(/Catalog response exceeds the 614400-byte limit/)
+		expect(calls).toHaveLength(1)
+		expect(walletCalls.decrypt).toHaveLength(0)
+	})
+
 	test('an undecryptable remote catalog aborts without an empty overwrite', async () => {
 		const { wallet } = createFakeWallet()
 		const { calls } = mockFetch([
@@ -561,6 +590,8 @@ describe('catalog sync', () => {
 			entries: 1,
 		})
 		expect(calls).toHaveLength(2)
+		expect(calls.every((call) => call.redirect === 'error')).toBe(true)
+		expect(calls[1]?.signal).toBeInstanceOf(AbortSignal)
 		const put = calls[1] as FetchCall
 		expect(put.method).toBe('PUT')
 		expect(put.url).toBe(`${SITE}/api/catalog/${VECTOR_ID}`)
@@ -571,6 +602,21 @@ describe('catalog sync', () => {
 			Buffer.from(put.body ?? new Uint8Array()).toString('utf8'),
 		) as Catalog
 		expect(body.entries.map((item) => item.id)).toEqual([HOSTED_A])
+	})
+
+	test('rejects an oversized catalog write response', async () => {
+		const { wallet } = createFakeWallet()
+		const { calls } = mockFetch([
+			new Response('missing', { status: 404 }),
+			new Response('x', {
+				status: 200,
+				headers: { 'content-length': String(64 * 1024 + 1) },
+			}),
+		])
+		await expect(
+			syncCatalog(wallet, { siteUrl: SITE, localEntries: [] }),
+		).rejects.toThrow('Catalog sync response exceeds')
+		expect(calls).toHaveLength(2)
 	})
 
 	test('merges local over remote and PUTs the exact fetched base version', async () => {

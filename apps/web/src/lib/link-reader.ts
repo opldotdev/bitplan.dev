@@ -9,6 +9,19 @@ import type { EnvelopeWallet } from "@/lib/envelope";
 
 const LINK_SECRET_BYTES = 32;
 
+/** Copying a reader link must not accidentally grant collaboration authority. */
+export function readerOnlyUrl(value: string): string {
+  const url = new URL(value);
+  const source = new URLSearchParams(url.hash.slice(1));
+  const fragment = new URLSearchParams();
+  const key = source.get("k");
+  if (source.getAll("k").length === 1 && key && parseLinkFragment(url.href)) {
+    fragment.set("k", key);
+  }
+  url.hash = fragment.toString();
+  return url.href;
+}
+
 /** Parse `#k=...`, `k=...`, or a full URL. Returns 64 lowercase hex or null. Only exactly 32 bytes are accepted. */
 export function parseLinkFragment(input: string): string | null {
   const encoded = encodedSecret(input);
@@ -37,18 +50,11 @@ function encodedSecret(input: string): string | null {
   if (fragment.startsWith("#")) {
     fragment = fragment.slice(1);
   }
-  if (!fragment.startsWith("k=")) {
+  const params = new URLSearchParams(fragment);
+  if (params.getAll("k").length !== 1) {
     return null;
   }
-  const encoded = fragment.slice(2);
-  if (encoded.length === 0) {
-    return null;
-  }
-  try {
-    return decodeURIComponent(encoded);
-  } catch {
-    return null;
-  }
+  return params.get("k") || null;
 }
 
 function decodeBase64Url(value: string): Uint8Array | null {

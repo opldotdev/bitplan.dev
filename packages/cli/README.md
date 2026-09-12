@@ -241,6 +241,10 @@ secp256k1 key whose public half is an ordinary reader slot and whose private
 half travels in the viewer URL fragment. Later versions keep the same link
 until you publish with `--private`. `bitplan fetch` can open that URL without
 a wallet. Anyone with the complete link can read, so treat it like a password.
+When adopting a draft without its local record, `--link` adds a new link but
+cannot distinguish an earlier link slot from another wallet reader; inherited
+readers remain authorized. Publish a wallet-only version with `--private`
+before adding a replacement link when every previous reader must be removed.
 
 ```sh
 npx bitplan upload ./plan.html --link
@@ -261,6 +265,12 @@ npx bitplan fetch 'https://bitplan.dev/d/<origin>#k=...'
 - **Propagation.** By default, the CLI sends the wallet-returned Atomic BEEF to
   1Sat. 1Sat attempts to store it for ORDFS and forwards the leaf transaction to
   Arcade. The wallet remains the publisher. Pass `--no-relay` to opt out.
+- **Batch plumbing (internal).** `publishBatch` can create or update several
+  ordinal outputs in one wallet action. It returns a separate origin/outpoint
+  receipt for every item and preserves the existing encryption envelope.
+  Existing-ordinal items must precede new inscriptions to preserve satoshi
+  ordering. `upload` and `inscribe` still expose their existing single-document
+  workflows; a combined document/annotation publish UI is not shipped yet.
 - **Metadata.** The cleartext MAP on chain is three fields:
   `{ app: "bitplan", type: "plan", enc: "1" }`. Titles, descriptions and git
   provenance live inside the ciphertext.
@@ -293,13 +303,14 @@ The scan runs on the plaintext even though the output is encrypted.
   and teams. Contacts contain public identity keys only.
 - `drafts.json`: which local file maps to which draft: origin, keyID, latest
   outpoint, latest version, and any local contact/team references used for its
-  access list. Hosted drafts also store the write secret so this machine can
-  update them.
+  access list. It stores each active reader-link private key and, for hosted
+  drafts, the write secret used to update them. Treat this file like a password
+  store even though these capabilities cannot fund or sign transactions.
 
-Neither file holds identity private keys. Losing `drafts.json` costs
-convenience only for chain drafts: origins are on chain, and each draft's
-keyID is in its envelope header. A hosted draft cannot be updated from this
-machine without its secret.
+Neither file holds the connected wallet's identity, funding, or signing private
+keys. Losing `drafts.json` also loses this machine's saved reader-link secrets and hosted mutation
+capabilities. Chain origins and keyIDs remain recoverable from public data, but
+a hosted draft cannot be updated from this machine without its write secret.
 
 ## License
 

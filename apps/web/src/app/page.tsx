@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { CommandCopy } from "@/components/command-copy";
 import { HomeCta } from "@/components/home-cta";
+import { SkillInstall } from "@/components/skill-install";
 
 export const metadata: Metadata = {
   description:
@@ -57,64 +58,85 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="mx-auto w-full max-w-[42rem] space-y-10 px-6 py-16">
-        <section className="space-y-3">
-          <h2 className="font-medium text-lg tracking-tight">
-            Create with the BitPlan CLI
-          </h2>
-          <h3 className="font-medium text-sm">npm package bitplan</h3>
-          <p className="text-muted-foreground">
-            The CLI is published on the npm registry as bitplan. Run npx bitplan
-            auth, then create a hosted draft with bunx bitplan upload
-            ./plan.html --hosted --link. Your BRC-100 wallet protects the
-            identity keys. Hosted drafts cost no BSV. When the plan is ready,
-            the wallet can publish it as a 1Sat Ordinal.
-          </p>
-          <h3 className="font-medium text-sm">Auth</h3>
-          <CommandCopy command="npx bitplan auth" />
-          <p className="text-muted-foreground text-sm">
-            Needs a BRC-100 wallet on this machine, unlocked.
-          </p>
-        </section>
+      <section className="flex min-h-[100dvh] items-center justify-center px-6 py-16">
+        <div className="mx-auto w-full max-w-2xl space-y-8 text-center">
+          <div className="space-y-3">
+            <h2 className="font-heading font-semibold text-3xl tracking-tight md:text-4xl">
+              Teach your agent
+            </h2>
+            <p className="text-balance text-foreground/70 md:text-lg">
+              Install the skill once. Your agent writes, hosts, shares, and
+              publishes plans through your wallet.
+            </p>
+          </div>
 
-        <section className="space-y-3">
-          <h2 className="font-medium text-lg tracking-tight">
-            Open a BitPlan draft
-          </h2>
-          <h3 className="font-medium text-sm">Docs</h3>
-          <p className="text-muted-foreground">
-            BitPlan docs start at /docs. They explain the CLI, wallet flow,
-            encrypted envelope, and agent integration.
-          </p>
-          <h3 className="font-medium text-sm">Viewer</h3>
-          <p className="text-muted-foreground">
-            This site opens encrypted plans with an authorized wallet or reader
-            link. Hosted storage contains ciphertext, never plaintext or wallet
-            keys.
-          </p>
-        </section>
+          <SkillInstall />
 
-        <p className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-          <a
-            className="text-primary underline-offset-4 hover:underline"
-            href="https://www.npmjs.com/package/bitplan"
+          <details
+            className="rounded-md border bg-background/80 p-4 text-left"
+            id="add-your-bot"
           >
-            CLI on npm
-          </a>
-          <Link
-            className="text-primary underline-offset-4 hover:underline"
-            href="/docs/envelope"
-          >
-            Envelope spec
-          </Link>
-          <Link
-            className="text-primary underline-offset-4 hover:underline"
-            href="/docs/how-it-works"
-          >
-            How it works
-          </Link>
-        </p>
-      </div>
+            <summary className="cursor-pointer font-medium">
+              Add your bot
+            </summary>
+            <p className="mt-3 text-muted-foreground text-sm">
+              Give Grok or another bot its own decryption identity. Copy this
+              prompt to your bot; only its public key comes back to you.
+            </p>
+            <p className="mt-3 select-all rounded border p-3 text-sm">
+              Use your operator-approved local wallet tooling to create or reuse
+              a dedicated BitPlan reader identity. Inspect @1sat/cli help first.
+              Keep private keys and seeds inside secure wallet storage, never in
+              chat, model context, logs, or source control. Return only your
+              public identity key and a verified BRC-100 decryption method. If
+              that interface is unavailable, report the gap rather than building
+              an unauthenticated key server. After I add you and republish,
+              verify you can decrypt the new version and read its annotations
+              before proposing revisions.
+            </p>
+            <p className="mt-3 text-muted-foreground text-sm">
+              On your publishing device, add the public key as a contact, add
+              that contact to your team, and publish a new version shared with
+              the team. This grants reading access—not ownership or publishing
+              permission.
+            </p>
+            <Link
+              className="mt-3 inline-block text-sm underline underline-offset-4"
+              href="/docs/agents#teams"
+            >
+              Contact and team commands
+            </Link>
+          </details>
+
+          <div className="space-y-3 text-left">
+            <p className="text-center text-muted-foreground text-sm">
+              Then, with a BRC-100 wallet unlocked:
+            </p>
+            <CommandCopy command="npx bitplan auth" />
+          </div>
+
+          <p className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
+            <Link
+              className="text-primary underline-offset-4 hover:underline"
+              href="/docs"
+            >
+              Docs
+            </Link>
+            <Link
+              className="text-primary underline-offset-4 hover:underline"
+              href="/docs/how-it-works"
+            >
+              How it works
+            </Link>
+            <a
+              className="text-primary underline-offset-4 hover:underline"
+              href="https://www.npmjs.com/package/bitplan"
+            >
+              CLI on npm
+            </a>
+          </p>
+        </div>
+      </section>
     </main>
   );
 }

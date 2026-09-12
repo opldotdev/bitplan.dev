@@ -8,6 +8,15 @@
 import { Buffer } from 'node:buffer'
 import { CONTENT_TYPE, HOSTED_API_URL, VIEWER_BASE_URL } from './constants.js'
 import { CliError } from './errors.js'
+import {
+	assertSecureHttpUrl,
+	readBoundedResponseText,
+	withTimeoutSignal,
+} from './http.js'
+
+const HOSTED_TIMEOUT_MS = 45_000
+const HOSTED_JSON_MAX_BYTES = 64 * 1024
+const HOSTED_ERROR_MAX_BYTES = 16 * 1024
 
 export const HOSTED_ID = /^h_[A-Za-z0-9_-]{20}$/
 
@@ -64,17 +73,7 @@ function siteOrigin(siteUrl: string): string {
  * development origins: localhost, 127.0.0.1, or ::1.
  */
 export function assertHttpsSiteUrl(url: URL): void {
-	if (url.protocol === 'https:') return
-	if (url.protocol !== 'http:') {
-		throw new CliError(
-			`Invalid site URL ${JSON.stringify(url.toString())}: expected https.`,
-		)
-	}
-	const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
-	if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return
-	throw new CliError(
-		`Refusing cleartext http site URL for ${JSON.stringify(url.host)}: use https, or http only for localhost development.`,
-	)
+	assertSecureHttpUrl(url, 'site')
 }
 
 export async function createHostedDraft(
@@ -178,7 +177,11 @@ async function hostedRequest(
 ): Promise<Response> {
 	let response: Response
 	try {
-		response = await fetch(url, init)
+		response = await fetch(url, {
+			...init,
+			redirect: 'error',
+			signal: withTimeoutSignal(HOSTED_TIMEOUT_MS, init.signal),
+		})
 	} catch (error) {
 		throw new CliError(
 			`Could not reach hosted API at ${url}: ${errorMessage(error)}`,
@@ -206,7 +209,11 @@ async function readErrorPayload(response: Response): Promise<{
 	message?: string
 	current?: number
 }> {
-	const text = await response.text()
+	const text = await readBoundedResponseText(
+		response,
+		HOSTED_ERROR_MAX_BYTES,
+		'Hosted API error response',
+	)
 	if (!text) return {}
 	try {
 		const body = JSON.parse(text) as Record<string, unknown>
@@ -222,11 +229,18 @@ async function readErrorPayload(response: Response): Promise<{
 
 async function readJson(response: Response): Promise<Record<string, unknown>> {
 	try {
-		const body: unknown = await response.json()
+		const body: unknown = JSON.parse(
+			await readBoundedResponseText(
+				response,
+				HOSTED_JSON_MAX_BYTES,
+				'Hosted API response',
+			),
+		)
 		if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
 			return body as Record<string, unknown>
 		}
-	} catch {
+	} catch (error) {
+		if (error instanceof CliError) throw error
 		// Fall through.
 	}
 	throw new CliError('Hosted API returned a response that was not JSON.')

@@ -57,9 +57,10 @@ export default function CliSetupPage() {
         </div>
       </section>
       <p>
-        Config and file-to-origin mappings live in <code>~/.bitplan/</code>.
-        Neither file holds key material. Next:{" "}
-        <Link href="/docs/commands">commands</Link>.
+        Config and file-to-origin mappings live in <code>~/.bitplan/</code>. The
+        wallet keeps identity and funding keys, but the draft mapping can
+        contain reader-link and hosted-write bearer secrets; protect it like a
+        password store. Next: <Link href="/docs/commands">commands</Link>.
       </p>
     </>
   );

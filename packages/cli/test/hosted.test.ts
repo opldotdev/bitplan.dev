@@ -89,6 +89,8 @@ describe('hosted HTTP', () => {
 		expect(headerValue(init, 'content-type')).toBe('application/x-bitplan')
 		expect(headerValue(init, 'authorization')).toBe(hostedAuthHeader(SECRET))
 		expect(Buffer.from(init?.body as Uint8Array)).toEqual(Buffer.from(ENVELOPE))
+		expect(init?.signal).toBeInstanceOf(AbortSignal)
+		expect(init?.redirect).toBe('error')
 	})
 
 	test('appends a version with X-Bitplan-Base-Version', async () => {
@@ -132,6 +134,28 @@ describe('hosted HTTP', () => {
 			'Another publish updated this hosted draft (now version 4). Fetch it, merge, and publish again.',
 		)
 	})
+
+	test('rejects oversized success and error responses before JSON parsing', async () => {
+		spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+			new Response('x', {
+				status: 201,
+				headers: { 'content-length': String(64 * 1024 + 1) },
+			}),
+		)
+		await expect(createHostedDraft(SITE, SECRET, ENVELOPE)).rejects.toThrow(
+			'Hosted API response exceeds',
+		)
+
+		spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+			new Response('x', {
+				status: 500,
+				headers: { 'content-length': String(16 * 1024 + 1) },
+			}),
+		)
+		await expect(createHostedDraft(SITE, SECRET, ENVELOPE)).rejects.toThrow(
+			'Hosted API error response exceeds',
+		)
+	})
 })
 
 describe('hosted fetchLatest', () => {
@@ -154,6 +178,33 @@ describe('hosted fetchLatest', () => {
 		expect(originFromReference(`https://bitplan.dev/d/${HOSTED}#k=abc`)).toBe(
 			HOSTED,
 		)
+	})
+
+	test('bounds hosted bodies and attaches a finite timeout', async () => {
+		const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
+			new Response(Uint8Array.of(1), {
+				headers: { 'content-length': '999999999' },
+			}),
+		)
+		await expect(fetchLatest(HOSTED, { siteUrl: SITE })).rejects.toThrow(
+			'Hosted content exceeds',
+		)
+		expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal)
+	})
+
+	test('times out a stalled hosted request', async () => {
+		spyOn(globalThis, 'fetch').mockImplementation(
+			((_input, init) =>
+				new Promise((_resolve, reject) => {
+					init?.signal?.addEventListener('abort', () => {
+						reject(init.signal?.reason)
+					})
+				})) as typeof fetch,
+		)
+
+		await expect(
+			fetchLatest(HOSTED, { siteUrl: SITE, timeoutMs: 1 }),
+		).rejects.toThrow('Could not reach hosted content')
 	})
 })
 

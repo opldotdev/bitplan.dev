@@ -1,0 +1,1275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>Staged rollout — comprehensive plan example</title>
+    <meta
+      content="An adaptable, self-contained proposal with contextual notes, evidence, architecture, milestones, and a decision handoff."
+      name="description"
+    >
+    <style>
+    :root {
+      --bg: #fbfaf7;
+      --fg: #1a1a1a;
+      --muted: #5f5b53;
+      --line: #ddd8cf;
+      --card: #fff;
+      --accent: #b5471f;
+      --soft: #f1ede4;
+      font-family:
+        ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.6;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #121110;
+        --fg: #ece8df;
+        --muted: #a39d92;
+        --line: #2c2a26;
+        --card: #1b1a17;
+        --accent: #e8825a;
+        --soft: #1f1d19;
+        color-scheme: dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #121110;
+      --fg: #ece8df;
+      --muted: #a39d92;
+      --line: #2c2a26;
+      --card: #1b1a17;
+      --accent: #e8825a;
+      --soft: #1f1d19;
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      color: var(--fg);
+      background: var(--bg);
+    }
+    main {
+      max-width: 868px;
+      padding: 48px 24px 96px;
+      margin: auto;
+    }
+    h1,
+    h2,
+    h3 {
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(2rem, 6vw, 3.4rem);
+      letter-spacing: -0.04em;
+    }
+    h2 {
+      padding-top: 1rem;
+      margin-top: 3rem;
+      border-top: 1px solid var(--line);
+    }
+    p,
+    li {
+      max-width: 68ch;
+    }
+    a {
+      color: var(--accent);
+      text-underline-offset: 0.15em;
+    }
+    .eyebrow {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    .lede {
+      font-size: 1.15rem;
+      color: var(--muted);
+    }
+    .meta {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .card {
+      padding: 16px 18px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+      gap: 12px;
+    }
+    .wrap {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    code,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.92em;
+    }
+    pre {
+      padding: 14px 16px;
+      overflow-x: auto;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th,
+    td {
+      padding: 0.55rem 0.6rem;
+      vertical-align: top;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+    }
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
+    </style>
+
+    <style>
+    .vp-choices {
+      margin-top: 3rem;
+      line-height: 1.6;
+      color: var(--fg);
+    }
+    .vp-decision {
+      min-inline-size: 0;
+      padding: 16px 18px;
+      margin: 1.4rem 0;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .vp-decision legend {
+      padding: 0 0.3rem;
+      font-weight: 700;
+    }
+    .vp-why,
+    .vp-hint {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .vp-why {
+      margin: 0 0 0.6rem;
+    }
+    .vp-opt {
+      display: grid;
+      grid-template-columns: 1.4rem 1fr;
+      gap: 8px;
+      align-items: start;
+      padding: 10px;
+      margin: 6px 0;
+      cursor: pointer;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .vp-opt input {
+      margin-top: 0.3rem;
+      accent-color: var(--accent);
+    }
+    .vp-opt b,
+    .vp-opt small {
+      display: block;
+    }
+    .vp-opt small {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .vp-opt:has(input:checked) {
+      background: var(--soft);
+      border-color: var(--accent);
+    }
+    .vp-opt:focus-within,
+    .vp-note:focus-visible,
+    .vp-copy:focus-visible,
+    .vp-output:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+    .vp-note-label {
+      display: block;
+      margin-top: 1rem;
+    }
+    .vp-note {
+      box-sizing: border-box;
+      display: block;
+      width: 100%;
+      min-height: 80px;
+      padding: 10px;
+      margin-top: 8px;
+      font: inherit;
+      color: var(--fg);
+      resize: vertical;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .vp-actions {
+      margin-top: 1.5rem;
+    }
+    .vp-copy {
+      padding: 10px 16px;
+      font: inherit;
+      font-weight: 700;
+      color: var(--fg);
+      cursor: pointer;
+      background: var(--soft);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+    }
+    .vp-copy[hidden] {
+      display: none;
+    }
+    .vp-output {
+      padding: 14px 16px;
+      font-size: 0.92rem;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      -webkit-user-select: all;
+      user-select: all;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .vp-answer,
+    .vp-conflict {
+      display: none;
+    }
+    .vp-choices:has(#vp-rollout-all:checked):has(#vp-ceo-agree:checked)
+      .vp-conflict {
+      display: block;
+    }
+    /* Add one answer rule per radio and one empty-state rule per question. */
+    .vp-choices:has(#vp-rollout-pilot:checked) .vp-answer-pilot,
+    .vp-choices:has(#vp-rollout-all:checked) .vp-answer-all,
+    .vp-choices:has(#vp-rollout-unsure:checked) .vp-answer-rollout-unsure,
+    .vp-choices:has(#vp-ceo-agree:checked) .vp-answer-agree,
+    .vp-choices:has(#vp-ceo-caveats:checked) .vp-answer-caveats,
+    .vp-choices:has(#vp-ceo-disagree:checked) .vp-answer-disagree,
+    .vp-choices:has(#vp-ceo-unsure:checked) .vp-answer-ceo-unsure {
+      display: inline;
+    }
+    .vp-choices:has(input[name="vp-rollout"]:checked) .vp-empty-rollout,
+    .vp-choices:has(input[name="vp-ceo"]:checked) .vp-empty-ceo {
+      display: none;
+    }
+    </style>
+
+    <style>
+    main {
+      max-width: 1100px;
+    }
+    h1 {
+      max-width: 18ch;
+      font-family: Georgia, serif;
+    }
+    section {
+      scroll-margin-top: 5rem;
+    }
+    .rail {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 20px;
+      padding: 12px 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--line);
+    }
+    .rail a {
+      font-size: 0.85rem;
+    }
+    button,
+    select {
+      padding: 8px;
+      font: inherit;
+      color: var(--fg);
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    [hidden] {
+      display: none !important;
+    }
+    .stamp,
+    .tag {
+      font-family: ui-monospace, monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+    }
+    .annotated {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 240px;
+      gap: 24px;
+      align-items: start;
+    }
+    .sticky {
+      padding: 16px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      transform: rotate(-1deg);
+    }
+    .sticky p {
+      margin-bottom: 0;
+    }
+    .avatar {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      margin-right: 8px;
+      font-size: 0.8rem;
+      border: 1px solid var(--accent);
+      border-radius: 50%;
+    }
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .diagram-box {
+      fill: var(--card);
+      stroke: var(--line);
+      stroke-width: 2;
+    }
+    .diagram-line {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 2;
+    }
+    .diagram-text {
+      font:
+        16px system-ui,
+        sans-serif;
+      fill: var(--fg);
+    }
+    .diagram-note {
+      font:
+        13px system-ui,
+        sans-serif;
+      fill: var(--muted);
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      padding: 0;
+      list-style: none;
+    }
+    .flow li {
+      min-width: 0;
+      padding: 12px;
+      background: var(--soft);
+      border-top: 3px solid var(--accent);
+    }
+    summary {
+      cursor: pointer;
+    }
+    td,
+    th {
+      min-width: 130px;
+    }
+    pre {
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    body:has(#hide-notes:checked) .sticky {
+      display: none;
+    }
+    .visual-hero {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 32px;
+      align-items: center;
+      padding: 32px 0;
+    }
+    .visual-hero h1 {
+      font-size: clamp(2.5rem, 5vw, 4.2rem);
+      line-height: 1.05;
+    }
+    .visual-hero figure {
+      padding: 20px;
+      margin: 0;
+      background: var(--soft);
+      border-top: 1px solid var(--fg);
+      border-bottom: 1px solid var(--line);
+    }
+    .visual-hero figcaption {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    @media (max-width: 800px) {
+      .visual-hero {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+    }
+    .eyebrow {
+      padding-top: 14px;
+      border-top: 3px double var(--fg);
+    }
+    .stamp {
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .card,
+    .vp-decision {
+      border-radius: 2px;
+    }
+    h2 {
+      font-family: Georgia, serif;
+      font-size: 2rem;
+      font-weight: 500;
+    }
+    @media (max-width: 700px) {
+      main {
+        padding: 24px 16px 64px;
+      }
+      .annotated,
+      .flow {
+        grid-template-columns: 1fr;
+      }
+      .sticky {
+        transform: none;
+      }
+    }
+    </style>
+<style>
+/* Editorial edition: document styling only; live controls remain in the viewer. */
+:root { --bg:#f3efe6; --fg:#24221e; --muted:#69645b; --line:#c6bfb0; --card:#f8f5ee; --soft:#e8e2d6; --accent:#8e3f29; }
+@media(prefers-color-scheme:dark) {
+  :root:not([data-theme="light"]) { --bg:#191917; --fg:#eee9de; --muted:#aaa499; --line:#514d44; --card:#22221f; --soft:#292722; --accent:#e29878; }
+}
+:root[data-theme="dark"] { --bg:#191917; --fg:#eee9de; --muted:#aaa499; --line:#514d44; --card:#22221f; --soft:#292722; --accent:#e29878; }
+main { max-width:1280px; padding:40px 5vw 80px; }
+h1,h2,h3 { font-family:Georgia,"Times New Roman",serif; font-weight:400; }
+h2 { font-size:clamp(2rem,3.5vw,3rem); }
+h3 { font-size:1.45rem; }
+.visual-hero { grid-template-columns:1.2fr 1fr; gap:48px; padding:40px 0; border-bottom:1px solid var(--line); }
+.visual-hero h1 { font-size:clamp(3.3rem,6.5vw,6rem); line-height:1.02; letter-spacing:-.055em; }
+.visual-hero .lede { font-family:Georgia,"Times New Roman",serif; font-size:1.35rem; line-height:1.5; color:var(--fg); }
+.visual-hero figure { padding:12px; background:transparent; border:0; }
+.card { box-shadow:none; }
+.sticky { transform:none; border-radius:3px; }
+.rail { font-size:.8rem; }
+.stamp { border-bottom:0; }
+@media(max-width:800px) { .visual-hero { grid-template-columns:1fr; gap:24px; } }
+@media(max-width:700px) { main { padding:24px 20px 64px; } .visual-hero { padding:24px 0; } }
+</style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Example product · draft 1 · illustrative template</p>
+      <p class="stamp">
+        Repository: REPLACE · Issue: REPLACE · Reader: release owner · Origin:
+        unpublished
+      </p>
+      <label hidden id="theme-control"
+        >Theme
+        <select id="theme">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select></label
+      >
+      <!-- Replace this visual thesis with your actual mechanism. Marketing/showcase pages
+     should show the product here, not begin with a long status report. Use real
+     chart data or a grounded diagram; never invent metrics to decorate a hero. -->
+      <header class="visual-hero">
+        <div>
+          <h1>Release with a recovery path.</h1>
+          <p class="lede">
+            Choose who gets the first release. Keep a tested way to stop new
+            access without changing existing data.
+          </p>
+        </div>
+        <figure id="hero-boundary">
+          <svg
+            aria-labelledby="hero-title hero-desc"
+            role="img"
+            viewBox="0 0 480 290"
+          >
+            <title id="hero-title">
+              Two audience choices, one recovery boundary
+            </title>
+            <desc id="hero-desc">
+              A pilot group or all users enter through the same access check.
+              Disabling access blocks new entry but leaves existing data
+              unchanged.
+            </desc>
+            <rect
+              class="diagram-box"
+              height="65"
+              rx="12"
+              width="175"
+              x="10"
+              y="15"
+            />
+            <rect
+              class="diagram-box"
+              height="65"
+              rx="12"
+              width="175"
+              x="10"
+              y="110"
+            />
+            <text class="diagram-text" x="28" y="54">Pilot group</text>
+            <text class="diagram-text" x="28" y="149">All users</text>
+            <path
+              class="diagram-line"
+              d="M185 48 H224 V96 H260 M185 142 H224 V96"
+            />
+            <rect
+              class="diagram-box"
+              height="75"
+              rx="12"
+              width="205"
+              x="260"
+              y="60"
+            />
+            <text class="diagram-text" x="282" y="92">Access check</text>
+            <text class="diagram-note" x="282" y="116">Can stop new entry</text>
+            <path class="diagram-line" d="M362 135 V200" />
+            <rect
+              class="diagram-box"
+              height="65"
+              rx="12"
+              width="205"
+              x="260"
+              y="200"
+            />
+            <text class="diagram-text" x="280" y="227">Existing data</text>
+            <text class="diagram-note" x="280" y="251">
+              Ownership unchanged
+            </text>
+          </svg>
+          <figcaption>
+            Illustrative architecture—not a working switch. Both audience
+            choices use the same recovery test.
+          </figcaption>
+        </figure>
+      </header>
+      <p class="card">
+        <b>Template, not a product status report.</b>
+        Replace this illustrative rollout scenario with verified facts. Remove
+        unused sections before publishing.
+      </p>
+      <nav aria-label="Plan sections" class="rail">
+        <a href="#situation">Situation</a><a href="#boundary">Architecture</a
+        ><a href="#evidence">Evidence</a><a href="#perspectives">Perspectives</a
+        ><a href="#delivery">Delivery</a><a href="#vp-heading">Your call</a>
+      </nav>
+
+      <section id="situation">
+        <h2>01 · What changes</h2>
+        <div class="panel">
+          <article class="card">
+            <span class="tag">Current · example</span>
+            <h3>One release boundary</h3>
+            <p>
+              The illustrative service enables access for its entire audience at
+              once.
+            </p>
+          </article>
+          <article class="card">
+            <span class="tag">Proposed</span>
+            <h3>An explicit audience</h3>
+            <p>
+              The release owner chooses a pilot or all users. Both paths require
+              a tested access switch.
+            </p>
+          </article>
+          <article class="card">
+            <span class="tag">Unchanged</span>
+            <h3>Existing data ownership</h3>
+            <p>
+              This example changes access to a feature, not ownership of user
+              data.
+            </p>
+          </article>
+        </div>
+        <!-- On later drafts add a dated "What changed" block with reasons, not only a version bump. -->
+        <h3>Keep the discussion beside the decision</h3>
+        <label
+          ><input id="hide-notes" type="checkbox">
+          Hide contextual notes</label
+        >
+        <div class="annotated">
+          <div id="release-boundary">
+            <p>
+              A smaller audience limits initial exposure. It also adds
+              recruitment work and can miss uncommon workflows.
+            </p>
+            <p>
+              A broad release reaches everyone immediately. A failure affects
+              more people before the team disables access.
+            </p>
+          </div>
+          <aside
+            aria-label="Illustrative human annotation"
+            class="sticky"
+            data-annotation-id="example-note-1"
+            data-source-version="draft 1"
+            data-target="release-boundary"
+          >
+            <b
+              ><span aria-hidden="true" class="avatar">EX</span>Example
+              participant</b
+            >
+            <p class="meta">
+              Human · illustrative paraphrase · raises a question
+            </p>
+            <p>Can we disable access without changing user data?</p>
+            <p class="meta">
+              <a href="#release-boundary">Target: release boundary</a>
+              · source: draft 1 · embedded example, not an independent
+              checkpoint
+            </p>
+          </aside>
+        </div>
+        <p class="meta">
+          This note demonstrates placement. It is not a real person's
+          contribution or live presence. Embed the user's chosen roster portrait
+          before use.
+        </p>
+      </section>
+
+      <section id="boundary">
+        <h2>02 · The proposed boundary</h2>
+        <figure class="card">
+          <svg
+            aria-labelledby="flow-title flow-description"
+            role="img"
+            viewBox="0 0 850 205"
+          >
+            <title id="flow-title">Audience selection controls access</title>
+            <desc id="flow-description">
+              A release owner selects an audience. An access check admits that
+              audience to the feature. The data store stays unchanged.
+            </desc>
+            <rect
+              class="diagram-box"
+              height="100"
+              rx="12"
+              width="220"
+              x="10"
+              y="25"
+            />
+            <rect
+              class="diagram-box"
+              height="100"
+              rx="12"
+              width="220"
+              x="310"
+              y="25"
+            />
+            <rect
+              class="diagram-box"
+              height="100"
+              rx="12"
+              width="220"
+              x="610"
+              y="25"
+            />
+            <path
+              class="diagram-line"
+              d="M230 75 H300 l-10 -6 m10 6 l-10 6 M530 75 H600 l-10 -6 m10 6 l-10 6"
+            />
+            <text class="diagram-text" x="30" y="65">Release owner</text>
+            <text class="diagram-note" x="30" y="95">Selects the audience</text>
+            <text class="diagram-text" x="330" y="65">Access check</text>
+            <text class="diagram-note" x="330" y="95">
+              Applies that selection
+            </text>
+            <text class="diagram-text" x="630" y="65">Feature</text>
+            <text class="diagram-note" x="630" y="95">
+              Uses existing user data
+            </text>
+            <text class="diagram-note" x="10" y="170">
+              Proposed flow. Disabling access stops new entry; it does not undo
+              previous writes.
+            </text>
+          </svg>
+          <figcaption>
+            Replace the boxes with actual components. Name the owner and failure
+            boundary for every transition.
+          </figcaption>
+        </figure>
+        <h3>Decision tree · Q1</h3>
+        <ol class="flow">
+          <li>
+            <b>Pilot group</b>
+            <p>
+              Recruit participants → verify workflow coverage → review
+              expansion.
+            </p>
+          </li>
+          <li>
+            <b>All users</b>
+            <p>
+              Verify recovery readiness → release broadly → review support
+              reports.
+            </p>
+          </li>
+          <li>
+            <b>Unsure or unanswered</b>
+            <p>
+              Check recruitment and coverage. Hold the audience decision;
+              continue recovery tests.
+            </p>
+          </li>
+        </ol>
+      </section>
+
+      <section id="evidence">
+        <h2>03 · Evidence before commitment</h2>
+        <div
+          aria-label="Evidence comparison"
+          class="wrap"
+          role="region"
+          tabindex="0"
+        >
+          <table>
+            <caption>
+              Illustrative comparisons. Replace assumptions with linked
+              evidence.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Concern</th>
+                <th scope="col">Pilot group</th>
+                <th scope="col">All users</th>
+                <th scope="col">Evidence needed</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Initial exposure</th>
+                <td>Invited participants</td>
+                <td>Full audience</td>
+                <td>Count eligible users in each group.</td>
+              </tr>
+              <tr>
+                <th scope="row">Coverage</th>
+                <td>Depends on recruitment</td>
+                <td>Includes uncommon workflows</td>
+                <td>Map participants to required workflows.</td>
+              </tr>
+              <tr>
+                <th scope="row">Recovery</th>
+                <td>Disable pilot access</td>
+                <td>Disable broad access</td>
+                <td>Run the same recovery test for both.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <details class="card">
+          <summary>How to explain a score or estimate</summary>
+          <p>
+            State the inputs, units, calculation, source, and uncertainty. Use
+            this native disclosure instead of a hover-only tooltip. Omit scores
+            without evidence.
+          </p>
+        </details>
+      </section>
+
+      <section id="perspectives">
+        <h2>04 · Perspectives and the current call</h2>
+        <p>
+          These authoring slots are not completed reviews. Choose a fast,
+          single-author role-play or actual independent reviewers for a real
+          unresolved decision.
+        </p>
+        <p class="meta">For role-play, label this section and every card “Simulated perspective · single author.” For independent review, attribute only contributions actually received.</p>
+        <div class="panel">
+          <article class="card">
+            <span class="tag">Advocate · unassigned</span>
+            <h3>The strongest case</h3>
+            <p>
+              Choose a roster character. Show its portrait, name, role, and
+              provenance. State the case, evidence, cost, and condition where
+              this option fits.
+            </p>
+          </article>
+          <article class="card">
+            <span class="tag">Judge · unassigned</span>
+            <h3>The deciding evidence</h3>
+            <p>
+              Name the evaluation criterion, result, and observable fact that
+              would change the result.
+            </p>
+          </article>
+          <article class="card">
+            <span class="tag">Decision owner · unassigned</span>
+            <h3>The proposed next step</h3>
+            <p>
+              Separate the owner's recommendation from the reviewer's response.
+              Record release gates and what remains open.
+            </p>
+          </article>
+        </div>
+        <p class="meta">
+          A roster portrait is not approval. Simulated voices are not independent
+          reviews, real participant messages, or live presence. Never invent
+          endorsements or consensus.
+        </p>
+        <details><summary>Make the disagreement useful</summary><p>Give each option equal space. Challenge the strongest rival argument and answer its objection. Question the premise when needed.</p><p>Assess correctness, simplicity, and user value. State what evidence would change each assessment. Preserve uncertainty and dissent.</p><p>Independent agents can challenge assumptions shared by a single author's role-play. Use them when the decision warrants the extra time.</p></details>
+      </section>
+
+      <section id="delivery">
+        <h2>05 · Delivery and proof</h2>
+        <ol class="flow">
+          <li>
+            <span class="tag">1 · Independent check</span>
+            <h3>Test recovery</h3>
+            <p>Owner: assign before work.</p>
+            <p>
+              <b>Done when:</b>
+              disabling access blocks new entry and leaves existing data
+              readable.
+            </p>
+          </li>
+          <li>
+            <span class="tag">2 · Depends on Q1</span>
+            <h3>Prepare the audience</h3>
+            <p>Owner: release owner.</p>
+            <p>
+              <b>Done when:</b>
+              the selected audience and required workflows are recorded.
+            </p>
+          </li>
+          <li>
+            <span class="tag">3 · Depends on 1 + 2</span>
+            <h3>Review release readiness</h3>
+            <p>Owner: assign before work.</p>
+            <p>
+              <b>Done when:</b>
+              the owner reviews recovery evidence and explicitly authorizes
+              release.
+            </p>
+          </li>
+        </ol>
+        <h3>Risks and exclusions</h3>
+        <p>
+          Disabling access cannot undo prior writes. Data migration and
+          automatic rollback are outside this example's scope.
+        </p>
+      </section>
+
+      <!-- Replace the illustrative questions below. If settled, use an implementation brief instead.
+     Keep static response, data attributes, and visible draft stamp synchronized.
+     Add dependency-aware output before introducing conditional questions. -->
+      <section
+        aria-labelledby="vp-heading"
+        class="vp-choices"
+        data-proposal-origin="unpublished"
+        data-proposal-title="Staged rollout"
+        data-proposal-version="draft 1"
+      >
+        <h2 id="vp-heading">Your call</h2>
+        <p>
+          Pick one answer per question. Unsure requests the stated check and
+          leaves that decision open.
+        </p>
+
+        <fieldset class="vp-decision" data-q="Rollout scope">
+          <legend>1. Who gets the first release?</legend>
+          <p class="vp-why">
+            Scope determines how many users encounter an undiscovered failure.
+          </p>
+          <label class="vp-opt"
+            ><input
+              id="vp-rollout-pilot"
+              name="vp-rollout"
+              type="radio"
+              value="Pilot group"
+            >
+            <span
+              ><b>Pilot group</b
+              ><small
+                >Release to a small invited group so feedback arrives before
+                broad exposure. Recruitment takes time and may miss uncommon
+                workflows. Expand after the pilot checks pass, or disable access
+                if they fail.</small
+              ></span
+            ></label
+          >
+          <label class="vp-opt"
+            ><input
+              id="vp-rollout-all"
+              name="vp-rollout"
+              type="radio"
+              value="All users"
+            >
+            <span
+              ><b>All users</b
+              ><small
+                >Release to everyone so all users can benefit immediately. An
+                undiscovered failure affects the full audience. Disable access
+                if needed; review support reports before the next
+                release.</small
+              ></span
+            ></label
+          >
+          <label class="vp-opt"
+            ><input
+              id="vp-rollout-unsure"
+              name="vp-rollout"
+              type="radio"
+              value="Unsure — check pilot recruitment capacity before deciding"
+            >
+            <span
+              ><b>Unsure</b
+              ><small
+                >The agent will check pilot recruitment capacity and report
+                whether the group covers the main workflows. This delays the
+                scope decision; neither release path is accepted.</small
+              ></span
+            ></label
+          >
+          <label class="vp-note-label" for="vp-rollout-note"
+            >Rollout notes (optional)</label
+          >
+          <textarea
+            class="vp-note"
+            id="vp-rollout-note"
+            placeholder="Constraints or questions about rollout"
+          ></textarea>
+        </fieldset>
+
+        <!-- Required when the CEO's final call awaits the reviewer's decision. -->
+        <fieldset
+          class="vp-decision"
+          data-q="CEO's final call: run a pilot before broad release"
+        >
+          <legend>2. On the CEO's final call</legend>
+          <p class="vp-why">
+            The example review lead calls for a pilot before broad release. Your
+            answer directs the next iteration.
+          </p>
+          <label class="vp-opt"
+            ><input id="vp-ceo-agree" name="vp-ceo" type="radio" value="Agree">
+            <span
+              ><b>Agree</b
+              ><small
+                >Adopt the pilot direction, subject to the proposal's stated
+                scope and unresolved dependencies. Broad availability waits for
+                pilot evidence. The direction can change after reviewing that
+                evidence.</small
+              ></span
+            ></label
+          >
+          <label class="vp-opt"
+            ><input
+              id="vp-ceo-caveats"
+              name="vp-ceo"
+              type="radio"
+              value="Agree with caveats — resolve my conditions before proceeding"
+            >
+            <span
+              ><b>Agree with caveats</b
+              ><small
+                >Keep the pilot direction with the conditions you write below.
+                The agent resolves those conditions before dependent work
+                starts, which may change cost or timing. You can revise the
+                conditions after the response.</small
+              ></span
+            ></label
+          >
+          <label class="vp-opt"
+            ><input
+              id="vp-ceo-disagree"
+              name="vp-ceo"
+              type="radio"
+              value="Disagree — revise the proposal using my reasons"
+            >
+            <span
+              ><b>Disagree</b
+              ><small
+                >Reopen the direction using your reasons below and request a
+                revised proposal. Dependent implementation waits, adding another
+                review cycle. You can choose a direction after reviewing the
+                revision.</small
+              ></span
+            ></label
+          >
+          <label class="vp-opt"
+            ><input
+              id="vp-ceo-unsure"
+              name="vp-ceo"
+              type="radio"
+              value="Unsure — check rollback readiness and pilot coverage before revisiting the CEO call"
+            >
+            <span
+              ><b>Unsure</b
+              ><small
+                >The agent will check rollback readiness and pilot coverage,
+                then revisit The example review lead's call with that evidence.
+                The call remains undecided while the check runs; this does not
+                accept it.</small
+              ></span
+            ></label
+          >
+          <label class="vp-note-label" for="vp-ceo-note"
+            >CEO response notes</label
+          >
+          <p class="vp-hint">
+            For caveats or disagreement, explain your conditions or reasons. If
+            omitted, the agent must ask before acting on this call.
+          </p>
+          <textarea
+            class="vp-note"
+            id="vp-ceo-note"
+            placeholder="Conditions, reasons, or missing evidence"
+          ></textarea>
+        </fieldset>
+
+        <label class="vp-note-label" for="vp-general-note"
+          >Anything else (optional)</label
+        >
+        <textarea
+          class="vp-note"
+          id="vp-general-note"
+          placeholder="Other constraints, questions, or changes"
+        ></textarea>
+
+        <div class="vp-actions">
+          <button class="vp-copy" hidden type="button">
+            Copy my response for the agent
+          </button>
+          <p class="vp-hint vp-copy-hint">
+            Select the block below and copy it. Append any typed notes manually;
+            scripts are needed to include them automatically.
+          </p>
+          <p aria-live="polite" class="vp-hint vp-status" role="status"></p>
+          <pre
+            aria-label="Proposal response"
+            class="vp-output"
+            tabindex="0"
+          >=== PROPOSAL RESPONSE ===
+Proposal: Staged rollout (draft 1)
+Origin: unpublished
+1. Rollout scope: <span class="vp-empty-rollout">(no selection)</span><span class="vp-answer vp-answer-pilot">Pilot group</span><span class="vp-answer vp-answer-all">All users</span><span class="vp-answer vp-answer-rollout-unsure">Unsure — check pilot recruitment capacity before deciding</span>
+2. CEO's final call: run a pilot before broad release: <span class="vp-empty-ceo">(no selection)</span><span class="vp-answer vp-answer-agree">Agree</span><span class="vp-answer vp-answer-caveats">Agree with caveats — resolve my conditions before proceeding</span><span class="vp-answer vp-answer-disagree">Disagree — revise the proposal using my reasons</span><span class="vp-answer vp-answer-ceo-unsure">Unsure — check rollback readiness and pilot coverage before revisiting the CEO call</span>
+<span class="vp-conflict">Conflict: All users conflicts with agreeing to the pilot call. Resolve rollout scope before dependent work.</span>
+Agent: Unsure requests its stated check; it does not accept an option. Ask about unselected decisions, conflicting answers, or missing caveats/reasons before dependent work. These answers do not authorize actions beyond the stated scope.</pre>
+        </div>
+      </section>
+
+      <section id="sources">
+        <h2>Sources and authoring notes</h2>
+        <p>
+          <a
+            href="https://github.com/opldotdev/bitplan.dev"
+            rel="noopener noreferrer"
+            target="_blank"
+            >BitPlan source</a
+          >
+          · Replace with specific issue, code, specification, and measurement
+          links that support your actual plan.
+        </p>
+        <p class="meta">
+          This example has no live editing, shared storage, or publish controls.
+          Its choices and notes stay in this page until copied.
+        </p>
+        <details>
+          <summary>Authoring a plan that supports annotation layers</summary>
+          <p>
+            Keep section IDs stable across revisions. Give each section a
+            meaningful heading. These anchors let people and agents refer to the
+            same passage at different screen sizes.
+          </p>
+          <p>
+            The host supplies the avatar dropdown, live overlays, and agent
+            tools. Do not duplicate that navbar or put collaboration credentials
+            in this document. A connected agent should read the document and its
+            annotation layers together.
+          </p>
+          <p>
+            For a historical export, identify the exact document version and
+            annotation checkpoint heads. Preserve note IDs, author attribution,
+            target sections, resolved state, and missing-content warnings. Do
+            not imply this embedded example contains every live contribution.
+          </p>
+          <p>
+            Keep the copy response available. Direct submission requires a
+            host-supported request channel with a delivery acknowledgement; an
+            online portrait alone is not proof that an agent received the
+            request.
+          </p>
+        </details>
+      </section>
+    </main>
+    <script>
+    "use strict";
+    (() => {
+      document.querySelectorAll(".vp-choices").forEach((root) => {
+        var out = root.querySelector(".vp-output");
+        var btn = root.querySelector(".vp-copy");
+        var status = root.querySelector(".vp-status");
+        var hint = root.querySelector(".vp-copy-hint");
+        if (!(out && btn && status && hint)) {
+          return;
+        }
+        var instruction =
+          "Agent: Unsure requests its stated check; it does not accept an option. Ask about unselected decisions, conflicting answers, or missing caveats/reasons before dependent work. These answers do not authorize actions beyond the stated scope.";
+        function build() {
+          var lines = [
+            "=== PROPOSAL RESPONSE ===",
+            "Proposal: " +
+              root.dataset.proposalTitle +
+              " (" +
+              root.dataset.proposalVersion +
+              ")",
+            "Origin: " + (root.dataset.proposalOrigin || "unpublished"),
+          ];
+          root.querySelectorAll(".vp-decision").forEach((decision, index) => {
+            var chosen = decision.querySelector('input[type="radio"]:checked');
+            lines.push(
+              index +
+                1 +
+                ". " +
+                decision.dataset.q +
+                ": " +
+                (chosen ? chosen.value : "(no selection)")
+            );
+            var note = decision.querySelector(".vp-note");
+            if (note && note.value.trim()) {
+              lines.push("Notes: " + note.value.trim());
+            }
+          });
+          var general = root.querySelector("#vp-general-note");
+          if (general && general.value.trim()) {
+            lines.push("General notes: " + general.value.trim());
+          }
+          if (
+            root.querySelector("#vp-rollout-all:checked") &&
+            root.querySelector("#vp-ceo-agree:checked")
+          ) {
+            lines.push(
+              "Conflict: All users conflicts with agreeing to the pilot call. Resolve rollout scope before dependent work."
+            );
+          }
+          lines.push("", instruction);
+          return lines.join("\n");
+        }
+        function update() {
+          out.textContent = build();
+        }
+        function legacyCopy(value) {
+          var field = document.createElement("textarea");
+          field.value = value;
+          field.readOnly = true;
+          field.style.position = "fixed";
+          field.style.top = "-1000px";
+          document.body.appendChild(field);
+          field.select();
+          var copied = false;
+          try {
+            copied = document.execCommand("copy");
+          } catch (error) {
+            copied = false;
+          }
+          field.remove();
+          btn.focus();
+          return copied;
+        }
+        function fallback(value) {
+          if (legacyCopy(value)) {
+            status.textContent = "Copied.";
+            return;
+          }
+          out.focus();
+          var range = document.createRange();
+          range.selectNodeContents(out);
+          var selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+          status.textContent =
+            "Clipboard unavailable. Copy the response block manually with Ctrl+C or Cmd+C; it includes your notes.";
+        }
+        root.addEventListener("input", () => {
+          update();
+          status.textContent = "";
+        });
+        root.addEventListener("change", update);
+        btn.addEventListener("click", () => {
+          update();
+          var value = out.textContent;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+              navigator.clipboard.writeText(value).then(
+                () => {
+                  status.textContent = "Copied.";
+                },
+                () => {
+                  fallback(value);
+                }
+              );
+            } catch (error) {
+              fallback(value);
+            }
+          } else {
+            fallback(value);
+          }
+        });
+        update();
+        hint.textContent =
+          "Copy the response below or use the button. All typed notes are included.";
+        btn.hidden = false;
+      });
+    })();
+    </script>
+
+    <script>
+    "use strict";
+    (() => {
+      var theme = document.getElementById("theme");
+      theme.addEventListener("change", () => {
+        if (theme.value === "system") {
+          document.documentElement.removeAttribute("data-theme");
+        } else {
+          document.documentElement.setAttribute("data-theme", theme.value);
+        }
+      });
+      document.getElementById("theme-control").hidden = false;
+    })();
+    </script>
+  </body>
+</html>

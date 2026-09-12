@@ -1,10 +1,10 @@
 /**
  * Local state: `~/.bitplan/config.json` and `~/.bitplan/drafts.json`.
  *
- * The directory is 0700, every file 0600. Neither file ever holds key
- * material — the wallet owns all keys, and the per-draft `keyID` recorded here
- * is only a label the wallet derives against. Losing this file loses nothing
- * but convenience: origins are on chain and keyIDs are in the envelope header.
+ * The directory is 0700, every file 0600. The wallet owns identity and funding
+ * keys, and each per-draft `keyID` is only a derivation label. `drafts.json`
+ * can contain reader-link private keys and hosted-write bearer secrets, so it
+ * must be handled like a credential store even though it cannot fund or sign.
  */
 
 import { randomUUID } from 'node:crypto'

@@ -35,6 +35,37 @@ components should compose those primitives rather than duplicating them.
 
 ## Important boundaries
 
+### Hosted collaboration (preview)
+
+Set `NEXT_PUBLIC_CONVEX_URL` to the deployed collaboration backend. Reader links
+do not grant collaboration authority; use an explicit encrypted room invitation.
+Right-click the document → **Add Annotation** → type at the anchor → **Save**.
+Saved notes stream through Convex to connected clients and survive reloads.
+Text/element-relative anchors follow scrolling and responsive layout; a small
+pin preserves the exact target when an edge forces the note card to flip.
+Notes remain bound to their original document content hash, not silently moved
+to an edited version. HTML and image annotations remain available in the panel.
+
+Actual document clicks (including agent-browser clicks) update an encrypted
+session location and click counter. The latest location and last click are
+retained in Convex; this is not a complete click-history log. Presence reports
+connection status separately, and disconnected locations are labeled “last seen.”
+No location is invented before a session interacts. These hosted operations
+do not inscribe anything or prove that an agent is still executing.
+
+Focused checks:
+
+```sh
+bun test apps/web/src/lib/annotation-bridge.test.ts apps/web/src/lib/annotation-position.test.ts
+NEXT_PUBLIC_CONVEX_URL=https://wary-wildebeest-416.convex.cloud bun apps/web/scripts/collaboration-smoke.ts
+```
+
+The second check creates a small encrypted development room and verifies
+cross-client updates, authorization, stale-write rejection, and retained click
+locations after disconnect. It refuses to run against another deployment.
+
+### Document and wallet boundaries
+
 - Draft routes are under `/d/<origin>`.
 - `/ordfs/content/<origin>:<sequence>` is a GET/HEAD-only Route Handler. It
   validates the pointer, content type, envelope, and size before returning

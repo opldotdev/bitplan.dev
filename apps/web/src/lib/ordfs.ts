@@ -4,6 +4,7 @@ import { toOrdinalOutpoint } from "@/lib/outpoint";
 import { SITE_URL } from "@/lib/site";
 
 const TRAILING_SLASHES = /\/+$/;
+const CONTENT_POINTER = /^[0-9a-f]{64}[._]\d+$/i;
 
 /**
  * Same-origin content proxy. A narrow Route Handler accepts only GET/HEAD for
@@ -56,6 +57,25 @@ export type OrdfsContentResult =
 
 function mediaType(value: string): string {
   return value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+}
+
+/** Gateways use txid.vout; all viewer/version targets use txid_vout. */
+function contentPointer(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  if (isHostedId(value)) {
+    return value;
+  }
+  if (
+    !(
+      CONTENT_POINTER.test(value) &&
+      Number.isSafeInteger(Number(value.slice(65)))
+    )
+  ) {
+    return null;
+  }
+  return toOrdinalOutpoint(value);
 }
 
 export function ordfsContentUrl(origin: string, seq: number): string {
@@ -113,8 +133,8 @@ export async function fetchOrdfsMeta(
     byteLength: Number.isFinite(parsedLength) ? parsedLength : null,
     contentType:
       response.headers.get("content-type") ?? "application/octet-stream",
-    origin: response.headers.get("x-origin"),
-    outpoint: response.headers.get("x-outpoint"),
+    origin: contentPointer(response.headers.get("x-origin")),
+    outpoint: contentPointer(response.headers.get("x-outpoint")),
     sequence: Number.isFinite(parsedSequence) ? parsedSequence : null,
   };
 }
@@ -185,8 +205,8 @@ export async function fetchOrdfsContent(
     content: {
       bytes,
       contentType,
-      origin: response.headers.get("x-origin"),
-      outpoint: response.headers.get("x-outpoint"),
+      origin: contentPointer(response.headers.get("x-origin")),
+      outpoint: contentPointer(response.headers.get("x-outpoint")),
       sequence: Number.isFinite(parsedSequence) ? parsedSequence : null,
     },
     state: "found",

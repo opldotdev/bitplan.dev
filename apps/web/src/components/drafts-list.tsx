@@ -2,8 +2,9 @@
 
 import { Check, Cloud, Copy, FileLock2, Wallet } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { DecipherText } from "@/components/decipher-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -90,6 +91,7 @@ export function classifyChainFailure(
 
 export type ChainDetail =
   | { status: "ok"; meta: DraftMeta; latestVersion: number | null }
+  | { status: "loading" }
   | { status: "retryable" }
   | { status: "unsupported" }
   | { status: "not-authorized" };
@@ -173,7 +175,7 @@ export function buildRows(
     }
     const detail = details[plan.origin];
     return {
-      detail: detail ?? { status: "retryable" },
+      detail: detail ?? { status: "loading" },
       plan,
     };
   });
@@ -278,39 +280,74 @@ export function chainOriginsForDetails(
   return origins;
 }
 
-async function loadChainDetails(
+export async function loadChainDetails(
   wallet: DraftsWallet,
-  origins: readonly string[]
+  origins: readonly string[],
+  onDetail?: (origin: string, detail: ChainDetail) => void,
+  isCurrent: () => boolean = () => true
 ): Promise<Record<string, ChainDetail>> {
   const details: Record<string, ChainDetail> = {};
   for (const origin of origins) {
+    if (!isCurrent()) {
+      break;
+    }
     // biome-ignore lint/performance/noAwaitInLoops: sequential on purpose — parallel decrypts would stack wallet permission prompts on first grant
     details[origin] = await loadChainDetail(wallet, origin);
+    if (isCurrent()) {
+      onDetail?.(origin, details[origin]);
+    }
   }
   return details;
 }
 
 export function DraftsList() {
   const [state, setState] = useState<ListState>({ phase: "checking" });
+  const generation = useRef(0);
 
   const bootWallet = useCallback(async (wallet: DraftsWallet) => {
-    const [coins, hosted] = await Promise.all([
-      listWalletDrafts(wallet),
-      loadHosted(wallet),
-    ]);
-    const details = await loadChainDetails(
-      wallet,
-      chainOriginsForDetails(coins, hosted.entries)
-    );
+    generation.current += 1;
+    const run = generation.current;
+    const isCurrent = () => generation.current === run;
+    const update = (patch: Partial<Extract<ListState, { phase: "loaded" }>>) =>
+      setState((current) =>
+        isCurrent() && current.phase === "loaded"
+          ? { ...current, ...patch }
+          : current
+      );
     setState({
-      catalog: hosted.error ? { state: "error" } : { state: "ready" },
-      coins,
-      details,
-      hosted: hosted.entries,
+      catalog: { state: "loading" },
+      coins: [],
+      details: {},
+      hosted: [],
       phase: "loaded",
       reloadingRows: [],
       wallet,
     });
+    const [coins, hosted] = await Promise.all([
+      listWalletDrafts(wallet).then((loadedCoins) => {
+        update({ coins: loadedCoins });
+        return loadedCoins;
+      }),
+      loadHosted(wallet).then((loadedHosted) => {
+        update({ hosted: loadedHosted.entries });
+        return loadedHosted;
+      }),
+    ]);
+    if (!isCurrent()) {
+      return;
+    }
+    update({ catalog: hosted.error ? { state: "error" } : { state: "ready" } });
+    await loadChainDetails(
+      wallet,
+      chainOriginsForDetails(coins, hosted.entries),
+      (origin, detail) =>
+        setState((current) =>
+          isCurrent() && current.phase === "loaded"
+            ? { ...current, details: { ...current.details, [origin]: detail } }
+            : current
+        ),
+      isCurrent
+    );
   }, []);
 
   const connect = useCallback(async () => {
@@ -345,10 +382,14 @@ export function DraftsList() {
     boot();
     return () => {
       cancelled = true;
+      generation.current += 1;
     };
   }, [bootWallet]);
 
   const retryCatalog = useCallback(async () => {
+    generation.current += 1;
+    const run = generation.current;
+    const isCurrent = () => generation.current === run;
     setState((current) => {
       if (current.phase !== "loaded") {
         return current;
@@ -371,20 +412,33 @@ export function DraftsList() {
         freshCoins = null;
       }
       const origins = chainOriginsForDetails(freshCoins ?? [], hosted.entries);
-      const details = await loadChainDetails(wallet, origins);
       setState((previous) => {
-        if (previous.phase !== "loaded") {
+        if (!isCurrent() || previous.phase !== "loaded") {
           return previous;
         }
         return {
           ...previous,
           catalog: hosted.error ? { state: "error" } : { state: "ready" },
           coins: freshCoins ?? previous.coins,
-          details: freshCoins ? details : { ...previous.details, ...details },
+          details: previous.details,
           hosted: hosted.entries,
           wallet,
         };
       });
+      await loadChainDetails(
+        wallet,
+        origins,
+        (origin, detail) =>
+          setState((current) =>
+            isCurrent() && current.phase === "loaded"
+              ? {
+                  ...current,
+                  details: { ...current.details, [origin]: detail },
+                }
+              : current
+          ),
+        isCurrent
+      );
     } catch {
       setState((previous) => {
         if (previous.phase !== "loaded") {
@@ -667,6 +721,24 @@ function PlanItem({
   reloading: boolean;
   row: ViewRow;
 }) {
+  if (row.detail?.status === "loading") {
+    return (
+      <Item aria-busy="true" aria-label="Loading plan" variant="outline">
+        <ItemMedia variant="icon">
+          <FileLock2 />
+        </ItemMedia>
+        <ItemContent className="min-w-0 overflow-hidden">
+          <ItemTitle>
+            <DecipherText pending />
+          </ItemTitle>
+          <ItemDescription>Retrieving encrypted plan…</ItemDescription>
+        </ItemContent>
+        <ItemActions>
+          <Badge variant="secondary">On chain</Badge>
+        </ItemActions>
+      </Item>
+    );
+  }
   if (row.detail === null) {
     return <HostedItem row={row} />;
   }
@@ -687,9 +759,13 @@ function HostedItem({ row }: { row: ViewRow }) {
           <Cloud />
         </ItemMedia>
         <ItemContent className="min-w-0">
-          <ItemTitle>{plan.title ?? "Untitled plan"}</ItemTitle>
+          <ItemTitle>
+            <DecipherText text={plan.title ?? "Untitled plan"} />
+          </ItemTitle>
           {plan.description ? (
-            <ItemDescription>{plan.description}</ItemDescription>
+            <ItemDescription>
+              <DecipherText text={plan.description} />
+            </ItemDescription>
           ) : null}
         </ItemContent>
         <ItemActions>
@@ -725,9 +801,13 @@ function ChainItem({ row }: { row: ViewRow }) {
           <FileLock2 />
         </ItemMedia>
         <ItemContent className="min-w-0">
-          <ItemTitle>{meta?.title ?? "Encrypted draft"}</ItemTitle>
+          <ItemTitle>
+            <DecipherText text={meta?.title ?? "Encrypted draft"} />
+          </ItemTitle>
           <ItemDescription>
-            {meta?.description ?? truncateMiddle(plan.origin)}
+            <DecipherText
+              text={meta?.description ?? truncateMiddle(plan.origin)}
+            />
           </ItemDescription>
         </ItemContent>
         <ItemActions>

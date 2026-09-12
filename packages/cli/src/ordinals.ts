@@ -16,19 +16,25 @@
  */
 
 import { Buffer } from 'node:buffer'
+import { randomUUID } from 'node:crypto'
 import {
+	buildOrdinalCustomInstructions,
 	buildTransferOrdinals,
+	type CreateActionArgs,
 	createContext,
 	executeTrackedAction,
-	inscribe,
+	MAX_INSCRIPTION_BYTES,
 	type OneSatContext,
 	ORDINALS_BASKET,
+	P1SAT_PROTOCOL,
 	type WalletInterface,
 	type WalletOutput,
 } from '@1sat/actions'
+import { buildInscriptionScript } from '@1sat/templates'
+import { Beef, Hash, P2PKH, PublicKey, Utils } from '@bsv/sdk'
 import { CONTENT_TYPE, MAP_METADATA, TYPE_TAG } from './constants.js'
 import { CliError } from './errors.js'
-import { splitOutpoint, toOrdinalOutpoint } from './outpoint.js'
+import { toOrdinalOutpoint } from './outpoint.js'
 
 export interface BitplanCoin {
 	/** Wallet tracking id (`id:` tag value) — what a transfer spends by. */
@@ -128,31 +134,7 @@ export async function publishGenesis(
 	wallet: WalletInterface,
 	envelope: Uint8Array,
 ): Promise<PublishResult> {
-	const ctx = walletContext(wallet)
-	const result = await inscribe.execute(ctx, {
-		base64Content: Buffer.from(envelope).toString('base64'),
-		contentType: CONTENT_TYPE,
-		map: { ...MAP_METADATA },
-	})
-
-	if (result.error) {
-		throw new CliError(
-			`The wallet could not inscribe this draft: ${result.error}`,
-		)
-	}
-	if (!result.txid) {
-		throw new CliError(
-			'The wallet returned no txid for the inscription; nothing was published.',
-		)
-	}
-
-	const outpoint = await locateCoinOutpoint(wallet, result.txid)
-	return {
-		txid: result.txid,
-		beef: result.tx ? Uint8Array.from(result.tx) : undefined,
-		outpoint,
-		origin: outpoint,
-	}
+	return (await publishBatch(wallet, [{ envelope }]))[0]!
 }
 
 function versionTransfer(coin: BitplanCoin, envelope: Uint8Array) {
@@ -193,70 +175,146 @@ export async function publishVersion(
 	coin: BitplanCoin,
 	envelope: Uint8Array,
 ): Promise<PublishResult> {
-	const params = await buildTransferOrdinals(walletContext(wallet), {
-		transfers: [versionTransfer(coin, envelope)],
-	})
-	if ('error' in params) {
-		throw new CliError(
-			`The wallet could not publish this version: ${params.error}`,
-		)
-	}
+	return (await publishBatch(wallet, [{ coin, envelope }]))[0]!
+}
 
-	const { labels: _wpmLabels, sources: _sources, ...createArgs } = params
+export interface PublishItem {
+	/** Already sealed with the existing envelope format; never re-encrypted here. */
+	envelope: Uint8Array
+	/** Omit to create a new ordinal. Supply to preserve an existing origin. */
+	coin?: BitplanCoin
+}
+
+/**
+ * One action, one ordinal output per item. Existing coins must precede genesis
+ * items so each one-sat input maps to its corresponding one-sat output.
+ * Item order is output order; callers can bind same-transaction references
+ * before sealing. Payment/change outputs belong to the wallet, not this list.
+ */
+export async function publishBatch(
+	wallet: WalletInterface,
+	items: readonly PublishItem[],
+): Promise<PublishResult[]> {
+	if (!items.length) throw new CliError('A publish needs at least one item.')
+	const ids = new Set<string>()
+	const outpoints = new Set<string>()
+	let sawGenesis = false
+	for (const { coin, envelope } of items) {
+		if (!envelope.byteLength || envelope.byteLength > MAX_INSCRIPTION_BYTES) {
+			throw new CliError(
+				'Envelope is empty or exceeds the inscription size limit.',
+			)
+		}
+		if (!coin) {
+			sawGenesis = true
+			continue
+		}
+		if (sawGenesis)
+			throw new CliError('Existing ordinal versions must precede new ordinals.')
+		const outpoint = toOrdinalOutpoint(coin.outpoint)
+		if (ids.has(coin.id) || outpoints.has(outpoint)) {
+			throw new CliError('An ordinal cannot be spent twice in one publish.')
+		}
+		ids.add(coin.id)
+		outpoints.add(outpoint)
+	}
+	const args: CreateActionArgs = {
+		description: `Publish ${items.length} BitPlan output(s)`,
+		inputs: [],
+		outputs: [],
+		options: { randomizeOutputs: false, acceptDelayedBroadcast: false },
+	}
+	const proofs: number[][] = []
+	for (const { coin, envelope } of items) {
+		if (coin) {
+			const params = await buildVersionTransfer(wallet, coin, envelope)
+			if ('error' in params)
+				throw new CliError(`Could not build version: ${params.error}`)
+			if (
+				params.inputs?.length !== 1 ||
+				params.outputs?.length !== 1 ||
+				toOrdinalOutpoint(params.inputs[0]!.outpoint) !==
+					toOrdinalOutpoint(coin.outpoint) ||
+				params.outputs[0]!.satoshis !== 1 ||
+				params.sources[0]?.satoshis !== 1
+			) {
+				throw new CliError(
+					'Ordinal source changed or the transfer layout is invalid; reload before publishing.',
+				)
+			}
+			if (!params.inputBEEF?.length)
+				throw new CliError('Missing ordinal input proof.')
+			args.inputs!.push(...params.inputs)
+			args.outputs!.push(...params.outputs)
+			proofs.push(Array.from(params.inputBEEF))
+		} else {
+			const keyID = `inscribe-${randomUUID()}`
+			const { publicKey } = await wallet.getPublicKey({
+				protocolID: P1SAT_PROTOCOL,
+				keyID,
+				counterparty: 'self',
+				forSelf: true,
+			})
+			const tags = [
+				TYPE_TAG,
+				'origin',
+				`sha256:${Utils.toHex(Hash.sha256(Array.from(envelope)))}`,
+			]
+			args.outputs!.push({
+				lockingScript: buildInscriptionScript(
+					new P2PKH().lock(PublicKey.fromString(publicKey).toAddress()),
+					envelope,
+					CONTENT_TYPE,
+					{ ...MAP_METADATA },
+				).toHex(),
+				satoshis: 1,
+				outputDescription: 'BitPlan inscription',
+				basket: ORDINALS_BASKET,
+				tags,
+				customInstructions: buildOrdinalCustomInstructions({
+					protocolID: P1SAT_PROTOCOL,
+					keyID,
+					tags,
+				}),
+			})
+		}
+	}
+	if (proofs.length === 1) args.inputBEEF = proofs[0]
+	else if (proofs.length > 1) {
+		const beef = new Beef()
+		for (const proof of proofs) beef.mergeBeef(proof)
+		args.inputBEEF = beef.toBinary()
+	}
 	const result = await executeTrackedAction(
 		wallet,
-		{
-			...createArgs,
-			options: { ...createArgs.options, randomizeOutputs: false },
-		},
+		args,
 		undefined,
-		params.inputBEEF ? Array.from(params.inputBEEF) : undefined,
+		args.inputBEEF ? Array.from(args.inputBEEF) : undefined,
 		undefined,
 		{
-			spends: [{ basket: ORDINALS_BASKET, id: coin.id }],
+			spends: items.flatMap(({ coin }) =>
+				coin ? [{ basket: ORDINALS_BASKET, id: coin.id }] : [],
+			),
 			usePermissionModule: false,
 		},
 	)
 
 	if (result.error) {
 		throw new CliError(
-			`The wallet could not publish this version: ${result.error}`,
+			`The wallet could not publish the batch: ${result.error}`,
 		)
 	}
 	if (!result.txid) {
 		throw new CliError(
-			'The wallet returned no txid for the update; nothing was published.',
+			'The wallet returned no txid. Check wallet activity before retrying this publish.',
 		)
 	}
 
-	const outpoint = await locateCoinOutpoint(wallet, result.txid)
-	return {
-		txid: result.txid,
+	const txid = result.txid
+	return items.map(({ coin }, index) => ({
+		txid,
 		beef: result.tx ? Uint8Array.from(result.tx) : undefined,
-		outpoint,
-		origin: coin.origin,
-	}
-}
-
-/**
- * Where the 1-sat output landed.
- *
- * Both paths build with `randomizeOutputs: false` and put the ordinal first,
- * so vout 0 is correct — but ask the wallet rather than assume, and only fall
- * back to vout 0 if the basket has not caught up yet.
- */
-async function locateCoinOutpoint(
-	wallet: WalletInterface,
-	txid: string,
-): Promise<string> {
-	try {
-		const coins = await listBitplanCoins(wallet, { limit: 1000 })
-		const match = coins.find(
-			(coin) => splitOutpoint(coin.outpoint).txid === txid.toLowerCase(),
-		)
-		if (match) return match.outpoint
-	} catch {
-		// Fall through to the deterministic position.
-	}
-	return `${txid}_0`
+		outpoint: `${txid}_${index}`,
+		origin: coin?.origin ?? `${txid}_${index}`,
+	}))
 }

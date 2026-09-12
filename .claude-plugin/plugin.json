@@ -1,6 +1,6 @@
 {
 	"name": "bitplan",
-	"version": "0.2.3",
+	"version": "0.2.10",
 	"description": "Create and share encrypted, versioned HTML plans with a BRC-100 wallet.",
 	"author": {
 		"name": "OPL",
