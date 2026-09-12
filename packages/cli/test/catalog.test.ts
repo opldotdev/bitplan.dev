@@ -137,6 +137,7 @@ interface FetchCall {
 	method: string
 	headers: Record<string, string>
 	body: Uint8Array | null
+	redirect: RequestRedirect | undefined
 	signal: AbortSignal | null | undefined
 }
 
@@ -172,7 +173,14 @@ function mockFetch(script: Response[]): {
 		} else if (Buffer.isBuffer(init?.body)) {
 			body = new Uint8Array(init.body)
 		}
-		calls.push({ url, method, headers, body, signal: init?.signal })
+		calls.push({
+			url,
+			method,
+			headers,
+			body,
+			redirect: init?.redirect,
+			signal: init?.signal,
+		})
 		const next = responses.shift()
 		if (!next) throw new Error('fetch script exhausted')
 		return next
@@ -582,6 +590,7 @@ describe('catalog sync', () => {
 			entries: 1,
 		})
 		expect(calls).toHaveLength(2)
+		expect(calls.every((call) => call.redirect === 'error')).toBe(true)
 		expect(calls[1]?.signal).toBeInstanceOf(AbortSignal)
 		const put = calls[1] as FetchCall
 		expect(put.method).toBe('PUT')

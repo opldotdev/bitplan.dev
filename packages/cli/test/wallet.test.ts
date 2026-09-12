@@ -42,6 +42,24 @@ describe('wallet HTTP response bounds', () => {
 			createWallet('https://wallet.example').getVersion({}),
 		).resolves.toEqual({ version: '1.2.3' })
 		expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal)
+		expect(fetchMock.mock.calls[0]?.[1]?.redirect).toBe('error')
+	})
+
+	test('allows payload-sized create and sign responses', async () => {
+		spyOn(globalThis, 'fetch').mockImplementation(
+			(async () =>
+				new Response('{}', {
+					headers: { 'content-length': String(4 * 1024 * 1024 + 1) },
+				})) as unknown as typeof fetch,
+		)
+		const wallet = createWallet('https://wallet.example') as unknown as {
+			substrate: {
+				createAction: (args: object) => Promise<unknown>
+				signAction: (args: object) => Promise<unknown>
+			}
+		}
+		await expect(wallet.substrate.createAction({})).resolves.toEqual({})
+		await expect(wallet.substrate.signAction({})).resolves.toEqual({})
 	})
 
 	test('rejects an oversized wallet RPC response', async () => {

@@ -31,9 +31,9 @@ test("parser-confusing plan markup cannot precede the policy or bridge", () => {
   ]) {
     const secured = withAnnotationBridge(html);
     expect(secured.indexOf("Content-Security-Policy")).toBeLessThan(
-      secured.indexOf("bitplan-geometry-connect/1")
+      secured.indexOf("bitplan-geometry-ready/1")
     );
-    expect(secured.indexOf("bitplan-geometry-connect/1")).toBeLessThan(
+    expect(secured.indexOf("bitplan-geometry-ready/1")).toBeLessThan(
       secured.indexOf("https://attacker.test")
     );
   }
@@ -61,16 +61,17 @@ test("click anchors round-trip over a private port, including blank space", asyn
     }
   }
   const element = new Element();
-  const parentChannel = new MessageChannel();
-  const parent = parentChannel.port1;
-  const bridgeChannel = new MessageChannel();
-  bridgeChannel.port2.addEventListener("message", (event) =>
-    messages.push(event.data)
-  );
-  bridgeChannel.port2.start();
-  const frameWindow = Object.assign(new EventTarget(), {
-    getSelection: () => ({ toString: () => "Selected paragraph" }),
-  });
+  let parentPort: MessagePort | undefined;
+  const parent = {
+    postMessage(
+      message: { type?: string },
+      _targetOrigin: string,
+      ports: MessagePort[]
+    ) {
+      expect(message.type).toBe("bitplan-geometry-ready/1");
+      parentPort = ports[0];
+    },
+  };
   const context = {
     document: {
       addEventListener: (name: string, callback: (event: unknown) => void) =>
@@ -80,10 +81,10 @@ test("click anchors round-trip over a private port, including blank space", asyn
       querySelectorAll: () => [element],
     },
     Element,
-    Event,
     EventTarget,
     innerHeight: 600,
     innerWidth: 800,
+    MessageChannel,
     MessageEvent,
     MessagePort,
     parent,
@@ -91,33 +92,25 @@ test("click anchors round-trip over a private port, including blank space", asyn
     requestAnimationFrame: (callback: () => void) => callback(),
     scrollX: 0,
     scrollY: 0,
-    window: frameWindow,
+    window: {
+      addEventListener: (name: string, callback: (event: unknown) => void) =>
+        handlers.set(`window:${name}`, callback),
+      getSelection: () => ({ toString: () => "Selected paragraph" }),
+    },
   };
   const script = bridgeScript(withAnnotationBridge("<head></head>"));
   runInNewContext(script, context);
-  let leakedPort = false;
-  frameWindow.addEventListener(
-    "message",
-    () => {
-      leakedPort = true;
-    },
-    true
-  );
-  frameWindow.dispatchEvent(
-    new MessageEvent("message", {
-      data: { type: "bitplan-geometry-connect/1" },
-      ports: [bridgeChannel.port1],
-      source: parent,
-    })
-  );
-  expect(leakedPort).toBe(false);
+  expect(parentPort).toBeDefined();
+  const port = parentPort as MessagePort;
+  port.addEventListener("message", (event) => messages.push(event.data));
+  port.start();
   handlers.get("click")?.({ clientX: 140, clientY: 120, target: element });
   await flushMessages();
   const anchor = messages.at(-1)?.payload.anchor;
   expect(messages.at(-1)?.type).toBe("click");
   expect(anchor.point).toEqual({ x: 0.25, y: 0.25 });
   const locate = async (value: unknown) => {
-    bridgeChannel.port2.postMessage({
+    port.postMessage({
       payload: [{ anchor: value, id: "note" }],
       type: "anchors",
     });
@@ -165,7 +158,7 @@ test("click anchors round-trip over a private port, including blank space", asyn
     target: element,
   });
   expect(messages.length).toBe(afterContext);
-  bridgeChannel.port2.postMessage({
+  port.postMessage({
     payload: { x: 70, y: 0 },
     type: "point",
   });
@@ -173,10 +166,7 @@ test("click anchors round-trip over a private port, including blank space", asyn
   await flushMessages();
   expect(messages.at(-1)?.payload.anchor.point).toEqual({ x: 0.25, y: 0.25 });
   expect(messages.at(-1)?.type).toBe("context");
-  bridgeChannel.port1.close();
-  bridgeChannel.port2.close();
-  parentChannel.port1.close();
-  parentChannel.port2.close();
+  port.close();
 });
 
 function flushMessages(): Promise<void> {

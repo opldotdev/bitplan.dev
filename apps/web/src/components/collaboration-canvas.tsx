@@ -67,6 +67,7 @@ export function CollaborationCanvas({
   const frame = useRef<HTMLIFrameElement>(null);
   const connectedFrame = useRef<HTMLIFrameElement | null>(null);
   const geometryPort = useRef<MessagePort | null>(null);
+  const [bridgeHostReady, setBridgeHostReady] = useState(false);
   const trigger = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState(false);
   const [anchor, setAnchor] = useState<AnnotationAnchor>(center);
@@ -126,10 +127,12 @@ export function CollaborationCanvas({
       .map((item) => ({ anchor: item.anchor, id: `cursor-${item.sessionId}` })),
   ];
   const targetsJson = JSON.stringify(targets);
+  const targetsJsonRef = useRef(targetsJson);
+  targetsJsonRef.current = targetsJson;
 
   function locate() {
     geometryPort.current?.postMessage({
-      payload: JSON.parse(targetsJson),
+      payload: JSON.parse(targetsJsonRef.current),
       type: "anchors",
     });
   }
@@ -220,33 +223,37 @@ export function CollaborationCanvas({
       }
   }
 
-  function connectGeometry() {
-    const currentFrame = frame.current;
-    if (!(currentFrame && connectedFrame.current !== currentFrame)) {
-      return;
+  useEffect(() => {
+    function acceptGeometryPort(event: MessageEvent) {
+      const currentFrame = frame.current;
+      const port = event.ports[0];
+      if (
+        event.source !== currentFrame?.contentWindow ||
+        event.data?.type !== "bitplan-geometry-ready/1" ||
+        !port
+      ) {
+        return;
+      }
+      if (connectedFrame.current === currentFrame) {
+        port.close();
+        return;
+      }
+      connectedFrame.current = currentFrame;
+      geometryPort.current?.close();
+      geometryPort.current = port;
+      port.addEventListener("message", received);
+      port.start();
+      locate();
     }
-    connectedFrame.current = currentFrame;
-    geometryPort.current?.close();
-    const channel = new MessageChannel();
-    geometryPort.current = channel.port1;
-    channel.port1.addEventListener("message", received);
-    channel.port1.start();
-    currentFrame.contentWindow?.postMessage(
-      { type: "bitplan-geometry-connect/1" },
-      "*",
-      [channel.port2]
-    );
-    locate();
-  }
-
-  useEffect(
-    () => () => {
+    window.addEventListener("message", acceptGeometryPort);
+    setBridgeHostReady(true);
+    return () => {
+      window.removeEventListener("message", acceptGeometryPort);
       geometryPort.current?.close();
       geometryPort.current = null;
       connectedFrame.current = null;
-    },
-    []
-  );
+    };
+  }, []);
 
   useEffect(() => {
     if (!room.connection) {
@@ -481,15 +488,16 @@ export function CollaborationCanvas({
             }}
             ref={trigger}
           >
-            <iframe
-              className="absolute inset-0 h-full w-full border-0 bg-background"
-              key={documentHtml}
-              onLoad={connectGeometry}
-              ref={frame}
-              sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-              srcDoc={documentHtml}
-              title={title}
-            />
+            {bridgeHostReady ? (
+              <iframe
+                className="absolute inset-0 h-full w-full border-0 bg-background"
+                key={documentHtml}
+                ref={frame}
+                sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                srcDoc={documentHtml}
+                title={title}
+              />
+            ) : null}
             <div
               aria-label="Annotation positions"
               className="pointer-events-none absolute inset-0 overflow-hidden"

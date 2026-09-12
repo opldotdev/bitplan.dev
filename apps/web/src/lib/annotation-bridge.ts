@@ -79,26 +79,18 @@ function installGeometryBridge(collaboration: boolean) {
   if (!collaboration) {
     return;
   }
-  // A MessagePort is transferred by the trusted parent after this script has
-  // registered its capture listener. Untrusted plan scripts never receive the
-  // port, so they cannot forge cursor or click activity as this participant.
+  // Create and transfer the port before the parser reaches untrusted markup.
+  // Replacing or navigating the document can only destroy this endpoint; an
+  // untrusted replacement never receives authenticated activity authority.
   const addTrustedListener = EventTarget.prototype.addEventListener;
-  const stopImmediately = Event.prototype.stopImmediatePropagation;
   const startPort = MessagePort.prototype.start;
   const postPortMessage = MessagePort.prototype.postMessage;
   const readMessageData = Object.getOwnPropertyDescriptor(
     MessageEvent.prototype,
     "data"
   )?.get;
-  const readMessagePorts = Object.getOwnPropertyDescriptor(
-    MessageEvent.prototype,
-    "ports"
-  )?.get;
-  const readMessageSource = Object.getOwnPropertyDescriptor(
-    MessageEvent.prototype,
-    "source"
-  )?.get;
-  let bridgePort: MessagePort | null = null;
+  const channel = new MessageChannel();
+  const bridgePort = channel.port1;
   let anchors: {
     id: string;
     anchor: {
@@ -109,11 +101,8 @@ function installGeometryBridge(collaboration: boolean) {
   }[] = [];
   let scheduled = false;
   let lastPointer = 0;
-  const send = (type: string, payload: unknown) => {
-    if (bridgePort) {
-      postPortMessage.call(bridgePort, { payload, type });
-    }
-  };
+  const send = (type: string, payload: unknown) =>
+    postPortMessage.call(bridgePort, { payload, type });
   const clamp = (n: number) => Math.max(0, Math.min(1, n));
   const selectedText = () =>
     window.getSelection?.()?.toString().slice(0, 32_000) ?? "";
@@ -259,38 +248,16 @@ function installGeometryBridge(collaboration: boolean) {
     geometry();
   }
   addTrustedListener.call(
-    window,
+    bridgePort,
     "message",
     (rawEvent: Event) => {
-      const event = rawEvent as MessageEvent;
-      const source = readMessageSource?.call(event);
-      const data = readMessageData?.call(event);
-      if (
-        source !== parent ||
-        data?.type !== "bitplan-geometry-connect/1"
-      ) {
-        return;
-      }
-      stopImmediately.call(event);
-      const port = readMessagePorts?.call(event)?.[0] as
-        | MessagePort
-        | undefined;
-      if (!(port && !bridgePort)) {
-        port?.close();
-        return;
-      }
-      bridgePort = port;
-      addTrustedListener.call(
-        port,
-        "message",
-        (rawPortEvent: Event) =>
-          receive(readMessageData?.call(rawPortEvent as MessageEvent)),
-        true
-      );
-      startPort.call(port);
+      receive(readMessageData?.call(rawEvent as MessageEvent));
     },
     true
   );
+  startPort.call(bridgePort);
+  const notifyParent = parent.postMessage.bind(parent);
+  notifyParent({ type: "bitplan-geometry-ready/1" }, "*", [channel.port2]);
   window.addEventListener("scroll", geometry, true);
   window.addEventListener("resize", geometry);
   window.addEventListener("load", geometry);

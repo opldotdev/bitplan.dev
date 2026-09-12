@@ -100,6 +100,7 @@ export async function fetchBoundedResponse(
 ): Promise<Response> {
 	const response = await fetchImpl(input, {
 		...init,
+		redirect: 'error',
 		signal: withTimeoutSignal(options.timeoutMs, init?.signal),
 	})
 	const bytes = await readBoundedResponseBody(

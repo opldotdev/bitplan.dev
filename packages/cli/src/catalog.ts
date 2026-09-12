@@ -570,6 +570,7 @@ async function getRemoteCatalog(
 	try {
 		response = await fetchImpl(url, {
 			method: 'GET',
+			redirect: 'error',
 			signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS),
 		})
 	} catch (error) {
@@ -632,6 +633,7 @@ async function putRemoteCatalog(
 				'X-BitPlan-Base-Version': String(baseVersion),
 			},
 			body: Buffer.from(body),
+			redirect: 'error',
 			signal: withTimeoutSignal(CATALOG_TIMEOUT_MS),
 		})
 	} catch (error) {

@@ -179,6 +179,7 @@ async function hostedRequest(
 	try {
 		response = await fetch(url, {
 			...init,
+			redirect: 'error',
 			signal: withTimeoutSignal(HOSTED_TIMEOUT_MS, init.signal),
 		})
 	} catch (error) {

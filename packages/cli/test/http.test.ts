@@ -50,8 +50,10 @@ describe('readBoundedResponseBody', () => {
 describe('fetchBoundedResponse', () => {
 	test('attaches a deadline and returns a replayable bounded response', async () => {
 		let signal: AbortSignal | null | undefined
+		let redirect: RequestRedirect | undefined
 		const fetchImpl = (async (_input, init) => {
 			signal = init?.signal
+			redirect = init?.redirect
 			return new Response('{"ok":true}', {
 				headers: { 'content-type': 'application/json' },
 				status: 201,
@@ -64,6 +66,7 @@ describe('fetchBoundedResponse', () => {
 			fetchImpl,
 		)
 		expect(signal).toBeInstanceOf(AbortSignal)
+		expect(redirect).toBe('error')
 		expect(response.status).toBe(201)
 		expect(await response.json()).toEqual({ ok: true })
 	})

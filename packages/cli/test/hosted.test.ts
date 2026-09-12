@@ -90,6 +90,7 @@ describe('hosted HTTP', () => {
 		expect(headerValue(init, 'authorization')).toBe(hostedAuthHeader(SECRET))
 		expect(Buffer.from(init?.body as Uint8Array)).toEqual(Buffer.from(ENVELOPE))
 		expect(init?.signal).toBeInstanceOf(AbortSignal)
+		expect(init?.redirect).toBe('error')
 	})
 
 	test('appends a version with X-Bitplan-Base-Version', async () => {

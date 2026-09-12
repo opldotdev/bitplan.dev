@@ -23,6 +23,15 @@ export interface WalletConnection {
 
 const WALLET_TIMEOUT_MS = 45_000
 const WALLET_RESPONSE_MAX_BYTES = 4 * 1024 * 1024
+const WALLET_TRANSACTION_RESPONSE_MAX_BYTES = 32 * 1024 * 1024
+
+function walletResponseLimit(input: string | URL | Request): number {
+	const path = input instanceof Request ? input.url : input.toString()
+	const method = new URL(path).pathname.split('/').at(-1)
+	return method === 'createAction' || method === 'signAction'
+		? WALLET_TRANSACTION_RESPONSE_MAX_BYTES
+		: WALLET_RESPONSE_MAX_BYTES
+}
 
 const walletHttpClient = (async (
 	input: string | URL | Request,
@@ -30,7 +39,7 @@ const walletHttpClient = (async (
 ) =>
 	fetchBoundedResponse(input, init, {
 		label: 'Wallet response',
-		maxBytes: WALLET_RESPONSE_MAX_BYTES,
+		maxBytes: walletResponseLimit(input),
 		timeoutMs: WALLET_TIMEOUT_MS,
 	})) as unknown as typeof fetch
 
