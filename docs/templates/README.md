@@ -57,11 +57,31 @@ visual needs readable labels, theme support, and a narrow-screen treatment.
   skill. Includes sticky section navigation, contextual human notes, a diagram,
   an evidence table, native detail disclosures, optional review panels,
   milestones, theme controls, and a versioned decision handoff.
+- `components.html`: editorial component gallery with serif headlines, a
+  before/after spread, impact map, annotated figure, evidence ledger, and
+  checkpoint timeline. Adapt useful compositions to actual facts; omit filler.
+
+## Links in the viewer
+
+Use `href="#stable-section-id"` for section navigation, and absolute HTTPS URLs
+with `target="_blank" rel="noopener noreferrer"` for external pages. The host
+scrolls local anchors directly because native `srcdoc` fragment navigation can
+load the host page inside itself. Avoid relative page URLs, `<base>`, routers,
+and `location` assignments. Test the hero CTA, section links, and outside links
+inside the real viewer as well as the standalone export. Keep the sandbox and
+CSP intact. A private reader invitation must not be embedded in document content.
 
 The minimal template remains appropriate for short plans. The comprehensive
 template is an illustrative component set, not a requirement to fill every
 section. Replace its scenario and metadata. Remove unused panels and never
-invent reviews, roster identities, scores, or agreement. Embed chosen portraits
+invent completed reviews, roster identities, scores, or agreement. A fast draft
+may role-play opposing positions using roster characters: visibly label the
+section and every card “Simulated perspective · single author.” Separate agents
+provide independent review only when they actually participate. Use strong
+cases, specific rebuttals, a premise challenge, and assessment with observable
+“would change my mind” conditions. Keep options equally weighted and leave the
+decision to the human. Simulated characters are not live collaborators or
+endorsements. Skip the panel when there is no unresolved decision. Embed chosen portraits
 directly so they remain readable without scripts or external image requests.
 For settled decisions, replace the questionnaire with an implementation brief.
 

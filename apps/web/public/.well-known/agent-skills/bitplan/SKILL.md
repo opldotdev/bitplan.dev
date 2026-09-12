@@ -6,12 +6,12 @@ description: >
   or update a plan, share one with a person or team, create a private reader
   link, move a hosted draft on chain, or explain bitplan.dev.
 metadata:
-  version: "0.2.6"
+  version: "0.2.8"
 ---
 
 # BitPlan
 
-**Skill version: 0.2.6**
+**Skill version: 0.2.8**
 
 BitPlan turns one self-contained HTML file into an encrypted living plan. A
 BRC-100 wallet owns the keys. A draft can stay hosted as ciphertext while it
@@ -104,12 +104,16 @@ Choose the format before authoring:
   contextual annotations, architecture diagrams, evidence comparisons, optional
   attributed perspectives, milestones, and a versioned response. This is a
   self-contained HTML format, not a new storage or inscription protocol.
+- **Visual component gallery:** https://bitplan.dev/templates/components.html
+  for reusable editorial compositions. Read it when authoring a substantial
+  proposal or showcase; actively adapt the components that explain your facts.
 
 Keep the minimal format available. Use either template as a design system,
 not a requirement to fill every section. The comprehensive example is
 illustrative: replace its scenario and remove unused authoring slots. Include
-advocates, judges, scores, or a decision-owner call only when real contributions
-and evidence exist. Never fabricate a panel to fill the layout.
+advocates, judges, or a decision-owner call when they clarify a real decision.
+Distinguish actual contributions from explicitly labeled role-play below. Never
+fabricate independent reviews, scores, or endorsements to fill the layout.
 
 A good BitPlan:
 
@@ -146,6 +150,12 @@ ink, fine rules, generous margins, and deliberate asymmetric columns. Aim for
 strength and sophistication through typography and composition—not heavy boxes,
 fake financial charts, ornamental gradients, or a dashboard-style card grid.
 Adapt this direction to the user's brand and explicit preferences.
+Default headline typography to Georgia or another self-contained serif; keep
+body text and control labels in a readable sans serif. Start by mapping the
+available information to visual components, then compose the page around the
+strongest explanation. Do not merely list the palette as optional inspiration:
+use it where it helps. Richness comes from useful relationships and evidence,
+not filling every slot or forcing every plan into the same arrangement.
 
 Choose graphics by the question they answer: a flow for sequence or boundaries,
 a layered diagram for document/annotation relationships, a timeline for states,
@@ -166,6 +176,75 @@ themes. Confirm the primary idea is visible without scrolling, graphics remain
 legible, and the page is useful with scripts off. For a new hosted version use
 the hosted upload workflow: saving shared room HTML alone does not advance the
 version dropdown. Report which kind of update actually happened.
+
+### Adversarial perspectives with roster characters
+
+For a meaningful unresolved decision, use the visual-proposal pattern:
+strong opposing cases → cross-examination → assessment → a human decision.
+Choose the depth that fits the task instead of requiring a delegated panel:
+
+- **Fast draft — simulated perspectives:** one author role-plays each position
+  using different bOpen roster characters. Label the section and each character
+  card “Simulated perspective · single author.” This is structured self-critique,
+  not independent review or a statement by that character's actual agent.
+- **Independent review:** when permitted and useful for consequential decisions,
+  dispatch separate advocates with the same facts and different options. Use
+  distinct reviewers for assessment. Independent agents can challenge assumptions
+  the drafting agent shares across its simulated voices; this takes more time.
+  Only label a contribution independent when that separate review actually ran.
+
+The author may choose the fast mode without delegation. Respect an explicit
+request for independent review; disclose unavailable delegation rather than
+silently substituting role-play. Mixed panels label provenance on every card.
+
+Cast from the current bOpen roster, matching expertise to the position. Show
+portrait (embedded for scripts-off use), name, evaluative role, and provenance.
+Keep authored character panels separate from actual live collaborators. Do not
+create presence events, participant records, signatures, or approval clusters
+for simulated voices. If a portrait is unavailable, use labeled initials.
+
+Keep the exchange concise and substantive:
+
+1. Each advocate states the strongest case, supporting evidence, honest cost,
+   and the condition where its option fits. Give competing options equal space.
+2. Each answers the strongest objection and challenges a rival's specific
+   assumption. Include a premise challenge when the framing itself is doubtful.
+   A feasible new alternative becomes an option, not a dismissed sidebar.
+3. Assess through distinct lenses such as correctness, simplicity, and user
+   value. State the deciding evidence and an observable “would change my mind
+   if…” condition. Preserve uncertainty and dissent; do not invent votes or
+   force disagreement. Simulated judges are still the same author's analysis.
+4. When useful, add a separate decision-owner/CEO perspective on cost, scope,
+   reversibility, and the user. A role-play CEO recommendation is not authority
+   or approval. The actual human chooses; keep the response controls neutral.
+
+Ground every voice in the same verified facts, and label unknowns. A character
+does not supply evidence. Skip the panel for status updates or settled choices;
+retain a short risk/objection note instead. If the options or facts change,
+revise the arguments and assessment together, retaining superseded history when
+useful. Do not update only the apparent winner.
+
+### Links inside the viewer
+
+Plans render in a sandboxed `srcdoc` iframe, not as a website at their own URL.
+Use `<a href="#section-id">` for a section with that exact stable `id`. The
+current viewer intercepts these links to scroll and focus within the plan:
+native fragment navigation can otherwise reload bitplan.dev inside its own
+iframe and show “refused to connect.” Do not replace this with `location.href`,
+`location.hash`, a client router, or a `<base>` element.
+
+Use absolute HTTPS URLs for outside pages, including other BitPlans, with
+`target="_blank" rel="noopener noreferrer"`. Do not use relative paths such as
+`/docs` or `../plan.html`, `_self`, or nested iframes for external destinations.
+Do not embed private reader or collaboration invitations in plan content.
+Use real anchors, not clickable divs or scripted navigation; the host retains
+native new-tab behavior and context-menu Copy link. Scripts-off standalone
+exports still have working native section anchors and explicit external targets.
+
+Test links in the actual viewer, not only a standalone local HTML tab. Click
+the hero CTA, section navigation, and an external reference; confirm section
+links preserve the plan and external pages open outside its iframe. Never
+disable CSP, frame protection, or the sandbox to make a destination load.
 
 ### Annotation overlays and roster characters
 
