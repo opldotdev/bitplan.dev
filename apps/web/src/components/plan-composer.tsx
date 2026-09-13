@@ -25,7 +25,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
 import { registerWebMcpTool } from "@/components/webmcp-tools";
 import {
   draftInputFromAgent,
@@ -46,17 +45,7 @@ import {
   onWalletChange,
 } from "@/lib/wallet";
 
-const PLAN_PLACEHOLDER = `Outcome
-
-Context
-
-Constraints
-
-Next steps`;
-
 export function PlanComposer() {
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [body, setBody] = useState("");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string>();
   const [prepared, setPrepared] = useState<DraftPlaintext>();
@@ -91,7 +80,6 @@ export function PlanComposer() {
         execute: (value) => {
           const input = draftInputFromAgent(value);
           const next = prepareDraft(input);
-          setBody(input.body);
           setError(undefined);
           setPrepared(next);
           setRepository(input.repository);
@@ -125,19 +113,6 @@ export function PlanComposer() {
         title: "Prepare a BitPlan",
       }),
     []
-  );
-
-  const review = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      try {
-        setPrepared(prepareDraft({ body, repository, title }));
-        setError(undefined);
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Check the plan.");
-      }
-    },
-    [body, repository, title]
   );
 
   const publish = useCallback(async () => {
@@ -178,16 +153,7 @@ export function PlanComposer() {
 
   const edit = useCallback(() => {
     setPrepared(undefined);
-    setAdvancedOpen(!walletMode);
-  }, [walletMode]);
-  const updateBody = useCallback(
-    (event: ChangeEvent<HTMLTextAreaElement>) => setBody(event.target.value),
-    []
-  );
-  const updateRepository = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => setRepository(event.target.value),
-    []
-  );
+  }, []);
   const updateTitle = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => setTitle(event.target.value),
     []
@@ -270,101 +236,22 @@ export function PlanComposer() {
     );
   }
 
-  if (!advancedOpen) {
-    return (
-      <SharedStarter
-        connectingWallet={walletMode && connectingWallet}
-        initialLayout={starterLayout}
-        onAdvanced={() => void openWallet()}
-        onPrepared={(draft, layout) => {
-          setPrepared(draft);
-          setStarterLayout(layout);
-        }}
-        onUseLink={() => setWalletMode(false)}
-        setTitle={setTitle}
-        title={title}
-        updateTitle={updateTitle}
-        walletError={walletMode ? walletError : ""}
-        walletMode={walletMode}
-      />
-    );
-  }
-
   return (
-    <WalletFlowShell connecting={connectingWallet} title="Use your wallet">
-      <Button
-        onClick={() => setAdvancedOpen(false)}
-        type="button"
-        variant="ghost"
-      >
-        Back to shared draft
-      </Button>
-
-      <div className="border-t pt-6">
-        <h2 className="font-heading text-2xl">Wallet access</h2>
-        {walletError ? (
-          <>
-            <p className="mt-3 text-muted-foreground text-sm" role="alert">
-              {walletError}
-            </p>
-            <Button
-              className="mt-3"
-              disabled={connectingWallet}
-              onClick={() => void openWallet()}
-              type="button"
-              variant="outline"
-            >
-              {connectingWallet ? "Connecting…" : "Reconnect wallet"}
-            </Button>
-          </>
-        ) : null}
-        <form className="mt-6 space-y-6" onSubmit={review}>
-          <p className="text-muted-foreground text-sm">
-            Only your wallet can open this plan. Review it before publishing.
-          </p>
-          <div className="space-y-2">
-            <Label htmlFor="plan-title">Title</Label>
-            <Input
-              id="plan-title"
-              maxLength={160}
-              onChange={updateTitle}
-              placeholder="Ship the account recovery flow"
-              value={title}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plan-repository">Repository URL (optional)</Label>
-            <Input
-              id="plan-repository"
-              inputMode="url"
-              onChange={updateRepository}
-              placeholder="https://github.com/owner/repository"
-              type="url"
-              value={repository}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plan-body">Plan</Label>
-            <Textarea
-              className="min-h-72 resize-y"
-              id="plan-body"
-              maxLength={50_000}
-              onChange={updateBody}
-              placeholder={PLAN_PLACEHOLDER}
-              value={body}
-            />
-          </div>
-          {error ? (
-            <p className="text-destructive text-sm" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <div className="flex justify-end">
-            <Button type="submit">Review plan</Button>
-          </div>
-        </form>
-      </div>
-    </WalletFlowShell>
+    <SharedStarter
+      connectingWallet={walletMode && connectingWallet}
+      initialLayout={starterLayout}
+      onAdvanced={() => void openWallet()}
+      onPrepared={(draft, layout) => {
+        setPrepared(draft);
+        setStarterLayout(layout);
+      }}
+      onUseLink={() => setWalletMode(false)}
+      setTitle={setTitle}
+      title={title}
+      updateTitle={updateTitle}
+      walletError={walletMode ? walletError : ""}
+      walletMode={walletMode}
+    />
   );
 }
 
