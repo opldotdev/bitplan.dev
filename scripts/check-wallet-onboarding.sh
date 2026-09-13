@@ -7,7 +7,7 @@ origin="${1:-http://localhost:3000}"
 agent-browser --session "$session" open "$origin/new" >/dev/null
 agent-browser --session "$session" wait '#shared-draft-title'
 agent-browser --session "$session" fill '#shared-draft-title' 'Wallet flow check'
-agent-browser --session "$session" find role button click --name 'Connect wallet' --exact
+agent-browser --session "$session" click '[role="dialog"] aside button[data-variant="default"]'
 agent-browser --session "$session" wait --fn '!Array.from(document.querySelectorAll("button")).find(b => b.textContent.trim() === "Continue")?.disabled'
 agent-browser --session "$session" find role button click --name 'Continue' --exact
 agent-browser --session "$session" check 'input[name="template"][value="terminal"]'
