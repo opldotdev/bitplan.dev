@@ -7,7 +7,13 @@ import {
   openEnvelope,
   sealEnvelope,
 } from "./envelope";
-import { linkWallet, parseLinkFragment, readerOnlyUrl } from "./link-reader";
+import {
+  linkFragment,
+  linkWallet,
+  newLinkSecret,
+  parseLinkFragment,
+  readerOnlyUrl,
+} from "./link-reader";
 
 const PLAINTEXT: DraftPlaintext = {
   html: "<!doctype html><title>Link plan</title><p>hello</p>",
@@ -26,6 +32,7 @@ const PLAINTEXT: DraftPlaintext = {
     title: "Link plan",
   },
 };
+const READER_SECRET_PATTERN = /^[0-9a-f]{64}$/;
 
 function toBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -43,6 +50,12 @@ function bytesOfLength(length: number): Uint8Array {
 }
 
 describe("parseLinkFragment", () => {
+  test("round-trips a newly generated 32-byte reader secret", () => {
+    const secret = newLinkSecret();
+    expect(secret).toMatch(READER_SECRET_PATTERN);
+    expect(parseLinkFragment(`#k=${linkFragment(secret)}`)).toBe(secret);
+  });
+
   test("accepts #k=, bare k=, and a full URL", () => {
     const secret = bytesOfLength(32);
     const hex = Utils.toHex(secret);
@@ -74,7 +87,7 @@ describe("readerOnlyUrl", () => {
     const key = toBase64Url(bytesOfLength(32));
     expect(
       readerOnlyUrl(
-        `https://bitplan.dev/d/example?v=1#k=${key}&room=room&collab=secret&client=agent`
+        `https://bitplan.dev/d/example?v=1&collaborate=1#k=${key}&room=room&collab=secret&client=agent`
       )
     ).toBe(`https://bitplan.dev/d/example?v=1#k=${key}`);
     expect(

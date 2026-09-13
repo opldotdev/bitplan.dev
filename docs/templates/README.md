@@ -33,15 +33,36 @@ Learned the hard way over five drafts of one plan.
    version numbers in the names of things people use. Short sentences.
 7. **Theme-aware.** Light and dark through `prefers-color-scheme`, colors
    on `:root` tokens only.
-8. **Says what it is.** Eyebrow with product, draft number, and date. A lede
-   that a stranger understands. A "what changed since the last draft" list when
-   there was a last draft. A closing line that says the work is not built yet.
+8. **Says what matters once.** Use sentence-case labels and a lede a stranger
+   understands. Do not repeat the host's branding or version, stack slogans,
+   or caption obvious artwork. Keep revision notes in one disclosure and label
+   genuinely unfinished features accurately. Do not add a boilerplate footer
+   claiming that shipped work is unbuilt.
 9. **Fits the limit.** Under the plan size limit with everything inlined.
    Check with `wc -c`.
 10. **Same file, new version.** Republishing the same path updates the same
     origin. Do not rename the file between drafts.
 
 ## Templates
+
+- `blank.html`: an empty white sheet in light mode and a matte chalkboard in
+  dark mode. No placeholder copy, fake notes, or embedded editor. Join a live
+  collaboration room to use the viewer's annotation tools on it.
+- `brief.html`: a warm editorial brief with two columns and embedded paper artwork.
+- `terminal.html`: a technical walkthrough with monochrome dither artwork.
+
+The player's Appearance picker can restyle an existing document locally. Blank
+removes decorative background artwork but never deletes text, images, or notes.
+Use the empty starter when creating a genuinely blank document. Appearance
+preferences do not publish a new version or modify shared document contents.
+
+Brief, Terminal, and Editorial include a private-sharing walkthrough: complete
+reader links and collaboration invitations are bearer credentials. For sensitive
+work, create a new wallet-encrypted plan with `--share-with <contact>` and no
+`--link`. An existing draft may retain previous reader-link recipients even if
+`--link` is omitted. Have the agent verify the public identity key with the
+operator before `contact set`; never request private keys or wallet passwords.
+Blank intentionally remains empty; the viewer supplies its onboarding.
 
 For substantial proposals and marketing showcases, lead with a visual thesis:
 show the mechanism beside the outcome, not a large title followed by a wall of

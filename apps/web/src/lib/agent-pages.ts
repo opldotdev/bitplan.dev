@@ -5,6 +5,8 @@ const PAGES: Record<string, string> = {
 
 Secure agent plans. Encrypted before upload. Keep a draft hosted while it changes, then put it on Bitcoin when it should be permanent.
 
+Get started at /new to create a browser-encrypted shared starter without a funding wallet. Choose Brief, Terminal, or Blank. Keep its complete invitation private. This link-owned working draft is separate from wallet-owned CLI publication.
+
 Publish a self-contained HTML file with the CLI:
 
     npx bitplan auth
@@ -118,9 +120,9 @@ Private plans use BRC-100 wallet encryption with [2, "bitplan"], a public keyID,
 
 See ${SITE_URL}/docs/how-it-works
 `,
-  "/new": `# New plan · BitPlan
+  "/new": `# New shared draft · BitPlan
 
-Create and review a private BitPlan in the browser at ${SITE_URL}/new.
+Choose Brief, Terminal, or Blank at ${SITE_URL}/new and create an encrypted shared starter without a funding wallet. The viewer joins realtime collaboration automatically. Keep the complete invitation private: its holder can read and contribute. This disposable link-owned draft has no retained hosted-update secret; room edits are not published document versions. Use the wallet/CLI flow for controlled recipients and permanent publication.
 
 Browser agents with WebMCP can call \`start_bitplan_plan\` to open the composer, then \`prepare_bitplan_plan\` with a title, plan body, and optional HTTPS repository URL. The tool validates and stages the exact review preview. It never connects a wallet or publishes; the user must approve publishing through their BRC-100 wallet.
 
@@ -196,7 +198,7 @@ Read an encrypted envelope:
 
 For an on-chain origin, this returns public ciphertext from 1Sat. For a hosted ID, it returns hosted ciphertext. The CLI is the npm package bitplan: https://www.npmjs.com/package/bitplan
 
-Creating and updating a plan goes through the user's wallet via \`npx bitplan\`. Decryption happens in the browser or CLI. Drafts at /d/<origin> are ciphertext and are not indexed.
+The browser's /new flow creates a link-owned encrypted hosted starter and opens live collaboration without a funding wallet. Keep its invitation private. Wallet-owned CLI publishing still uses the user's BRC-100 wallet via \`npx bitplan\`. Decryption happens in the browser or CLI. Drafts at /d/<origin> are ciphertext and are not indexed.
 `;
 
 export function markdownForPath(pathname: string): string | null {

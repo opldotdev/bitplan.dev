@@ -63,8 +63,13 @@ test("click anchors round-trip over a private port, including blank space", asyn
   const element = new Element();
   const trustedEvents = new WeakSet<object>();
   class TestEvent {
-    get isTrusted() {
-      return trustedEvents.has(this);
+    constructor() {
+      // Chromium exposes this unforgeable getter on each event, not its prototype.
+      Object.defineProperty(this, "isTrusted", {
+        get() {
+          return trustedEvents.has(this);
+        },
+      });
     }
   }
   const trustedEvent = <T extends object>(value: T) => {
@@ -200,6 +205,24 @@ test("click anchors round-trip over a private port, including blank space", asyn
     "context",
   ]);
   expect(messages.at(-1)?.payload.selection).toBe("Selected paragraph");
+  const beforePassthrough = messages.length;
+  let passthroughPrevented = false;
+  handlers.get("contextmenu")?.(
+    trustedEvent({
+      clientX: 70,
+      clientY: 0,
+      preventDefault() {
+        passthroughPrevented = true;
+      },
+      shiftKey: true,
+      target: element,
+    })
+  );
+  await flushMessages();
+  expect(passthroughPrevented).toBe(false);
+  expect(
+    messages.slice(beforePassthrough).map((message) => message.type)
+  ).toEqual(["click"]);
   const afterContext = messages.length;
   handlers.get("auxclick")?.(
     trustedEvent({

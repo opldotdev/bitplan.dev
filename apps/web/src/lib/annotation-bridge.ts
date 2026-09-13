@@ -3,14 +3,23 @@ import { withRenderPolicy } from "./render-policy";
 /** Geometry only crosses this boundary. Never inject annotation content or credentials. */
 export function withAnnotationBridge(
   html: string,
-  collaboration = true
+  collaboration = true,
+  appearanceCss = "",
+  browserMenu = false
 ): string {
-  const script = `;(${installGeometryBridge.toString()})(${collaboration});`;
+  const script = `;(${installGeometryBridge.toString()})(${collaboration},${browserMenu});`;
   const tag = `<script>${script.replaceAll("</script", "<\\/script")}</script>`;
-  return withRenderPolicy(html, tag);
+  // Only the host's validated preset compiler supplies this style text.
+  return withRenderPolicy(
+    html,
+    tag +
+      (appearanceCss
+        ? `<style>${appearanceCss.replaceAll("</style", "<\\/style")}</style>`
+        : "")
+  );
 }
 
-function installGeometryBridge(collaboration: boolean) {
+function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
   function linkFor(target: EventTarget | null) {
     const link = target instanceof Element ? target.closest("a[href]") : null;
     const href = link?.getAttribute("href")?.trim();
@@ -84,10 +93,10 @@ function installGeometryBridge(collaboration: boolean) {
   // Replacing or navigating the document can only destroy this endpoint; an
   // untrusted replacement never receives authenticated activity authority.
   const addTrustedListener = EventTarget.prototype.addEventListener;
-  const readEventTrusted = Object.getOwnPropertyDescriptor(
-    Event.prototype,
-    "isTrusted"
-  )?.get;
+  const readEventTrusted =
+    Object.getOwnPropertyDescriptor(new Event("bitplan-probe"), "isTrusted")
+      ?.get ??
+    Object.getOwnPropertyDescriptor(Event.prototype, "isTrusted")?.get;
   const startPort = MessagePort.prototype.start;
   const postPortMessage = MessagePort.prototype.postMessage;
   const readMessageData = Object.getOwnPropertyDescriptor(
@@ -273,10 +282,13 @@ function installGeometryBridge(collaboration: boolean) {
     if (!trustedActivity(event)) {
       return;
     }
-    event.preventDefault();
     send("click", {
       anchor: anchorFor(event.target, event.clientX, event.clientY),
     });
+    if (browserMenu || event.shiftKey) {
+      return;
+    }
+    event.preventDefault();
     send("context", {
       anchor: anchorFor(event.target, event.clientX, event.clientY),
       href: linkFor(event.target),
