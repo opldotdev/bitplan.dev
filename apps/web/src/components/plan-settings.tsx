@@ -47,7 +47,7 @@ export function PlanSettings({
   return (
     <section
       aria-label={`${section} settings`}
-      className="min-h-0 flex-1 overflow-y-auto pb-8"
+      className="plan-scroll scroll-fade min-h-0 flex-1 overflow-y-auto pb-8 [--scroll-fade-size:16px]"
     >
       {section === "Interaction" ? (
         <>

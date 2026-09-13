@@ -2,6 +2,8 @@ import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DocumentEditSummary } from "./document-edit-summary";
 
+const SUMMARY = /<summary\b[^>]*>(.*?)<\/summary>/s;
+
 test("document edits show attributed patches, HTML replacements, and deletion", () => {
   const block = {
     base: {
@@ -23,11 +25,16 @@ test("document edits show attributed patches, HTML replacements, and deletion", 
     <DocumentEditSummary
       blocks={[block]}
       htmlRevision={3}
-      profiles={{ tina: { name: "Tina" } }}
+      profiles={{ tina: { character: "Tina", name: "Tina" } }}
     />
   );
   expect(markup).toContain("Document edits");
   expect(markup).toContain("Edited by Tina");
+  const summary = markup.match(SUMMARY)?.[1];
+  expect(summary).toContain("Tina");
+  expect(summary).toContain("tina-96.webp");
+  expect(summary).toContain("Text edit · edit 1");
+  expect(summary).toContain("View change");
   expect(markup).toContain("Shared HTML replacement");
   expect(markup).toContain("&lt;script&gt;literal&lt;/script&gt;");
   expect(markup).not.toContain("<script>");

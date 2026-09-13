@@ -3,6 +3,34 @@
 @import "shadcn/tailwind.css";
 @import "./typeset.css";
 
+/* Quiet, discoverable scrollbars in the universal plan menu. */
+:where(#bitplan-annotations *),
+.plan-scroll {
+  scrollbar-color: color-mix(in oklch, var(--foreground) 22%, transparent)
+    transparent;
+  scrollbar-width: thin;
+}
+#bitplan-annotations ::-webkit-scrollbar,
+.plan-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+#bitplan-annotations ::-webkit-scrollbar-thumb,
+.plan-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--foreground) 22%, transparent);
+  border-radius: 999px;
+}
+.plan-scroll {
+  padding-right: 8px;
+  scrollbar-gutter: stable;
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-scroll {
+    mask-image: none;
+    animation: none;
+  }
+}
+
 /* Shared control motion: small, quick, and independent of layout dimensions. */
 [data-slot="button"],
 [data-slot="input"],

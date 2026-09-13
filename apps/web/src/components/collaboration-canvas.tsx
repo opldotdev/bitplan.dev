@@ -24,6 +24,7 @@ import { AnnotationThread } from "@/components/annotation-thread";
 import { DocumentEditSummary } from "@/components/document-edit-summary";
 import { PlanAccessPanel } from "@/components/plan-access-panel";
 import { PlanSettings } from "@/components/plan-settings";
+import { ReviewAuthor } from "@/components/review-author";
 import { useRevisionSharing } from "@/components/revision-sharing";
 import { usePlanAppearance } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
@@ -1420,6 +1421,7 @@ export function CollaborationCanvas({
             }}
             onPointerMoveCapture={(event) => {
               const pan = viewportPan.current;
+              // biome-ignore lint/suspicious/noUnnecessaryConditions: independent pointer events can arrive before a pan starts
               if (!pan) {
                 return;
               }
@@ -2110,7 +2112,7 @@ export function CollaborationCanvas({
               />
             ) : null}
             {preferenceSection || publishSection === "Review changes" ? null : (
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="plan-scroll scroll-fade min-h-0 flex-1 overflow-y-auto [--scroll-fade-size:16px]">
                 <PlanAccessPanel
                   origin={target.origin}
                   publisher={isPublisher}
@@ -2119,7 +2121,7 @@ export function CollaborationCanvas({
               </div>
             )}
             <div
-              className="min-h-0 flex-1 space-y-3 overflow-y-auto"
+              className="plan-scroll scroll-fade min-h-0 flex-1 space-y-1 overflow-y-auto [--scroll-fade-size:16px]"
               hidden={publishSection !== "Review changes"}
             >
               <DocumentEditSummary
@@ -2246,7 +2248,7 @@ export function CollaborationCanvas({
                 )
                 .map((item) => (
                   <article
-                    className="flex items-start gap-3 border-b py-3 text-sm"
+                    className="flex items-start gap-3 border-border/50 border-b py-5 text-sm"
                     data-annotation-id={item.id}
                     key={item.id}
                   >
@@ -2269,15 +2271,23 @@ export function CollaborationCanvas({
                       </label>
                     ) : null}
                     <details className="min-w-0 flex-1">
-                      <summary className="cursor-pointer truncate">
-                        {annotationLabel(item.content)}
-                        <span className="ml-2 text-muted-foreground text-xs">
-                          ·{" "}
-                          {room.profiles[item.participantId]?.name ??
-                            "Collaborator"}
+                      <summary className="cursor-pointer list-none rounded-lg outline-offset-4 focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+                        <ReviewAuthor
+                          detail={`${item.content.type} contribution · edit ${item.revision}`}
+                          profile={room.profiles[item.participantId]}
+                        />
+                        <span className="mt-3 block rounded-xl bg-muted/45 px-4 py-3 leading-relaxed">
+                          <span className="line-clamp-2">
+                            {item.content.type === "text"
+                              ? item.content.text
+                              : annotationLabel(item.content)}
+                          </span>
+                        </span>
+                        <span className="mt-2 block text-muted-foreground text-xs">
+                          View contribution ↗
                         </span>
                       </summary>
-                      <div className="mt-3 max-h-64 space-y-3 overflow-auto">
+                      <div className="plan-scroll scroll-fade mt-3 max-h-64 space-y-3 overflow-auto [--scroll-fade-size:12px]">
                         <Button
                           onClick={() => {
                             if (
