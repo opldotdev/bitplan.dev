@@ -1,6 +1,10 @@
 import { Hash, Utils } from "@bsv/sdk";
 
-import { type DraftPlaintext, sealEnvelope } from "@/lib/envelope";
+import {
+  type DraftPlaintext,
+  type EncryptingEnvelopeWallet,
+  sealEnvelope,
+} from "@/lib/envelope";
 import { isHostedId } from "@/lib/hosted-id";
 import { linkFragment, linkWallet, newLinkSecret } from "@/lib/link-reader";
 import { BITPLAN_CONTENT_TYPE } from "@/lib/ordfs";
@@ -83,19 +87,22 @@ export async function prepareStarterDraft(
   return plaintext;
 }
 
-/** Link-only creation. Wallet review uses prepareStarterDraft without creating capabilities. */
+/** Open a hosted starter. A supplied wallet never gets a bearer reader fallback. */
 export async function createInstantDraft(
   input: InstantDraftInput,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  wallet?: EncryptingEnvelopeWallet
 ): Promise<string> {
   const plaintext = await prepareStarterDraft(input, fetchImpl);
-  const readerSecret = newLinkSecret();
+  const readerSecret = wallet ? undefined : newLinkSecret();
   const envelope = await sealEnvelope(
-    linkWallet(readerSecret),
+    wallet ?? linkWallet(readerSecret as string),
     plaintext,
     crypto.randomUUID()
   );
-  const mutationSecret = distinctCapability(readerSecret);
+  const mutationSecret = readerSecret
+    ? distinctCapability(readerSecret)
+    : randomBytes(32);
   const response = await fetchImpl("/api/hosted", {
     body: Uint8Array.from(envelope).buffer,
     headers: {
@@ -117,7 +124,9 @@ export async function createInstantDraft(
   ) {
     throw new Error("The hosted draft service returned an invalid response.");
   }
-  return `/d/${result.id}?collaborate=1#k=${linkFragment(readerSecret)}`;
+  return readerSecret
+    ? `/d/${result.id}?collaborate=1#k=${linkFragment(readerSecret)}`
+    : `/d/${result.id}?collaborate=1`;
 }
 
 function mediaType(value: string | null): string {

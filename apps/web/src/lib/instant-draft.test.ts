@@ -11,6 +11,35 @@ const VIEWER_PATTERN =
   /^\/d\/h_abcdefghijklmnopqrst\?collaborate=1#k=[A-Za-z0-9_-]{43}$/;
 
 describe("createInstantDraft", () => {
+  test("wallet starters open hosted without a reader key or on-chain action", async () => {
+    const wallet = linkWallet("11".repeat(32));
+    let uploaded: Uint8Array | undefined;
+    const fetchMock = ((input: URL | RequestInfo, init?: RequestInit) => {
+      if (String(input) === "/templates/brief.html") {
+        return Promise.resolve(
+          new Response(HTML, { headers: { "content-type": "text/html" } })
+        );
+      }
+      expect(String(input)).toBe("/api/hosted");
+      uploaded = new Uint8Array(init?.body as ArrayBuffer);
+      return Promise.resolve(
+        Response.json({ id: "h_abcdefghijklmnopqrst", version: 1 })
+      );
+    }) as typeof fetch;
+    const viewer = await createInstantDraft(
+      { layout: "brief", title: "Wallet starter" },
+      fetchMock,
+      wallet
+    );
+    expect(viewer).toBe("/d/h_abcdefghijklmnopqrst?collaborate=1");
+    const opened = await openEnvelope(wallet, uploaded as Uint8Array);
+    expect(opened.plaintext.html).toBe(HTML);
+    expect(opened.plaintext.meta.title).toBe("Wallet starter");
+    await expect(
+      openEnvelope(linkWallet("22".repeat(32)), uploaded as Uint8Array)
+    ).rejects.toThrow();
+  });
+
   test("prepares a wallet starter without uploading or requiring plan prose", async () => {
     const requests: string[] = [];
     const fetchMock = ((input: URL | RequestInfo, init?: RequestInit) => {

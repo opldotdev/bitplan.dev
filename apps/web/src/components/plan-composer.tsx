@@ -33,11 +33,7 @@ import {
   publishDraft,
 } from "@/lib/draft-publish";
 import type { DraftPlaintext } from "@/lib/envelope";
-import {
-  createInstantDraft,
-  prepareStarterDraft,
-  type StarterLayout,
-} from "@/lib/instant-draft";
+import { createInstantDraft } from "@/lib/instant-draft";
 import { PLAN_APPEARANCES } from "@/lib/plan-appearance";
 import {
   connectBrowserWalletClient,
@@ -54,7 +50,6 @@ export function PlanComposer() {
   const [repository, setRepository] = useState("");
   const [title, setTitle] = useState("");
   const [walletMode, setWalletMode] = useState(false);
-  const [starterLayout, setStarterLayout] = useState<StarterLayout>("brief");
   const [walletError, setWalletError] = useState("");
   const [connectingWallet, setConnectingWallet] = useState(false);
   const openWallet = useCallback(async () => {
@@ -239,12 +234,7 @@ export function PlanComposer() {
   return (
     <SharedStarter
       connectingWallet={walletMode && connectingWallet}
-      initialLayout={starterLayout}
       onAdvanced={() => void openWallet()}
-      onPrepared={(draft, layout) => {
-        setPrepared(draft);
-        setStarterLayout(layout);
-      }}
       onUseLink={() => setWalletMode(false)}
       setTitle={setTitle}
       title={title}
@@ -330,8 +320,6 @@ function SharedStarter({
   connectingWallet,
   walletError,
   onUseLink,
-  initialLayout,
-  onPrepared,
 }: {
   title: string;
   setTitle: (title: string) => void;
@@ -341,21 +329,16 @@ function SharedStarter({
   connectingWallet: boolean;
   walletError: string;
   onUseLink: () => void;
-  initialLayout: StarterLayout;
-  onPrepared: (draft: DraftPlaintext, layout: StarterLayout) => void;
 }) {
   const router = useRouter();
   const { resolvedTheme } = useTheme();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string>();
-  const [starter, setStarter] = useState(
-    PLAN_APPEARANCES.find((item) => item.layout === initialLayout) ??
-      PLAN_APPEARANCES[0]
-  );
+  const [starter, setStarter] = useState(PLAN_APPEARANCES[0]);
   const [step, setStep] = useState<"name" | "style">(
     walletMode && title.trim() ? "style" : "name"
   );
-  const finalAction = walletMode ? "Review plan" : "View shared draft";
+  const finalAction = walletMode ? "Open plan" : "View shared draft";
   const actionLabel = step === "name" ? "Continue" : finalAction;
   const createSharedDraft = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -373,18 +356,14 @@ function SharedStarter({
       setCreating(true);
       setError(undefined);
       try {
-        if (walletMode) {
-          const draft = await prepareStarterDraft({
-            layout: starter.layout,
-            title,
-          });
-          onPrepared(draft, starter.layout);
-          return;
-        }
-        const viewer = await createInstantDraft({
-          layout: starter.layout,
-          title,
-        });
+        const wallet = walletMode
+          ? await connectBrowserWalletClient()
+          : undefined;
+        const viewer = await createInstantDraft(
+          { layout: starter.layout, title },
+          fetch,
+          wallet
+        );
         router.push(viewer);
       } catch (cause) {
         setError(
@@ -403,7 +382,6 @@ function SharedStarter({
       title,
       walletMode,
       connectingWallet,
-      onPrepared,
     ]
   );
 
@@ -566,7 +544,7 @@ function SharedStarter({
             {step === "style" ? (
               <p className="text-muted-foreground text-xs leading-relaxed">
                 {walletMode
-                  ? "Only your wallet can open it. Review before publishing."
+                  ? "Encrypted to your wallet. Nothing goes on chain."
                   : "Anyone with the full link can read and contribute. Keep it private."}
               </p>
             ) : null}
