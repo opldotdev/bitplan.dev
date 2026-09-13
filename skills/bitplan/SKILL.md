@@ -42,6 +42,11 @@ name and continue, then choose Brief, Terminal, or Blank from the previews.
 Back preserves your choices. View shared draft creates the draft and opens its
 encrypted collaboration room automatically. Page styles remain available in
 the viewer. Save the full invitation privately.
+Connect wallet lives in a separate off-chain draft card, not the naming form.
+It reuses the name and template steps, then opens the complete starter for
+review without requiring prose or a repository. No upload or transaction occurs
+just to review. Wallet publication still requires explicit approval; connecting
+alone does not grant contacts access or change an existing room's encryption.
 Skip uses “Master Plan.” On a connected hosted plan, click the navbar title to
 rename it inline; Enter or leaving the field saves, Escape cancels. The name is
 an encrypted live-room update, not a new hosted envelope or on-chain version.

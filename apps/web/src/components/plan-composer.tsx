@@ -34,7 +34,11 @@ import {
   publishDraft,
 } from "@/lib/draft-publish";
 import type { DraftPlaintext } from "@/lib/envelope";
-import { createInstantDraft } from "@/lib/instant-draft";
+import {
+  createInstantDraft,
+  prepareStarterDraft,
+  type StarterLayout,
+} from "@/lib/instant-draft";
 import { PLAN_APPEARANCES } from "@/lib/plan-appearance";
 import {
   connectBrowserWalletClient,
@@ -60,10 +64,12 @@ export function PlanComposer() {
   const [publishing, setPublishing] = useState(false);
   const [repository, setRepository] = useState("");
   const [title, setTitle] = useState("");
+  const [walletMode, setWalletMode] = useState(false);
+  const [starterLayout, setStarterLayout] = useState<StarterLayout>("brief");
   const [walletError, setWalletError] = useState("");
   const [connectingWallet, setConnectingWallet] = useState(false);
   const openWallet = useCallback(async () => {
-    setAdvancedOpen(true);
+    setWalletMode(true);
     setConnectingWallet(true);
     setWalletError("");
     try {
@@ -172,8 +178,8 @@ export function PlanComposer() {
 
   const edit = useCallback(() => {
     setPrepared(undefined);
-    setAdvancedOpen(true);
-  }, []);
+    setAdvancedOpen(!walletMode);
+  }, [walletMode]);
   const updateBody = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => setBody(event.target.value),
     []
@@ -267,10 +273,19 @@ export function PlanComposer() {
   if (!advancedOpen) {
     return (
       <SharedStarter
+        connectingWallet={walletMode && connectingWallet}
+        initialLayout={starterLayout}
         onAdvanced={() => void openWallet()}
+        onPrepared={(draft, layout) => {
+          setPrepared(draft);
+          setStarterLayout(layout);
+        }}
+        onUseLink={() => setWalletMode(false)}
         setTitle={setTitle}
         title={title}
         updateTitle={updateTitle}
+        walletError={walletMode ? walletError : ""}
+        walletMode={walletMode}
       />
     );
   }
@@ -363,20 +378,6 @@ function WalletFlowShell({
   connecting?: boolean;
 }) {
   const { resolvedTheme } = useTheme();
-  const connected = useSyncExternalStore(
-    onWalletChange,
-    isWalletConnected,
-    () => false
-  );
-  let walletLabel = "Wallet disconnected";
-  let orbColor = "bg-muted-foreground";
-  if (connecting) {
-    walletLabel = "Connecting to wallet";
-    orbColor = "bg-amber-500 motion-safe:animate-pulse";
-  } else if (connected) {
-    walletLabel = "Wallet connected";
-    orbColor = "bg-emerald-500";
-  }
   return (
     <>
       <TemplatePreview
@@ -393,18 +394,7 @@ function WalletFlowShell({
           showCloseButton={false}
         >
           <DialogTitle className="sr-only">{title}</DialogTitle>
-          <span
-            aria-label={walletLabel}
-            className="absolute top-4 right-4 flex size-6 items-center justify-center"
-            role="status"
-            title={walletLabel}
-          >
-            <span
-              aria-hidden="true"
-              className={`size-2 rounded-full ${orbColor}`}
-            />
-            <span className="sr-only">{walletLabel}</span>
-          </span>
+          <WalletStatus connecting={connecting} />
           <DialogDescription className="sr-only">
             Wallet-controlled encryption and permanent publication. No
             transaction is sent until you review and approve publishing.
@@ -416,24 +406,70 @@ function WalletFlowShell({
   );
 }
 
+function WalletStatus({ connecting }: { connecting: boolean }) {
+  const connected = useSyncExternalStore(
+    onWalletChange,
+    isWalletConnected,
+    () => false
+  );
+  let label = "Wallet disconnected";
+  let color = "bg-muted-foreground";
+  if (connecting) {
+    label = "Connecting to wallet";
+    color = "bg-amber-500 motion-safe:animate-pulse";
+  } else if (connected) {
+    label = "Wallet connected";
+    color = "bg-emerald-500";
+  }
+  return (
+    <span
+      aria-label={label}
+      className="absolute top-4 right-4 flex size-6 items-center justify-center"
+      role="status"
+      title={label}
+    >
+      <span aria-hidden="true" className={`size-2 rounded-full ${color}`} />
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
 function SharedStarter({
   title,
   setTitle,
   updateTitle,
   onAdvanced,
+  walletMode,
+  connectingWallet,
+  walletError,
+  onUseLink,
+  initialLayout,
+  onPrepared,
 }: {
   title: string;
   setTitle: (title: string) => void;
   updateTitle: (event: ChangeEvent<HTMLInputElement>) => void;
   onAdvanced: () => void;
+  walletMode: boolean;
+  connectingWallet: boolean;
+  walletError: string;
+  onUseLink: () => void;
+  initialLayout: StarterLayout;
+  onPrepared: (draft: DraftPlaintext, layout: StarterLayout) => void;
 }) {
   const router = useRouter();
   const { resolvedTheme } = useTheme();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string>();
-  const [starter, setStarter] = useState(PLAN_APPEARANCES[0]);
-  const [step, setStep] = useState<"name" | "style">("name");
-  const actionLabel = step === "name" ? "Continue" : "View shared draft";
+  const [starter, setStarter] = useState(
+    PLAN_APPEARANCES.find((item) => item.layout === initialLayout) ??
+      PLAN_APPEARANCES[0]
+  );
+  const [step, setStep] = useState<"name" | "style">(
+    walletMode && title.trim() ? "style" : "name"
+  );
+  const finalAction = walletMode ? "Review plan" : "View shared draft";
+  const actionLabel = step === "name" ? "Continue" : finalAction;
   const createSharedDraft = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -444,9 +480,20 @@ function SharedStarter({
         setStep("style");
         return;
       }
+      if (walletMode && connectingWallet) {
+        return;
+      }
       setCreating(true);
       setError(undefined);
       try {
+        if (walletMode) {
+          const draft = await prepareStarterDraft({
+            layout: starter.layout,
+            title,
+          });
+          onPrepared(draft, starter.layout);
+          return;
+        }
         const viewer = await createInstantDraft({
           layout: starter.layout,
           title,
@@ -461,7 +508,16 @@ function SharedStarter({
         setCreating(false);
       }
     },
-    [creating, router, starter.layout, step, title]
+    [
+      creating,
+      router,
+      starter.layout,
+      step,
+      title,
+      walletMode,
+      connectingWallet,
+      onPrepared,
+    ]
   );
 
   return (
@@ -481,7 +537,7 @@ function SharedStarter({
         open
       >
         <DialogContent
-          className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto bg-background/95 p-6 motion-reduce:animate-none sm:max-w-lg sm:p-10 data-[step=style]:sm:max-w-2xl"
+          className="data-open:zoom-in-100 data-closed:zoom-out-100 inset-0 flex h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col items-center overflow-y-auto rounded-none bg-transparent p-4 ring-0 motion-reduce:animate-none sm:max-w-none sm:p-8"
           data-step={step}
           fullScreenOnMobile={false}
           onEscapeKeyDown={(event) => {
@@ -492,24 +548,21 @@ function SharedStarter({
           onInteractOutside={(event) => event.preventDefault()}
           showCloseButton={false}
         >
+          <StarterAccess
+            connecting={connectingWallet}
+            disabled={creating}
+            onConnect={onAdvanced}
+            onUseLink={onUseLink}
+            walletMode={walletMode}
+          />
           <form
             aria-busy={creating}
-            className="space-y-6"
+            className="relative my-auto w-full max-w-lg shrink-0 space-y-6 rounded-xl bg-background/95 p-6 ring-1 ring-foreground/10 data-[step=style]:max-w-2xl sm:p-10"
+            data-step={step}
             key={step}
             onSubmit={createSharedDraft}
           >
-            <div className="motion-safe:fade-in motion-safe:slide-in-from-bottom-2 space-y-3 motion-safe:animate-in motion-safe:duration-300">
-              <DialogTitle className="font-heading text-3xl leading-tight sm:text-4xl">
-                {step === "name" ? "Name your plan." : "Choose a template."}
-              </DialogTitle>
-              <DialogDescription
-                className={step === "name" ? "sr-only" : undefined}
-              >
-                {step === "name"
-                  ? "Choose a name or skip. You can rename it later."
-                  : "You can change it later."}
-              </DialogDescription>
-            </div>
+            <StarterHeading step={step} />
             {step === "name" ? (
               <>
                 <Label className="sr-only" htmlFor="shared-draft-title">
@@ -567,15 +620,15 @@ function SharedStarter({
                 ))}
               </fieldset>
             )}
-            {error ? (
+            {error || walletError ? (
               <p className="text-destructive text-sm" role="alert">
-                {error}
+                {error || walletError}
               </p>
             ) : null}
             <div className="motion-safe:fade-in motion-safe:slide-in-from-bottom-2 flex flex-wrap items-center gap-3 motion-safe:animate-in motion-safe:fill-mode-both motion-safe:duration-300 motion-safe:[animation-delay:160ms]">
               <Button
                 className="group motion-safe:transition-transform motion-safe:active:scale-[0.98]"
-                disabled={creating || !title.trim()}
+                disabled={creating || connectingWallet || !title.trim()}
                 size="lg"
                 type="submit"
               >
@@ -614,20 +667,12 @@ function SharedStarter({
             </div>
             {step === "style" ? (
               <p className="text-muted-foreground text-xs leading-relaxed">
-                Anyone with the full link can read and contribute. Keep it
-                private.
+                {walletMode
+                  ? "Only your wallet can open it. Review before publishing."
+                  : "Anyone with the full link can read and contribute. Keep it private."}
               </p>
             ) : null}
-            <div className="flex items-center justify-between gap-3 border-foreground/10 border-t pt-3">
-              <Button
-                disabled={creating}
-                onClick={onAdvanced}
-                size="sm"
-                type="button"
-                variant="link"
-              >
-                Use wallet
-              </Button>
+            <div className="flex justify-end">
               <Button
                 disabled={creating}
                 onClick={() => router.push("/")}
@@ -642,5 +687,57 @@ function SharedStarter({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function StarterAccess({
+  walletMode,
+  connecting,
+  disabled,
+  onConnect,
+  onUseLink,
+}: {
+  walletMode: boolean;
+  connecting: boolean;
+  disabled: boolean;
+  onConnect: () => void;
+  onUseLink: () => void;
+}) {
+  return (
+    <aside className="relative mb-6 w-full max-w-lg shrink-0 rounded-xl bg-background/90 p-5 ring-1 ring-foreground/10 lg:absolute lg:top-6 lg:right-6 lg:mb-0 lg:w-64">
+      {walletMode ? <WalletStatus connecting={connecting} /> : null}
+      <p className="font-medium">Off-chain draft</p>
+      <p className="mt-1 text-muted-foreground text-xs leading-relaxed">
+        {walletMode
+          ? "Wallet encryption is selected. Nothing is published until you approve."
+          : "Use wallet encryption instead of a shared link."}
+      </p>
+      <Button
+        className="mt-4 w-full"
+        disabled={disabled || connecting}
+        onClick={walletMode ? onUseLink : onConnect}
+        size="lg"
+        type="button"
+        variant={walletMode ? "outline" : "default"}
+      >
+        {walletMode ? "Use link instead" : "Connect wallet"}
+      </Button>
+    </aside>
+  );
+}
+
+function StarterHeading({ step }: { step: "name" | "style" }) {
+  const naming = step === "name";
+  return (
+    <div className="motion-safe:fade-in motion-safe:slide-in-from-bottom-2 space-y-3 motion-safe:animate-in motion-safe:duration-300">
+      <DialogTitle className="font-heading text-3xl leading-tight sm:text-4xl">
+        {naming ? "Name your plan." : "Choose a template."}
+      </DialogTitle>
+      <DialogDescription className={naming ? "sr-only" : undefined}>
+        {naming
+          ? "Choose a name or skip. You can rename it later."
+          : "You can change it later."}
+      </DialogDescription>
+    </div>
   );
 }

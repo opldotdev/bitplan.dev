@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Utils } from "@bsv/sdk";
 
 import { openEnvelope } from "./envelope";
-import { createInstantDraft } from "./instant-draft";
+import { createInstantDraft, prepareStarterDraft } from "./instant-draft";
 import { linkWallet, parseLinkFragment } from "./link-reader";
 
 const HTML =
@@ -11,6 +11,25 @@ const VIEWER_PATTERN =
   /^\/d\/h_abcdefghijklmnopqrst\?collaborate=1#k=[A-Za-z0-9_-]{43}$/;
 
 describe("createInstantDraft", () => {
+  test("prepares a wallet starter without uploading or requiring plan prose", async () => {
+    const requests: string[] = [];
+    const fetchMock = ((input: URL | RequestInfo, init?: RequestInit) => {
+      requests.push(String(input));
+      expect(init?.method ?? "GET").toBe("GET");
+      return Promise.resolve(
+        new Response(HTML, { headers: { "content-type": "text/html" } })
+      );
+    }) as typeof fetch;
+    const draft = await prepareStarterDraft(
+      { layout: "brief", title: "Master Plan" },
+      fetchMock
+    );
+    expect(requests).toEqual(["/templates/brief.html"]);
+    expect(draft.html).toBe(HTML);
+    expect(draft.meta.title).toBe("Master Plan");
+    expect(draft.meta.repoName).toBeNull();
+  });
+
   test("seals the template for a throwaway reader and keeps the hosted secret out of the link", async () => {
     let uploaded: Uint8Array | undefined;
     let bearer = "";

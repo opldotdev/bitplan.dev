@@ -23,14 +23,12 @@ interface HostedCreateResponse {
 }
 
 /**
- * Create an encrypted, link-owned working draft without touching a wallet.
- * Reader and hosted mutation capabilities are independently random. The
- * mutation capability is intentionally discarded after this one upload.
+ * Prepare a complete starter for review without creating keys or uploading it.
  */
-export async function createInstantDraft(
+export async function prepareStarterDraft(
   input: InstantDraftInput,
   fetchImpl: typeof fetch = fetch
-): Promise<string> {
+): Promise<DraftPlaintext> {
   const title = input.title.trim() || "Untitled plan";
   if (!STARTER_LAYOUTS.has(input.layout)) {
     throw new Error("Choose a recognized BitPlan starter page.");
@@ -82,6 +80,15 @@ export async function createInstantDraft(
     },
   };
 
+  return plaintext;
+}
+
+/** Link-only creation. Wallet review uses prepareStarterDraft without creating capabilities. */
+export async function createInstantDraft(
+  input: InstantDraftInput,
+  fetchImpl: typeof fetch = fetch
+): Promise<string> {
+  const plaintext = await prepareStarterDraft(input, fetchImpl);
   const readerSecret = newLinkSecret();
   const envelope = await sealEnvelope(
     linkWallet(readerSecret),
