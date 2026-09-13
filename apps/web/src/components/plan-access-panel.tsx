@@ -6,6 +6,11 @@ import { toast } from "sonner";
 import { PrivateContacts } from "@/components/private-contacts";
 import { useRevisionSharing } from "@/components/revision-sharing";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { parseIdentityKeys } from "@/lib/sharing";
 
@@ -49,6 +54,7 @@ export function PlanAccessPanel({
       )}
       <div className="flex gap-2">
         <Button
+          className="flex-1"
           onClick={async () => {
             try {
               const url = new URL(`/d/${origin}`, window.location.origin);
@@ -66,11 +72,14 @@ export function PlanAccessPanel({
           <Copy />
           Copy plan link
         </Button>
-        <details className="min-w-0 flex-1">
-          <summary className="cursor-pointer rounded-lg border px-3 py-2 text-sm">
-            PDF
-          </summary>
-          <div className="space-y-3 py-3">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button className="flex-1" size="sm" variant="outline">
+              <FileText />
+              PDF
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="space-y-3 p-4">
             <label
               className="flex items-center justify-between gap-2 text-xs"
               htmlFor="pdf-annotations"
@@ -103,8 +112,8 @@ export function PlanAccessPanel({
               <FileText />
               Save as PDF
             </Button>
-          </div>
-        </details>
+          </PopoverContent>
+        </Popover>
       </div>
       {publisher ? (
         <div className="space-y-3">

@@ -19,7 +19,7 @@ agent-browser --session "$session" eval '(async()=>{const m=document.modelContex
 agent-browser --session "$session" eval 'document.addEventListener("load",e=>{const f=e.target;if(f instanceof HTMLIFrameElement&&f.title==="PDF print snapshot"){f.contentWindow.print=()=>{window.pdfCheck={text:f.contentDocument.body.textContent,scripts:f.contentDocument.scripts.length,sandbox:f.getAttribute("sandbox")};f.contentWindow.dispatchEvent(new Event("afterprint"));};}},true)' >/dev/null
 agent-browser --session "$session" eval '(()=>{const b=document.querySelector("button[aria-label=Publish]");if(b.getAttribute("aria-expanded")!=="true")b.click();})()' >/dev/null
 agent-browser --session "$session" wait --fn 'document.querySelector("button[aria-label=Publish]")?.getAttribute("aria-expanded")==="true"' >/dev/null
-agent-browser --session "$session" click '[aria-label="Plan access"] summary' >/dev/null
+agent-browser --session "$session" find role button click --name PDF --exact >/dev/null
 agent-browser --session "$session" find role button click --name 'Save as PDF' --exact >/dev/null
 agent-browser --session "$session" wait --fn '!!window.pdfCheck' >/dev/null
 agent-browser --session "$session" eval 'pdfCheck.scripts===0&&!pdfCheck.sandbox.includes("allow-scripts")&&!pdfCheck.text.includes("PDF appendix verification")&&pdfCheck.text.includes("Bring your agent")' | rg -q true

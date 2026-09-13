@@ -16,7 +16,7 @@ test("contributors see actual access but cannot configure next-revision recipien
   const contributor = render(false);
   expect(contributor).toContain("Anyone with the full link");
   expect(contributor).toContain("Copy plan link");
-  expect(contributor).toContain("Save as PDF");
+  expect(contributor).toContain("PDF</button>");
   expect(contributor).not.toContain("revision-access");
   expect(contributor).not.toContain("Private copy");
   expect(render(true)).toContain("revision-access");

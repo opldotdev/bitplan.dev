@@ -8,7 +8,10 @@ import { CharacterChooser } from "@/components/character-chooser";
 import { CollaborationCanvas } from "@/components/collaboration-canvas";
 import { InlinePlanTitle } from "@/components/inline-plan-title";
 import { PlanPublishing } from "@/components/plan-publishing";
-import { RevisionSharingProvider } from "@/components/revision-sharing";
+import {
+  RevisionSharingProvider,
+  useRevisionSharing,
+} from "@/components/revision-sharing";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +48,7 @@ import {
   parseEnvelope,
 } from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
+import { hostedAuthority } from "@/lib/hosted-authority";
 import { isHostedId } from "@/lib/hosted-id";
 import { linkWallet, parseLinkFragment } from "@/lib/link-reader";
 import {
@@ -53,6 +57,7 @@ import {
   type OrdfsContentResult,
 } from "@/lib/ordfs";
 import { normalizeOrigin } from "@/lib/outpoint";
+import { saveHostedVersion } from "@/lib/save-hosted-version";
 import { useCollaboration } from "@/lib/use-collaboration";
 import {
   clampVersion,
@@ -63,6 +68,7 @@ import {
 import {
   connectBrowserWallet,
   getConnectedWallet,
+  getConnectedWalletClient,
   isWalletAvailable,
   reconnectAuthenticatedWallet,
 } from "@/lib/wallet";
@@ -815,6 +821,7 @@ function EncryptedView({
   );
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: viewer composes separate link, wallet, and hosted-capability flows without conflating their permissions
 function DecryptedView({
   openedWithLink,
   plaintext,
@@ -838,6 +845,7 @@ function DecryptedView({
   outpoint: string | null;
 }) {
   const baseTitle = plaintext.meta.title;
+  const sharing = useRevisionSharing();
   const [isPublisher, setIsPublisher] = useState(false);
   const target = {
     origin,
@@ -1002,6 +1010,41 @@ function DecryptedView({
       <CollaborationCanvas
         html={plaintext.html}
         isPublisher={isPublisher}
+        onSaveHosted={
+          isPublisher && hostedAuthority(origin)
+            ? async (html, assertCurrent) => {
+                if (sharing?.value.mode !== "preserve") {
+                  throw new Error(
+                    "Use the revision prompt to review an access change first."
+                  );
+                }
+                const reader = openedWithLink
+                  ? parseLinkFragment(window.location.hash)
+                  : null;
+                const wallet = reader
+                  ? linkWallet(reader)
+                  : getConnectedWalletClient();
+                if (!wallet) {
+                  throw new Error(
+                    "Connect the wallet that can open this draft."
+                  );
+                }
+                const version = await saveHostedVersion({
+                  assertCurrent,
+                  id: origin,
+                  plaintext: {
+                    ...plaintext,
+                    html,
+                    meta: { ...plaintext.meta, title },
+                  },
+                  recipients: sharing.currentAccess.recipients,
+                  version: currentVersion,
+                  wallet,
+                });
+                onVersion(version);
+              }
+            : undefined
+        }
         room={collaboration}
         target={target}
         title={title ?? "Draft"}

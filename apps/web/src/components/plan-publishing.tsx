@@ -5,9 +5,14 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
 import { walletOwnsDraft } from "@/lib/drafts";
+import { hostedAuthority } from "@/lib/hosted-authority";
 import { isHostedId } from "@/lib/hosted-id";
 import { type PlanAuthority, planAuthority } from "@/lib/plan-authority";
-import { getConnectedWallet, onWalletChange } from "@/lib/wallet";
+import {
+  getConnectedWallet,
+  onWalletChange,
+  reconnectAuthenticatedWallet,
+} from "@/lib/wallet";
 
 /** Wallet changes update controls without remounting the live document. */
 export function PlanPublishing({
@@ -32,8 +37,9 @@ export function PlanPublishing({
     async function refresh() {
       generation += 1;
       const current = generation;
-      setAccess(null);
-      onPublisherChange?.(false);
+      const ownsHosted = !!hostedAuthority(origin);
+      setAccess(ownsHosted ? { identity: "", role: "owner" } : null);
+      onPublisherChange?.(ownsHosted);
       const wallet = getConnectedWallet();
       if (!wallet) {
         return;
@@ -44,18 +50,13 @@ export function PlanPublishing({
           ? false
           : await walletOwnsDraft(wallet, origin, latestOutpoint);
         if (current === generation && getConnectedWallet() === wallet) {
-          onPublisherChange?.(
-            planAuthority(origin, publicKey, senderIdentityKey, holdsLatest) !==
-              "connected"
-          );
+          const role = ownsHosted
+            ? "owner"
+            : planAuthority(origin, publicKey, senderIdentityKey, holdsLatest);
+          onPublisherChange?.(role !== "connected");
           setAccess({
             identity: publicKey,
-            role: planAuthority(
-              origin,
-              publicKey,
-              senderIdentityKey,
-              holdsLatest
-            ),
+            role,
           });
         }
       } catch {
@@ -66,6 +67,7 @@ export function PlanPublishing({
     const unsubscribe = onWalletChange(changed);
     window.addEventListener("focus", changed);
     changed();
+    void reconnectAuthenticatedWallet();
     return () => {
       generation += 1;
       unsubscribe();

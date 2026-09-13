@@ -2,14 +2,60 @@ import { describe, expect, test } from "bun:test";
 import { Utils } from "@bsv/sdk";
 
 import { openEnvelope } from "./envelope";
-import { createInstantDraft, prepareStarterDraft } from "./instant-draft";
+import { hostedAuthority } from "./hosted-authority";
+import {
+  createInstantDraft as createDraft,
+  prepareStarterDraft,
+} from "./instant-draft";
 import { linkWallet, parseLinkFragment } from "./link-reader";
 
 const HTML =
   '<!doctype html><html data-bitplan-template="brief"><title>Brief</title><body>hello</body></html>';
 const VIEWER_PATTERN = /^\/d\/h_abcdefghijklmnopqrst#k=[A-Za-z0-9_-]{43}$/;
+const values = new Map<string, string>();
+const storage = {
+  getItem: (key: string) => values.get(key) ?? null,
+  removeItem: (key: string) => {
+    values.delete(key);
+  },
+  setItem: (key: string, value: string) => {
+    values.set(key, value);
+  },
+} as Storage;
+const createInstantDraft = (
+  ...args: [
+    Parameters<typeof createDraft>[0],
+    typeof fetch,
+    Parameters<typeof createDraft>[2]?,
+  ]
+) => createDraft(args[0], args[1], args[2], storage);
 
 describe("createInstantDraft", () => {
+  test("blocked browser storage stops creation before uploading", async () => {
+    let uploads = 0;
+    const fetchMock = ((input) => {
+      if (String(input) === "/api/hosted") {
+        uploads += 1;
+      }
+      return Promise.resolve(
+        new Response(HTML, { headers: { "content-type": "text/html" } })
+      );
+    }) as typeof fetch;
+    await expect(
+      createDraft(
+        { layout: "brief", title: "No lost owner" },
+        fetchMock,
+        undefined,
+        {
+          ...storage,
+          setItem: () => {
+            throw new Error("Storage blocked");
+          },
+        }
+      )
+    ).rejects.toThrow("Storage blocked");
+    expect(uploads).toBe(0);
+  });
   test("wallet starters open hosted without a reader key or on-chain action", async () => {
     const wallet = linkWallet("11".repeat(32));
     let uploaded: Uint8Array | undefined;
@@ -96,6 +142,12 @@ describe("createInstantDraft", () => {
     expect(readerSecret).not.toBeNull();
     expect(base64UrlHex(bearer)).not.toBe(readerSecret);
     expect(viewer).not.toContain(bearer);
+    expect(hostedAuthority("h_abcdefghijklmnopqrst", storage)).toBe(bearer);
+    expect(
+      [...values.keys()].some((key) =>
+        key.startsWith("bitplan:hosted-pending:")
+      )
+    ).toBe(false);
 
     const opened = await openEnvelope(
       linkWallet(readerSecret as string),

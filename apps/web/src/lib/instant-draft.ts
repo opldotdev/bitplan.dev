@@ -5,6 +5,7 @@ import {
   type EncryptingEnvelopeWallet,
   sealEnvelope,
 } from "@/lib/envelope";
+import { retainHostedAuthority } from "@/lib/hosted-authority";
 import { isHostedId } from "@/lib/hosted-id";
 import { linkFragment, linkWallet, newLinkSecret } from "@/lib/link-reader";
 import { BITPLAN_CONTENT_TYPE } from "@/lib/ordfs";
@@ -96,7 +97,8 @@ export async function prepareStarterDraft(
 export async function createInstantDraft(
   input: InstantDraftInput,
   fetchImpl: typeof fetch = fetch,
-  wallet?: EncryptingEnvelopeWallet
+  wallet?: EncryptingEnvelopeWallet,
+  storage: Storage = window.localStorage
 ): Promise<string> {
   const plaintext = await prepareStarterDraft(input, fetchImpl);
   const readerSecret = wallet ? undefined : newLinkSecret();
@@ -108,10 +110,15 @@ export async function createInstantDraft(
   const mutationSecret = readerSecret
     ? distinctCapability(readerSecret)
     : randomBytes(32);
+  // Persist before uploading: storage failures must not create another unowned draft.
+  // Keep the pending record on ambiguous network failures for recovery, never retry creation automatically.
+  const token = toBase64Url(mutationSecret);
+  const pendingKey = `bitplan:hosted-pending:${crypto.randomUUID()}`;
+  storage.setItem(pendingKey, token);
   const response = await fetchImpl("/api/hosted", {
     body: Uint8Array.from(envelope).buffer,
     headers: {
-      Authorization: `Bearer ${toBase64Url(mutationSecret)}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": BITPLAN_CONTENT_TYPE,
     },
     method: "POST",
@@ -129,6 +136,8 @@ export async function createInstantDraft(
   ) {
     throw new Error("The hosted draft service returned an invalid response.");
   }
+  retainHostedAuthority(result.id, token, storage);
+  storage.removeItem(pendingKey);
   return readerSecret
     ? `/d/${result.id}#k=${linkFragment(readerSecret)}`
     : `/d/${result.id}`;

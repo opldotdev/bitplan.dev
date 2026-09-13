@@ -54,9 +54,20 @@ rename it inline; Enter or leaving the field saves, Escape cancels. The name is
 an encrypted live-room update, not a new hosted envelope or on-chain version.
 The collaboration read tool returns the live title alongside the HTML; carry
 both into the next published version. Renaming does not change annotation anchors.
-This disposable draft has no retained hosted-update secret or wallet ownership;
-live room edits do not create base-document versions. Use the wallet/CLI path
-when the user needs controlled recipients, version publishing, or inscription.
+New browser starters retain a separate hosted-update capability on the creating
+browser and site origin. It is not included in reader links, collaboration rooms,
+or agent prompts. Clearing site storage loses this permission; another browser
+or localhost versus production does not inherit it. An already authorized wallet
+reconnects automatically, but wallet connection alone does not transfer ownership.
+Older starters that discarded the capability cannot be upgraded using a reader
+link; request an explicitly authorized new owned copy instead.
+The creator's Publish sidebar offers Save current document: this saves all
+currently saved live document edits as a new hosted version, preserves envelope
+recipients, and rejects stale base versions. Notes remain on their original
+version; this action does not checkpoint annotation layers or spend BSV.
+For selective annotation-informed redesign or access changes, use the revision
+prompt and review the result before saving. Never extract browser credentials
+to make a CLI update.
 
 ## Check the live product first
 
