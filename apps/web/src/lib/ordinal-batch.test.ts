@@ -76,14 +76,26 @@ async function fakeWallet() {
     txidOnly: boolean;
     wrongFinalOutput: boolean;
     wrongTxid: boolean;
+    partialProof: boolean;
   } = {
     abortFails: false,
     fundingFirst: false,
+    partialProof: false,
     reverseOutputs: false,
     sourceSatoshis: 1,
     txidOnly: false,
     wrongFinalOutput: false,
     wrongTxid: false,
+  };
+  const responseBeef = () => {
+    if (!controls.partialProof) {
+      return unsigned.toAtomicBEEF();
+    }
+    const partial = new Beef();
+    partial.mergeTxidOnly(source.id("hex"));
+    partial.mergeTransaction(funding);
+    partial.mergeRawTx(unsigned.toBinary());
+    return partial.toBinaryAtomic(unsigned.id("hex"));
   };
   const wallet = {
     abortAction: () => {
@@ -124,7 +136,7 @@ async function fakeWallet() {
       return Promise.resolve({
         signableTransaction: {
           reference: "dGVzdC1yZWZlcmVuY2U=",
-          tx: unsigned.toAtomicBEEF(),
+          tx: responseBeef(),
         },
       });
     },
@@ -155,7 +167,7 @@ async function fakeWallet() {
       }
       return Promise.resolve({
         txid: controls.wrongTxid ? "a".repeat(64) : unsigned.id("hex"),
-        ...(controls.txidOnly ? {} : { tx: unsigned.toAtomicBEEF() }),
+        ...(controls.txidOnly ? {} : { tx: responseBeef() }),
       });
     },
   } as unknown as WalletInterface;
@@ -166,6 +178,47 @@ async function fakeWallet() {
     wallet,
   };
 }
+
+test("partial wallet proofs merge supplied sources before preparation, signing, and receipt validation", async () => {
+  const f = await fakeWallet();
+  f.controls.partialProof = true;
+  const prepared = await prepareOrdinalBatch(
+    f.wallet,
+    [{ coin: f.coin, envelope }],
+    "bitplan-checkpoint:partial"
+  );
+  expect(f.calls.aborted).toBe(false);
+  const partial = Beef.fromBinary(prepared.createResult.signableTransaction.tx);
+  expect(partial.findTxid(f.coin.origin.slice(0, 64))?.isTxidOnly).toBe(true);
+  const signed = await signOrdinalBatch(f.wallet, prepared);
+  const tx = Transaction.fromAtomicBEEF(Array.from(signed.beef));
+  expect(tx.id("hex")).toBe(signed.txid);
+  expect(tx.inputs[0]?.sourceTransaction?.id("hex")).toBe(
+    f.coin.origin.slice(0, 64)
+  );
+  expect(tx.inputs[0]?.sourceTransaction?.outputs[0]?.satoshis).toBe(1);
+  const withoutProof = {
+    ...prepared,
+    args: { ...prepared.args, inputBEEF: undefined },
+  };
+  await expect(signOrdinalBatch(f.wallet, withoutProof)).rejects.toThrow(
+    OrdinalBatchError
+  );
+  const unrelated = new Beef();
+  unrelated.mergeTransaction(new Transaction());
+  await expect(
+    signOrdinalBatch(f.wallet, {
+      ...prepared,
+      args: { ...prepared.args, inputBEEF: unrelated.toBinary() },
+    })
+  ).rejects.toThrow(OrdinalBatchError);
+  await expect(
+    signOrdinalBatch(f.wallet, {
+      ...prepared,
+      args: { ...prepared.args, inputBEEF: [0, 1, 2] },
+    })
+  ).rejects.toThrow(OrdinalBatchError);
+});
 
 test("mixed ordinal batch prepares, signs no-send, validates AtomicBEEF receipts and unchanged envelopes", async () => {
   const f = await fakeWallet();

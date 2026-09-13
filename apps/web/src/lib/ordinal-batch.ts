@@ -19,7 +19,7 @@ import {
   Hash,
   P2PKH,
   PublicKey,
-  Transaction,
+  type Transaction,
   Utils,
   type WalletInterface,
 } from "@bsv/sdk";
@@ -69,6 +69,24 @@ export class OrdinalBatchError extends Error {
     this.abortConfirmed = details.abortConfirmed;
     this.signed = details.signed;
   }
+}
+
+function transactionWithSources(
+  bytes: number[],
+  inputBEEF?: number[] | Uint8Array
+): Transaction {
+  const response = Beef.fromBinary(bytes);
+  const txid = response.atomicTxid;
+  if (!txid) {
+    throw new Error("Wallet response is not AtomicBEEF.");
+  }
+  const merged = inputBEEF ? Beef.fromBinary(inputBEEF) : new Beef();
+  merged.mergeBeef(response);
+  const tx = merged.findAtomicTransaction(txid);
+  if (!tx || tx.id("hex") !== txid) {
+    throw new Error("AtomicBEEF transaction identity is invalid.");
+  }
+  return tx;
 }
 
 function canonicalOutpoint(value: string): string {
@@ -318,7 +336,10 @@ export async function prepareOrdinalBatch(
   };
   try {
     validateLayout(
-      Transaction.fromAtomicBEEF(prepared.createResult.signableTransaction.tx),
+      transactionWithSources(
+        prepared.createResult.signableTransaction.tx,
+        prepared.args.inputBEEF
+      ),
       prepared
     );
   } catch (cause) {
@@ -339,8 +360,9 @@ export async function signOrdinalBatch(
 ): Promise<SignedOrdinalBatch> {
   let result: CompleteSignedActionResult | undefined;
   try {
-    const unsigned = Transaction.fromAtomicBEEF(
-      prepared.createResult.signableTransaction.tx
+    const unsigned = transactionWithSources(
+      prepared.createResult.signableTransaction.tx,
+      prepared.args.inputBEEF
     );
     validateLayout(unsigned, prepared);
     const expectedLayout = layout(unsigned);
@@ -368,7 +390,7 @@ export async function signOrdinalBatch(
           "Wallet returned no signed AtomicBEEF. Do not relay or retry without reconciliation."
       );
     }
-    const signed = Transaction.fromAtomicBEEF(result.tx);
+    const signed = transactionWithSources(result.tx, prepared.args.inputBEEF);
     if (
       signed.id("hex") !== result.txid.toLowerCase() ||
       layout(signed) !== expectedLayout
@@ -380,7 +402,7 @@ export async function signOrdinalBatch(
     validateLayout(signed, prepared);
     const txid = signed.id("hex");
     return {
-      beef: Uint8Array.from(result.tx),
+      beef: Uint8Array.from(signed.toAtomicBEEF()),
       outputs: prepared.origins.map((origin, index) => ({
         origin: origin ?? `${txid}_${index}`,
         outpoint: `${txid}_${index}`,
