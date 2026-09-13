@@ -7,6 +7,7 @@ import {
 const PATH = /^body(?:>[a-z][a-z0-9-]*:nth-child\([1-9][0-9]{0,5}\)){1,64}$/;
 export interface TextBlock {
   base: DocumentTarget;
+  deleted?: boolean;
   original: string;
   path: string;
   schema: "bitplan-text/1";
@@ -30,12 +31,14 @@ export function parseTextBlock(value: unknown): TextBlock {
     value.original.length > 16_000 ||
     !("text" in value) ||
     typeof value.text !== "string" ||
-    value.text.length > 16_000
+    value.text.length > 16_000 ||
+    ("deleted" in value && typeof value.deleted !== "boolean")
   ) {
     throw new Error("Invalid inline text update.");
   }
   return {
     base: parseDocumentTarget(value.base),
+    ...("deleted" in value && value.deleted === true ? { deleted: true } : {}),
     original: value.original,
     path: value.path,
     schema: "bitplan-text/1",
@@ -62,8 +65,12 @@ export function materializeTextBlocks(
     return html;
   }
   const document = new DOMParser().parseFromString(html, "text/html");
-  for (const block of active) {
-    const element = document.querySelector(block.path);
+  // Resolve every original path before removing siblings changes nth-child addresses.
+  const targets = active.map((block) => ({
+    block,
+    element: document.querySelector(block.path),
+  }));
+  for (const { block, element } of targets) {
     if (
       element?.matches(
         "h1,h2,h3,h4,h5,h6,p,li,span,strong,em,b,i,code,td,th,dt,dd,blockquote"
@@ -74,7 +81,11 @@ export function materializeTextBlocks(
       element.children.length === 0 &&
       element.textContent === block.original
     ) {
-      element.textContent = block.text;
+      if (block.deleted) {
+        element.remove();
+      } else {
+        element.textContent = block.text;
+      }
     }
   }
   return `${document.doctype ? "<!doctype html>" : ""}${document.documentElement.outerHTML}`;

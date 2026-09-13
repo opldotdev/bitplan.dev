@@ -14,17 +14,23 @@ export function installInlineTextBridge() {
     post.call(port, { payload, type });
   interface Block {
     conflict: boolean;
+    deleted: boolean;
     dirty: boolean;
     element: HTMLElement;
+    marker?: Comment;
     original: string;
     pending: boolean;
-    remote?: { text: string; revision: number };
+    remote?: { text: string; revision: number; deleted?: boolean };
     revision: number;
+    savedDeleted: boolean;
     text: string;
     timer?: ReturnType<typeof setTimeout>;
   }
   const blocks = new Map<string, Block>();
   let enabled = false;
+  let selected: Block | null = null;
+  let editing: Block | null = null;
+  const byElement = new Map<EventTarget, Block>();
   function collect() {
     if (blocks.size || !document.body) {
       return;
@@ -57,15 +63,19 @@ export function installInlineTextBridge() {
       if (current !== document.body) {
         continue;
       }
-      blocks.set(`body>${parts.join(">")}`, {
+      const block: Block = {
         conflict: false,
+        deleted: false,
         dirty: false,
         element,
         original: element.textContent,
         pending: false,
         revision: 0,
+        savedDeleted: false,
         text: element.textContent,
-      });
+      };
+      blocks.set(`body>${parts.join(">")}`, block);
+      byElement.set(element, block);
     }
   }
   function save(path: string, block: Block) {
@@ -82,6 +92,7 @@ export function installInlineTextBridge() {
     }
     block.pending = true;
     send("edit", {
+      deleted: block.deleted,
       original: block.original,
       path,
       revision: block.revision,
@@ -91,12 +102,62 @@ export function installInlineTextBridge() {
   function mode() {
     for (const block of blocks.values()) {
       if (enabled) {
-        block.element.setAttribute("contenteditable", "plaintext-only");
         block.element.setAttribute("data-bitplan-editable", "");
       } else {
         block.element.removeAttribute("contenteditable");
         block.element.removeAttribute("data-bitplan-editable");
       }
+    }
+    if (!enabled) {
+      clearSelection();
+    }
+  }
+  function clearSelection() {
+    if (editing) {
+      editing.element.removeAttribute("contenteditable");
+      editing.element.blur();
+    }
+    selected?.element.removeAttribute("data-bitplan-selected");
+    selected = null;
+    editing = null;
+  }
+  function render(block: Block, text: string, deleted = false) {
+    block.element.textContent = text;
+    block.deleted = deleted;
+    if (deleted && !block.marker) {
+      block.marker = document.createComment("bitplan text");
+      block.element.replaceWith(block.marker);
+      if (selected === block) {
+        clearSelection();
+      }
+    } else if (!deleted && block.marker) {
+      block.marker.replaceWith(block.element);
+      block.marker = undefined;
+    }
+  }
+  function reportDraft(path: string, block: Block) {
+    block.dirty =
+      block.element.textContent !== block.text ||
+      block.deleted !== block.savedDeleted;
+    send("draft", {
+      deleted: block.deleted,
+      original: block.original,
+      path,
+      revision: block.revision,
+      text: block.element.textContent ?? "",
+    });
+    clearTimeout(block.timer);
+    block.timer = setTimeout(() => save(path, block), 700);
+  }
+  function removeSelected() {
+    for (const [path, block] of blocks) {
+      if (block !== selected) {
+        continue;
+      }
+      render(block, "", true);
+      reportDraft(path, block);
+      save(path, block);
+      break;
     }
   }
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: serialized dispatcher keeps revision and local-draft guards at the private channel boundary
@@ -109,6 +170,9 @@ export function installInlineTextBridge() {
     if (data.type === "mode") {
       enabled = data.payload === true;
       mode();
+    }
+    if (data.type === "clear-selection") {
+      clearSelection();
     }
     if (data.type === "restore" && Array.isArray(data.payload)) {
       for (const value of data.payload.slice(0, 1000)) {
@@ -127,7 +191,7 @@ export function installInlineTextBridge() {
           continue;
         }
         clearTimeout(block.timer);
-        block.element.textContent = value.text;
+        render(block, value.text, value.deleted === true);
         block.dirty = true;
         block.pending = false;
         block.conflict = true;
@@ -147,12 +211,17 @@ export function installInlineTextBridge() {
           continue;
         }
         if (block.dirty || block.pending) {
-          block.remote = { revision: value.revision, text: value.text };
+          block.remote = {
+            deleted: value.deleted === true,
+            revision: value.revision,
+            text: value.text,
+          };
           continue;
         }
         block.text = value.text;
+        block.savedDeleted = value.deleted === true;
         block.revision = value.revision;
-        block.element.textContent = value.text;
+        render(block, value.text, block.savedDeleted);
       }
     }
     if (data.type === "saved") {
@@ -163,10 +232,17 @@ export function installInlineTextBridge() {
       }
       block.pending = false;
       block.text = value.text;
+      block.savedDeleted = value.deleted === true;
       block.revision = value.revision;
-      block.dirty = block.element.textContent !== block.text;
+      block.dirty =
+        block.element.textContent !== block.text ||
+        block.deleted !== block.savedDeleted;
       if (!block.dirty) {
-        send("clean", { path: value.path, text: value.text });
+        send("clean", {
+          deleted: block.deleted,
+          path: value.path,
+          text: value.text,
+        });
       }
       if (
         !block.dirty &&
@@ -174,8 +250,9 @@ export function installInlineTextBridge() {
         block.remote.revision > block.revision
       ) {
         block.text = block.remote.text;
+        block.savedDeleted = block.remote.deleted === true;
         block.revision = block.remote.revision;
-        block.element.textContent = block.text;
+        render(block, block.text, block.savedDeleted);
       }
       save(value.path, block);
     }
@@ -193,9 +270,10 @@ export function installInlineTextBridge() {
         block.conflict = false;
         if (block.remote && block.remote.revision > block.revision) {
           block.text = block.remote.text;
+          block.savedDeleted = block.remote.deleted === true;
           block.revision = block.remote.revision;
         }
-        block.element.textContent = block.text;
+        render(block, block.text, block.savedDeleted);
       }
       send("discarded", {});
       send("ready", {});
@@ -203,6 +281,31 @@ export function installInlineTextBridge() {
   });
   port.start();
   parent.postMessage({ type: "bitplan-text-ready/1" }, "*", [channel.port2]);
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (!enabled || event.defaultPrevented || trusted?.call(event) !== true) {
+        return;
+      }
+      const block = event.target ? byElement.get(event.target) : undefined;
+      if (block === editing) {
+        return;
+      }
+      const again = block === selected;
+      clearSelection();
+      if (!block || block.deleted) {
+        return;
+      }
+      selected = block;
+      block.element.setAttribute("data-bitplan-selected", "");
+      if (again || event.detail >= 2) {
+        editing = block;
+        block.element.setAttribute("contenteditable", "plaintext-only");
+        block.element.focus();
+      }
+    },
+    true
+  );
   document.addEventListener(
     "paste",
     (event) => {
@@ -237,18 +340,10 @@ export function installInlineTextBridge() {
         if (event.target !== block.element) {
           continue;
         }
-        block.dirty = block.element.textContent !== block.text;
-        send("draft", {
-          original: block.original,
-          path,
-          revision: block.revision,
-          text: block.element.textContent ?? "",
-        });
+        reportDraft(path, block);
         if (!(block.dirty || block.pending)) {
           send("clean", { path, text: block.element.textContent ?? "" });
         }
-        clearTimeout(block.timer);
-        block.timer = setTimeout(() => save(path, block), 700);
         break;
       }
     },
@@ -257,12 +352,32 @@ export function installInlineTextBridge() {
   document.addEventListener(
     "keydown",
     (event) => {
+      if (!enabled || trusted?.call(event) !== true || event.isComposing) {
+        return;
+      }
+      if (event.key === "Escape") {
+        clearSelection();
+        return;
+      }
       if (
-        !enabled ||
-        trusted?.call(event) !== true ||
-        event.isComposing ||
-        event.key !== "Enter"
+        !editing &&
+        selected &&
+        (event.key === "Delete" || event.key === "Backspace") &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
       ) {
+        if (
+          event.target instanceof Element &&
+          event.target.closest("input,textarea,select,[contenteditable]")
+        ) {
+          return;
+        }
+        event.preventDefault();
+        removeSelected();
+        return;
+      }
+      if (event.key !== "Enter") {
         return;
       }
       for (const [path, block] of blocks) {
@@ -271,7 +386,7 @@ export function installInlineTextBridge() {
         }
         event.preventDefault();
         save(path, block);
-        block.element.blur();
+        clearSelection();
         break;
       }
     },
@@ -282,7 +397,7 @@ export function installInlineTextBridge() {
     mode();
     const style = document.createElement("style");
     style.textContent =
-      "[data-bitplan-editable]{cursor:text;outline-offset:5px}[data-bitplan-editable]:focus{outline:1px solid currentColor;border-radius:2px}";
+      "[data-bitplan-editable]{cursor:default;outline-offset:5px}[data-bitplan-selected]{outline:1px solid currentColor;border-radius:2px}[data-bitplan-editable][contenteditable]{cursor:text}";
     document.head.append(style);
     send("ready", {});
   });

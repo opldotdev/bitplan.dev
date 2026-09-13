@@ -64,13 +64,9 @@ Prefer a compatible BRC-100 wallet the user already has. The planned 1Sat CLI fa
 
     npx bitplan config --share-with <wallet-identity-key>
 
-For a local team, save contacts and share by team name:
+An agent with its own wallet gives the operator its public identity key. For team invitations, recipient encryption, and removing guest-link access, follow ${SITE_URL}/docs/sharing.
 
-    npx bitplan contact set alice <identity-key>
-    npx bitplan team add acme-dev alice
-    npx bitplan config --share-with acme-dev
-
-Contact names, their public keys, and team membership are defined in ~/.bitplan/config.json. A local draft may remember a name so it can resolve the current members when publishing. Neither names nor membership go to BitPlan servers or on-chain; only public identity keys appear in the shared envelope. BitPlan has no accounts or membership database. Hosted storage contains sealed envelopes, not names, wallet keys, or plaintext. Removing a member excludes them from the next version of locally tracked plans that remember the team, but cannot revoke older versions.
+Browser agents can join an authorized live invitation. CLI fetch returns the saved document, not live edits or annotations; read those in the viewer before revising. If a sandbox blocks wallet access or installation, request scoped permission or use the browser. Do not bypass its restrictions.
 
 Docs: ${SITE_URL}/docs/agents
 `,

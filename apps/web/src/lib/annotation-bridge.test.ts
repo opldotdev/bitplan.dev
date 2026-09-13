@@ -168,6 +168,27 @@ test("click anchors round-trip over a private port, including blank space", asyn
   await flushMessages();
   expect(messages).toEqual([]);
   expect(syntheticContextPrevented).toBe(false);
+  port.postMessage({ payload: true, type: "pick" });
+  await flushMessages();
+  expect(context.document.documentElement.style.cursor).toContain("crosshair");
+  handlers.get("keydown")?.(trustedEvent({ key: "Escape" }));
+  await flushMessages();
+  expect(context.document.documentElement.style.cursor).toBe("");
+  expect(messages.at(-1)).toEqual({ payload: "Escape", type: "shortcut" });
+  handlers.get("keydown")?.(
+    trustedEvent({
+      key: "t",
+      preventDefault() {
+        /* Test event. */
+      },
+    })
+  );
+  await flushMessages();
+  expect(messages.at(-1)).toEqual({ payload: "t", type: "shortcut" });
+  const beforeModifiedShortcut = messages.length;
+  handlers.get("keydown")?.(trustedEvent({ ctrlKey: true, key: "t" }));
+  await flushMessages();
+  expect(messages.length).toBe(beforeModifiedShortcut);
   handlers.get("click")?.(
     trustedEvent({ clientX: 140, clientY: 120, target: element })
   );

@@ -6,12 +6,12 @@ description: >
   or update a plan, share one with a person or team, create a private reader
   link, move a hosted draft on chain, or explain bitplan.dev.
 metadata:
-  version: "0.2.13"
+  version: "0.2.14"
 ---
 
 # BitPlan
 
-**Skill version: 0.2.13**
+**Skill version: 0.2.14**
 
 BitPlan turns one self-contained HTML file into an encrypted living plan. A
 BRC-100 wallet owns the keys. A draft can stay hosted as ciphertext while it
@@ -491,7 +491,12 @@ or substitute a CLI fetch that omits live edits and annotations.
 In Edit & annotate, “Edit text in place” enables plain-text editing of supported
 leaf passages inside the document. It does not make scripts, links, form controls,
 or arbitrary nested markup into a rich-text editor. Text saves after a short pause;
-concurrent changes reject stale passage revisions instead of overwriting them.
+click once to select, again or double-click to edit. Escape clears selection or
+annotation targeting. Delete/Backspace removes a selected text leaf through the
+encrypted text overlay; it is also removed from materialized exports. There is
+no undo UI yet. V enters text selection, T starts a comment, and I starts an image
+annotation; shortcuts do not intercept typing or modifier-key browser commands.
+Concurrent changes reject stale passage revisions instead of overwriting them.
 Keep the page open until saves finish. A conflict or restored unsaved passage
 requires deliberate recovery; preserve or copy the text before loading latest.
 Full-document HTML editing still uses explicit Save. Neither path creates a

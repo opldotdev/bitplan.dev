@@ -169,6 +169,7 @@ export function CollaborationCanvas({
   const [panel, setPanel] = useState(false);
   const [browserMenu, setBrowserMenu] = useState(false);
   const [picking, setPicking] = useState(false);
+  const pickingRef = useRef(false);
   const [highlight, setHighlight] = useState<AnnotationAnchor | null>(null);
   const picker = useRef<"text" | "image">("text");
   const lastHover = useRef<AnnotationAnchor>(center);
@@ -299,7 +300,11 @@ export function CollaborationCanvas({
         }
         if (data?.type === "clean" && typeof data.payload?.path === "string") {
           const key = `${base.sha256}:${data.payload.path}`;
-          if (textRecovery.current.get(key)?.text === data.payload.text) {
+          if (
+            textRecovery.current.get(key)?.text === data.payload.text &&
+            !!textRecovery.current.get(key)?.deleted ===
+              (data.payload.deleted === true)
+          ) {
             textRecovery.current.delete(key);
           }
           return;
@@ -349,11 +354,15 @@ export function CollaborationCanvas({
             value.revision
           );
           const recoveryKey = `${base.sha256}:${block.path}`;
-          if (textRecovery.current.get(recoveryKey)?.text === block.text) {
+          if (
+            textRecovery.current.get(recoveryKey)?.text === block.text &&
+            !!textRecovery.current.get(recoveryKey)?.deleted === !!block.deleted
+          ) {
             textRecovery.current.delete(recoveryKey);
           }
           port.postMessage({
             payload: {
+              deleted: block.deleted === true,
               path: block.path,
               revision: saved.revision,
               text: block.text,
@@ -405,18 +414,25 @@ export function CollaborationCanvas({
     });
   }
   function startPicking(kind: "text" | "image" = "text") {
+    textPort.current?.postMessage({ type: "clear-selection" });
     picker.current = kind;
     setPanel(false);
     setPicking(true);
+    pickingRef.current = true;
     setHighlight(null);
     geometryPort.current?.postMessage({ payload: true, type: "pick" });
     frame.current?.focus();
   }
   function stopPicking() {
+    const wasPicking = pickingRef.current;
+    pickingRef.current = false;
     setPicking(false);
     setHighlight(null);
     geometryPort.current?.postMessage({ payload: false, type: "pick" });
-    roomRef.current.moveCursor(lastHover.current, false, false, true);
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: this ref is set by a separate user-event callback
+    if (wasPicking) {
+      roomRef.current.moveCursor(lastHover.current, false, false, true);
+    }
   }
   function cardTransform(
     point: { x: number; y: number },
@@ -457,6 +473,8 @@ export function CollaborationCanvas({
         });
       } else if (event.data.type === "pick-cancel") {
         stopPicking();
+      } else if (event.data.type === "shortcut") {
+        keyboardAction(event.data.payload);
       } else if (event.data.type === "context") {
         const { payload } = event.data;
         if (!(position(payload) && "anchor" in payload)) {
@@ -554,6 +572,19 @@ export function CollaborationCanvas({
     }
   }
 
+  function keyboardAction(key: unknown) {
+    if (key === "Escape" || key === "v") {
+      stopPicking();
+      setDrawing(null);
+      textPort.current?.postMessage({ type: "clear-selection" });
+      if (key === "v" && isHostedId(target.origin)) {
+        setInlineEditing(true);
+      }
+    } else if ((key === "t" || key === "i") && roomRef.current.connection) {
+      startPicking(key === "t" ? "text" : "image");
+    }
+  }
+
   useEffect(() => {
     function acceptGeometryPort(event: MessageEvent) {
       const currentFrame = frame.current;
@@ -578,16 +609,27 @@ export function CollaborationCanvas({
     }
     window.addEventListener("message", acceptGeometryPort);
     function keyboardTools(event: KeyboardEvent) {
+      if (event.isTrusted && event.key === "Escape" && !event.isComposing) {
+        keyboardAction("Escape");
+        return;
+      }
       if (
         !event.isTrusted ||
-        event.key !== "Shift" ||
+        event.isComposing ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
         event.repeat ||
         (event.target instanceof Element &&
-          event.target.closest("input,textarea,[contenteditable]"))
+          event.target.closest("input,textarea,select,[contenteditable]"))
       ) {
         return;
       }
-      geometryPort.current?.postMessage({ type: "open-tools" });
+      if (event.key === "Shift") {
+        geometryPort.current?.postMessage({ type: "open-tools" });
+      } else {
+        keyboardAction(event.key.toLowerCase());
+      }
     }
     window.addEventListener("keydown", keyboardTools);
     setBridgeHostReady(true);
@@ -874,7 +916,7 @@ export function CollaborationCanvas({
         >
           <span>
             {inlineEditError ??
-              "Click a text passage to edit. Changes save live; Enter finishes the passage."}
+              "Click to select; click again to edit. Delete removes selected text blocks. Esc clears selection. V select · T comment · I image. Changes save live."}
           </span>
           <div className="flex gap-2">
             {inlineEditError ? (

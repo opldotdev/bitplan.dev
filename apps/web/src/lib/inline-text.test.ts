@@ -33,6 +33,8 @@ test("inline text uses independent exact-base addresses and cannot carry markup 
     })
   );
   expect(() => parseTextBlock({ ...block, path: "body,script" })).toThrow();
+  expect(() => parseTextBlock({ ...block, deleted: "yes" })).toThrow();
+  expect(parseTextBlock({ ...block, deleted: true }).deleted).toBe(true);
   expect(() =>
     parseTextBlock({ ...block, text: "x".repeat(16_001) })
   ).toThrow();
@@ -51,6 +53,9 @@ test("export materializes only eligible text leaves, never script or interactive
     children: [],
     closest: () => null,
     matches: () => true,
+    remove() {
+      this.textContent = "";
+    },
     textContent: "Original",
   };
   const script = {
@@ -98,6 +103,10 @@ test("export materializes only eligible text leaves, never script or interactive
     expect(materializeTextBlocks("base", blocks, base)).toBe(
       "Updated|Original|Original"
     );
+    paragraph.textContent = "Original";
+    expect(
+      materializeTextBlocks("base", [{ ...blocks[0], deleted: true }], base)
+    ).toBe("|Original|Original");
     expect(
       materializeTextBlocks("base", blocks, { ...base, sha256: "b".repeat(64) })
     ).toBe("base");

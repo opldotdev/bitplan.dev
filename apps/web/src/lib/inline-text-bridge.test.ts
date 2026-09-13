@@ -5,20 +5,26 @@ import { installInlineTextBridge } from "./inline-text-bridge";
 function bridge() {
   const messages: {
     type: string;
-    payload: { path?: string; text?: string };
+    payload: { deleted?: boolean; path?: string; text?: string };
   }[] = [];
   const handlers = new Map<string, (event: object) => void>();
   const timers = new Map<number, () => void>();
   let nextTimer = 0;
   let receive: (event: MessageEvent) => void = () => undefined;
   const body = { children: [] as object[] };
+  const attributes = new Map<string, string>();
+  let removed = false;
   const element = {
     blur: () => undefined,
     children: [],
     closest: () => null,
+    focus: () => undefined,
     parentElement: body,
-    removeAttribute: () => undefined,
-    setAttribute: () => undefined,
+    removeAttribute: (key: string) => attributes.delete(key),
+    replaceWith: () => {
+      removed = true;
+    },
+    setAttribute: (key: string, value: string) => attributes.set(key, value),
     tagName: "P",
     textContent: "Original",
   };
@@ -50,10 +56,16 @@ function bridge() {
       addEventListener: (name: string, callback: (event: object) => void) =>
         handlers.set(name, callback),
       body,
+      createComment: () => ({
+        replaceWith: () => {
+          removed = false;
+        },
+      }),
       createElement: () => ({ textContent: "" }),
       head: { append: () => undefined },
       querySelectorAll: () => [element],
     },
+    Element: class {},
     Event: TrustedEvent,
     MessageChannel: class {
       port1 = new Port();
@@ -78,7 +90,21 @@ function bridge() {
     receive(new MessageEvent("message", { data: { payload, type } }));
   send("mode", true);
   return {
+    attributes,
     element,
+    event(name: string, options: object = {}, trusted = true) {
+      const event = Object.assign(new TrustedEvent(), {
+        preventDefault() {
+          /* No browser default in this harness. */
+        },
+        target: element,
+        ...options,
+      });
+      if (trusted) {
+        trustedEvents.add(event);
+      }
+      handlers.get(name)?.(event);
+    },
     flush() {
       const pending = [...timers.values()];
       timers.clear();
@@ -95,6 +121,9 @@ function bridge() {
       handlers.get("input")?.(event);
     },
     messages,
+    get removed() {
+      return removed;
+    },
     send,
   };
 }
@@ -127,6 +156,36 @@ test("serialized bridge reports drafts immediately and restores without overwrit
   expect(
     restored.messages.some((message) => message.type === "discarded")
   ).toBe(true);
+});
+
+test("click selects, second click edits, Escape clears, and deletion survives remote replay", () => {
+  const instance = bridge();
+  instance.event("click");
+  expect(instance.attributes.has("data-bitplan-selected")).toBe(true);
+  expect(instance.attributes.has("contenteditable")).toBe(false);
+  instance.event("click");
+  expect(instance.attributes.get("contenteditable")).toBe("plaintext-only");
+  instance.event("keydown", { key: "Escape" });
+  expect(instance.attributes.has("data-bitplan-selected")).toBe(false);
+  expect(instance.attributes.has("contenteditable")).toBe(false);
+  instance.event("click", { detail: 2 });
+  expect(instance.attributes.has("contenteditable")).toBe(true);
+  instance.send("clear-selection", null);
+  instance.event("click");
+  instance.event("keydown", { key: "Delete" }, false);
+  expect(instance.removed).toBe(false);
+  instance.event("keydown", { key: "Delete" });
+  expect(instance.removed).toBe(true);
+  const edit = instance.messages.find((message) => message.type === "edit");
+  expect(edit?.payload.deleted).toBe(true);
+  const reader = bridge();
+  reader.send("blocks", [{ ...edit?.payload, revision: 1 }]);
+  expect(reader.removed).toBe(true);
+  reader.send("blocks", [
+    { ...edit?.payload, deleted: false, revision: 2, text: "Original" },
+  ]);
+  expect(reader.removed).toBe(false);
+  expect(reader.element.textContent).toBe("Original");
 });
 
 test("restore validates original text and retains newer local drafts across save acknowledgements", () => {

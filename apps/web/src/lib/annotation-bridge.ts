@@ -443,6 +443,34 @@ function installGeometryBridge(
   document.addEventListener("keydown", (event) => {
     if (
       trustedActivity(event) &&
+      !event.isComposing &&
+      event.key === "Escape"
+    ) {
+      picking = false;
+      document.documentElement.style.cursor = "";
+      send("shortcut", "Escape");
+      return;
+    }
+    if (
+      trustedActivity(event) &&
+      !event.isComposing &&
+      !event.repeat &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      ["v", "t", "i"].includes(event.key.toLowerCase()) &&
+      !(
+        event.target instanceof Element &&
+        event.target.closest("input,textarea,select,[contenteditable]")
+      )
+    ) {
+      event.preventDefault();
+      send("shortcut", event.key.toLowerCase());
+      return;
+    }
+    if (
+      trustedActivity(event) &&
       event.key === "Shift" &&
       !event.repeat &&
       !(
@@ -462,12 +490,6 @@ function installGeometryBridge(
         x,
         y,
       });
-      return;
-    }
-    if (trustedActivity(event) && picking && event.key === "Escape") {
-      picking = false;
-      document.documentElement.style.cursor = "";
-      send("pick-cancel", {});
       return;
     }
     if (trustedActivity(event) && event.shiftKey && event.key === "F10") {

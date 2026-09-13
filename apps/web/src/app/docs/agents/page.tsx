@@ -75,28 +75,12 @@ export default function AgentsAndWalletsPage() {
       </section>
 
       <section id="teams">
-        <h2>Share with a team</h2>
-        <p>Save wallet IDs with names, then put those contacts in a team:</p>
-        <div className="not-typeset my-4">
-          <CommandCopy command="npx bitplan contact set alice &lt;identity-key&gt;" />
-        </div>
-        <div className="not-typeset my-4">
-          <CommandCopy command="npx bitplan team add acme-dev alice" />
-        </div>
-        <div className="not-typeset my-4">
-          <CommandCopy command="npx bitplan config --share-with acme-dev" />
-        </div>
+        <h2>Give the agent access</h2>
         <p>
-          Contact names, their public wallet keys, and team membership are
-          defined in <code>~/.bitplan/config.json</code>. A local draft may
-          remember a team name so it can resolve the current members when you
-          publish. Neither names nor membership go to the server or on-chain;
-          only public wallet keys appear in the shared envelope. BitPlan has no
-          accounts, membership database, or plan database.
-        </p>
-        <p>
-          Remove a member and the next version of a locally tracked plan will
-          leave them out. Versions already shared with them cannot be revoked.
+          An agent with its own wallet gives you its public identity key. Follow{" "}
+          <Link href="/docs/sharing">Sharing and access</Link> to add it to a
+          team and encrypt a new version for it. That guide also covers guest
+          invitations and removing link access from future versions.
         </p>
       </section>
 
@@ -106,6 +90,13 @@ export default function AgentsAndWalletsPage() {
           BitPlan&apos;s WebMCP tools can prepare a plan, list encrypted plan
           IDs, and open the viewer. They cannot publish or read decrypted plan
           text.
+        </p>
+        <p>
+          A browser agent can join an authorized live invitation and use the
+          viewer. CLI fetch returns the saved document, not the room&apos;s
+          annotations or live edits. Read those before proposing a revision. If
+          a sandbox blocks wallet access or installation, request scoped
+          permission or use the browser; do not work around its restrictions.
         </p>
       </section>
 
