@@ -6,12 +6,12 @@ description: >
   or update a plan, share one with a person or team, create a private reader
   link, move a hosted draft on chain, or explain bitplan.dev.
 metadata:
-  version: "0.2.16"
+  version: "0.2.17"
 ---
 
 # BitPlan
 
-**Skill version: 0.2.16**
+**Skill version: 0.2.17**
 
 BitPlan turns one self-contained HTML file into an encrypted living plan. A
 BRC-100 wallet owns the keys. A draft can stay hosted as ciphertext while it
@@ -649,7 +649,8 @@ scoped agent session when supported; matching a human's portrait is not a
 handoff. Do not extract localStorage capabilities to impersonate a participant.
 
 **Not implemented yet:** direct “Submit to agent,” a durable addressed inbox,
-delivery acknowledgements, section-reading tools, and reading animations.
+and delivery acknowledgements. Section reads and activity scans are available
+through the discovered WebMCP tools described above.
 Do not label a message delivered merely because an agent appears online.
 A future send action must retain the request on disconnect, deduplicate retries,
 and distinguish queued, received, and answered. Keep Copy available until this

@@ -72,6 +72,8 @@ test("click anchors round-trip over a private port, including blank space", asyn
     }
   }
   const element = new Element();
+  let scans = 0;
+  let candidates = [element];
   const trustedEvents = new WeakSet<object>();
   class TestEvent {
     constructor() {
@@ -109,7 +111,10 @@ test("click anchors round-trip over a private port, including blank space", asyn
         style: { cursor: "" },
       },
       elementFromPoint: () => element,
-      querySelectorAll: () => [element],
+      querySelectorAll: () => {
+        scans += 1;
+        return candidates;
+      },
     },
     Element,
     Event: TestEvent,
@@ -313,6 +318,34 @@ test("click anchors round-trip over a private port, including blank space", asyn
   await flushMessages();
   expect(messages.at(-1)?.type).toBe("context");
   expect(messages.at(-1)?.payload.x).toBe(70);
+  scans = 0;
+  port.postMessage({
+    payload: Array.from({ length: 400 }, (_, i) => ({
+      anchor:
+        i % 2
+          ? { elementId: "section", point: { x: 0.5, y: 0.5 } }
+          : { point: { x: 0.5, y: 0.5 }, quote: { exact: "A paragraph" } },
+      id: `bulk-${i}`,
+    })),
+    type: "anchors",
+  });
+  await flushMessages();
+  await flushMessages();
+  expect(scans).toBe(2);
+  expect(messages.at(-1)?.payload).toHaveLength(400);
+  expect(
+    messages.at(-1)?.payload.every((row: any) => row.position !== null)
+  ).toBe(true);
+  // Indexes live for one frame only: duplicates and changed text must invalidate resolution.
+  candidates = [element, new Element()];
+  await locate(anchor);
+  expect(messages.at(-1)?.payload[0].position).toBeNull();
+  await locate({ point: { x: 0.5, y: 0.5 }, quote: { exact: "A paragraph" } });
+  expect(messages.at(-1)?.payload[0].position).toBeNull();
+  candidates = [element];
+  element.textContent = "Changed paragraph";
+  await locate({ point: { x: 0.5, y: 0.5 }, quote: { exact: "A paragraph" } });
+  expect(messages.at(-1)?.payload[0].position).toBeNull();
   port.close();
 });
 

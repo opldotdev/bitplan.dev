@@ -225,16 +225,22 @@ function installGeometryBridge(
       },
     };
   }
-  function locate(anchor: (typeof anchors)[number]["anchor"]) {
+  function uniqueElements(selector: string, key: (element: Element) => string) {
+    const index = new Map<string, Element | null>();
+    for (const element of document.querySelectorAll(selector)) {
+      const value = key(element);
+      index.set(value, index.has(value) ? null : element);
+    }
+    return index;
+  }
+  function locate(
+    anchor: (typeof anchors)[number]["anchor"],
+    ids: Map<string, Element | null> | undefined,
+    quotes: Map<string, Element | null> | undefined
+  ) {
     let element: Element | null = null;
     if (anchor.elementId) {
-      const matches = [...document.querySelectorAll("[id]")].filter(
-        (el) => el.id === anchor.elementId
-      );
-      if (matches.length !== 1) {
-        return null;
-      }
-      element = matches[0] ?? null;
+      element = ids?.get(anchor.elementId) ?? null;
     } else if (
       anchor.domPath &&
       // biome-ignore lint/performance/useTopLevelRegex: this function is serialized into an isolated iframe
@@ -244,17 +250,7 @@ function installGeometryBridge(
     ) {
       element = document.querySelector(anchor.domPath);
     } else if (anchor.quote?.exact) {
-      const matches = [
-        ...document.querySelectorAll(
-          "p,li,h1,h2,h3,h4,pre,blockquote,figure,section"
-        ),
-      ].filter(
-        (el) => el.textContent?.trim().slice(0, 8000) === anchor.quote?.exact
-      );
-      if (matches.length !== 1) {
-        return null;
-      }
-      element = matches[0] ?? null;
+      element = quotes?.get(anchor.quote.exact) ?? null;
     } else {
       return {
         x: document.documentElement.scrollWidth * anchor.point.x - scrollX,
@@ -283,9 +279,24 @@ function installGeometryBridge(
     scheduled = true;
     requestAnimationFrame(() => {
       scheduled = false;
+      // Rebuild only the needed indexes once per frame. Never cache across DOM edits.
+      const ids = anchors.some((item) => item.anchor.elementId)
+        ? uniqueElements("[id]", (element) => element.id)
+        : undefined;
+      const quotes = anchors.some(
+        (item) => item.anchor.quote?.exact && !item.anchor.elementId
+      )
+        ? uniqueElements(
+            "p,li,h1,h2,h3,h4,pre,blockquote,figure,section",
+            (element) => element.textContent?.trim().slice(0, 8000) ?? ""
+          )
+        : undefined;
       send(
         "positions",
-        anchors.map((item) => ({ id: item.id, position: locate(item.anchor) }))
+        anchors.map((item) => ({
+          id: item.id,
+          position: locate(item.anchor, ids, quotes),
+        }))
       );
     });
   }
