@@ -589,7 +589,7 @@ reused against replacement content. The image
 icon opens Photos, Stickers, Draw, and Generate. Raster uploads up to 20 MB are resized
 locally to fit the 170 KB image budget; SVG/GIF must already fit that budget.
 The annotation toolbar gear and navbar Settings button open the same centered
-Settings dialog. Interaction contains Plan right-click tools (off uses the
+plan menu as Publish. Interaction contains Plan right-click tools (off uses the
 native browser menu), the shortcut legend, comparison and editing controls.
 The menu preference persists on this device; opening Settings does not change it.
 Sound controls UI mute and overall volume for the existing sound theme. Audio never
@@ -598,12 +598,14 @@ Select your own drawing, image, HTML widget, or note and press Delete to remove 
 Command/Ctrl+Z undoes a removal in the current session; concurrent changes reject
 stale restores. These actions retain annotation history and do not delete other
 authors' layers. Native typing undo remains separate.
-Publish uses the same modal design, with Review changes, Access, and Export PDF.
+One persistent navigation rail includes Review changes, Access, Export PDF,
+Interaction, Appearance, Sound, and Document details. Switch sections in place;
+there is no separate Publish interface or "Open Publish" step.
 Review rows start collapsed; expand only the changes you need. Access selections
 and team fingerprints are shared with the generated revision prompt. Contributor
 access is read-only; only the publisher changes next-version readers.
-Appearance offers Light/Dark/System. Publishing links to Publish and retains
-document metadata; recipients and per-version spending intent stay in Publish.
+Appearance offers Light/Dark/System. Document details retains metadata.
+Review and Access retain recipients and per-version spending intent.
 The centered document title opens a searchable wallet draft list; rename the
 current plan inside that dialog. Navbar labels collapse to icons on mobile.
 Browsers cannot be told to open their native menu programmatically. If a browser
