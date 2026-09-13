@@ -1,13 +1,17 @@
 import { withRenderPolicy } from "./render-policy";
 
+const PUBLIC_PLAN_ID = /^(?:h_[a-zA-Z0-9_-]{20}|[0-9a-f]{64}_\d+)$/;
+
 /** Geometry only crosses this boundary. Never inject annotation content or credentials. */
 export function withAnnotationBridge(
   html: string,
   collaboration = true,
   appearanceCss = "",
-  browserMenu = false
+  browserMenu = false,
+  planId = ""
 ): string {
-  const script = `;(${installGeometryBridge.toString()})(${collaboration},${browserMenu});`;
+  const publicId = PUBLIC_PLAN_ID.test(planId) ? planId : "";
+  const script = `;(${installGeometryBridge.toString()})(${collaboration},${browserMenu},${JSON.stringify(publicId)});`;
   const tag = `<script>${script.replaceAll("</script", "<\\/script")}</script>`;
   // Only the host's validated preset compiler supplies this style text.
   return withRenderPolicy(
@@ -19,7 +23,14 @@ export function withAnnotationBridge(
   );
 }
 
-function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
+function installGeometryBridge(
+  collaboration: boolean,
+  browserMenu: boolean,
+  planId: string
+) {
+  if (planId) {
+    document.documentElement.setAttribute("data-bitplan-id", planId);
+  }
   let picking = false;
   function linkFor(target: EventTarget | null) {
     const link = target instanceof Element ? target.closest("a[href]") : null;
@@ -303,7 +314,7 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
       });
       return;
     }
-    if (data.type === "point") {
+    if (data.type === "point" || data.type === "resolve-anchor") {
       const payload = "payload" in data ? data.payload : undefined;
       const point =
         payload && typeof payload === "object"
@@ -321,6 +332,10 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
         return;
       }
       const anchor = anchorFor(document.elementFromPoint(x, y), x, y);
+      if (data.type === "resolve-anchor") {
+        send("resolved-anchor", { anchor });
+        return;
+      }
       send("click", { anchor });
       send("context", {
         anchor,

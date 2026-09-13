@@ -458,7 +458,8 @@ export function useCollaboration(target: DocumentTarget) {
   async function saveAnnotation(
     content: AnnotationContent,
     anchor: AnnotationAnchor,
-    existing?: Annotation
+    existing?: Annotation,
+    size?: Annotation["size"]
   ) {
     const c = connectionRef.current;
     // biome-ignore lint/suspicious/noUnnecessaryConditions: actions can race the asynchronous disconnect cleanup
@@ -476,7 +477,7 @@ export function useCollaboration(target: DocumentTarget) {
       sessionId: c.sessionId,
       status: existing?.status ?? "open",
       target: existing?.target ?? activeTargetRef.current,
-      ...(existing?.size ? { size: existing.size } : {}),
+      ...(existing?.size || size ? { size: existing?.size ?? size } : {}),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });

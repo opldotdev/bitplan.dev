@@ -15,3 +15,15 @@ export function annotationCardOffset(
         : 0,
   };
 }
+/** Move the visual card without changing its document/element anchor. */
+export function moveAnnotationPlacement(
+  placement: { dx: number; dy: number },
+  delta: { x: number; y: number }
+) {
+  const clamp = (value: number) =>
+    Math.max(-10_000, Math.min(10_000, Math.round(value)));
+  return {
+    dx: clamp(placement.dx + delta.x),
+    dy: clamp(placement.dy + delta.y),
+  };
+}

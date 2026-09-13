@@ -5,8 +5,10 @@ import {
   ImagePlus,
   Link,
   MessageSquare,
+  PenTool,
   Plus,
   Settings,
+  Shapes,
   Type,
   X,
 } from "lucide-react";
@@ -16,6 +18,7 @@ import { ContextMenu } from "radix-ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AnnotationCard } from "@/components/annotation-card";
+import { AnnotationDrawLayer } from "@/components/annotation-draw-layer";
 import { AnnotationImagePicker } from "@/components/annotation-image-picker";
 import { AnnotationOnboarding } from "@/components/annotation-onboarding";
 import { usePlanAppearance } from "@/components/theme-provider";
@@ -42,6 +45,7 @@ import {
 } from "@/lib/annotations";
 import { characterPortrait } from "@/lib/collaborator";
 import { cursorIsActive } from "@/lib/cursor-activity";
+import type { DrawingTool } from "@/lib/drawing-asset";
 import { isHostedId } from "@/lib/hosted-id";
 import { planAppearanceCss } from "@/lib/plan-appearance";
 import { withRenderPolicy } from "@/lib/render-policy";
@@ -153,6 +157,11 @@ export function CollaborationCanvas({
   const [highlight, setHighlight] = useState<AnnotationAnchor | null>(null);
   const picker = useRef<"text" | "image">("text");
   const lastHover = useRef<AnnotationAnchor>(center);
+  const [drawing, setDrawing] = useState<DrawingTool | null>(null);
+  const [drawingColor, setDrawingColor] = useState("#b65c38");
+  const resolveDrawingAnchor = useRef<
+    ((anchor: AnnotationAnchor) => void) | null
+  >(null);
   const [anchor, setAnchor] = useState<AnnotationAnchor>(center);
   const [contextLink, setContextLink] = useState<string | null>(null);
   const [contextSelection, setContextSelection] = useState("");
@@ -198,9 +207,10 @@ export function CollaborationCanvas({
         currentHtml,
         !!room.connection,
         preset ? planAppearanceCss(preset) : "",
-        browserMenu
+        browserMenu,
+        target.origin
       ),
-    [currentHtml, !!room.connection, preset, browserMenu]
+    [currentHtml, !!room.connection, preset, browserMenu, target.origin]
   );
   const visible = room.annotations.filter(
     (item) =>
@@ -263,7 +273,9 @@ export function CollaborationCanvas({
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the private-port receiver validates each supported message shape before updating UI state
   function received(event: MessageEvent) {
     try {
-      if (event.data.type === "hover-end") {
+      if (event.data.type === "resolved-anchor") {
+        resolveDrawingAnchor.current?.(parseAnchor(event.data.payload?.anchor));
+      } else if (event.data.type === "hover-end") {
         setHighlight(null);
         roomRef.current.moveCursor(lastHover.current, false, false, true);
       } else if (event.data.type === "picked") {
@@ -698,6 +710,56 @@ export function CollaborationCanvas({
               />
             ) : null}
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              {drawing ? (
+                <AnnotationDrawLayer
+                  color={drawingColor}
+                  key={documentHtml}
+                  onCancel={() => setDrawing(null)}
+                  onSave={async (asset) => {
+                    const base = room.activeTarget;
+                    const at = await new Promise<AnnotationAnchor>(
+                      (complete, reject) => {
+                        const timer = setTimeout(() => {
+                          resolveDrawingAnchor.current = null;
+                          reject(
+                            new Error(
+                              "The document did not respond. Retry your drawing."
+                            )
+                          );
+                        }, 3000);
+                        resolveDrawingAnchor.current = (value) => {
+                          clearTimeout(timer);
+                          resolveDrawingAnchor.current = null;
+                          complete(value);
+                        };
+                        geometryPort.current?.postMessage({
+                          payload: asset.point,
+                          type: "resolve-anchor",
+                        });
+                      }
+                    );
+                    if (
+                      !sameDocumentTarget(base, roomRef.current.activeTarget)
+                    ) {
+                      throw new Error(
+                        "The plan changed. Return to the original version before saving this drawing."
+                      );
+                    }
+                    await roomRef.current.saveAnnotation(
+                      {
+                        alt: `${drawing} drawing`,
+                        dataUrl: asset.dataUrl,
+                        type: "image",
+                      },
+                      at,
+                      undefined,
+                      asset.size
+                    );
+                    roomRef.current.moveCursor(at, true);
+                  }}
+                  tool={drawing}
+                />
+              ) : null}
               {[
                 {
                   color: sessionColor(room.connection?.sessionId ?? ""),
@@ -765,24 +827,23 @@ export function CollaborationCanvas({
                     key={item.id}
                     label={`Annotation ${index + 1}`}
                     onSelect={() => setHighlight(item.anchor)}
-                    save={(size) =>
+                    save={(changes) =>
                       room.saveAnnotation(item.content, item.anchor, {
                         ...item,
-                        size,
+                        ...changes,
                       })
                     }
                     style={{
                       left: point.x,
                       top: point.y,
-                      transform: cardTransform(
-                        point,
-                        item.size?.width ?? 224,
-                        item.size?.height ?? 120
-                      ),
                     }}
                   >
                     <button
-                      className="mb-1 block text-muted-foreground text-xs"
+                      className={
+                        item.content.type === "image"
+                          ? "absolute -top-6 left-0 rounded bg-background/90 px-1 text-muted-foreground text-xs opacity-0 group-focus-within/annotation:opacity-100 group-hover/annotation:opacity-100"
+                          : "mb-1 block text-muted-foreground text-xs"
+                      }
                       onClick={() => setPanel(true)}
                       type="button"
                     >
@@ -906,7 +967,30 @@ export function CollaborationCanvas({
                 </div>
               </details>
             ) : null}
-            {inline && positions.composer ? (
+            {inline?.kind === "image" ? (
+              <AnnotationImagePicker
+                initiallyOpen
+                onClose={() => setInline(null)}
+                onLoad={async (dataUrl) => {
+                  if (
+                    !sameDocumentTarget(
+                      inline.target,
+                      roomRef.current.activeTarget
+                    )
+                  ) {
+                    throw new Error(
+                      "The document changed. Close the picker and choose the image position again."
+                    );
+                  }
+                  await room.saveAnnotation(
+                    { alt: "Image annotation", dataUrl, type: "image" },
+                    inline.anchor
+                  );
+                  setInline(null);
+                }}
+              />
+            ) : null}
+            {inline && !inline.kind && positions.composer ? (
               <form
                 aria-label="Add Annotation"
                 className="absolute z-30 w-64 max-w-[90vw] space-y-2 rounded-md border bg-background p-2 shadow-md"
@@ -920,80 +1004,27 @@ export function CollaborationCanvas({
                   transform: cardTransform(positions.composer, 256, 160),
                 }}
               >
-                {inline.kind === "image" ? (
-                  <>
-                    <AnnotationImagePicker
-                      onLoad={(dataUrl) =>
-                        setInline((value) =>
-                          value ? { ...value, image: dataUrl } : null
-                        )
-                      }
-                    />
-                    {inline.image ? (
-                      /* biome-ignore lint/performance/noImgElement lint/correctness/useImageSize: encrypted data URLs need their natural dimensions for an undistorted preview */
-                      <img
-                        alt="Selected preview"
-                        className="max-h-40 max-w-full"
-                        src={inline.image}
-                      />
-                    ) : null}
-                  </>
-                ) : null}
                 <textarea
-                  aria-label={
-                    inline.kind === "image"
-                      ? "Image description"
-                      : "Annotation text"
-                  }
+                  aria-label="Annotation text"
                   autoFocus
                   className="min-h-20 w-full resize-y rounded border bg-background p-2 text-sm"
-                  maxLength={inline.kind === "image" ? 2000 : 32_000}
+                  maxLength={32_000}
                   onChange={(event) =>
                     setInline((value) =>
                       value ? { ...value, text: event.target.value } : null
                     )
                   }
                   onKeyDown={handleInlineKeyDown}
-                  placeholder={
-                    inline.kind === "image"
-                      ? "Describe the image…"
-                      : "Write an annotation…"
-                  }
+                  placeholder="Write an annotation…"
                   readOnly={busy}
                   ref={inlineInput}
                   value={inline.text}
                 />
-                {inline.kind === "image" ? (
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      disabled={busy}
-                      onClick={() => setInline(null)}
-                      size="sm"
-                      type="button"
-                      variant="ghost"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      disabled={
-                        busy ||
-                        (inline.kind === "image"
-                          ? !inline.image
-                          : !inline.text.trim())
-                      }
-                      size="sm"
-                      type="submit"
-                    >
-                      {busy ? "Saving…" : "Save"}
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-xs" role="status">
-                    {busy
-                      ? "Saving…"
-                      : "Enter to save · Shift+Enter for a new line · Esc to cancel"}
-                  </p>
-                )}
+                <p className="text-muted-foreground text-xs" role="status">
+                  {busy
+                    ? "Saving…"
+                    : "Enter to save · Shift+Enter for a new line · Esc to cancel"}
+                </p>
               </form>
             ) : null}
             {room.connection ? (
@@ -1275,6 +1306,56 @@ export function CollaborationCanvas({
             >
               <ImagePlus />
             </ContextMenu.Item>
+            <ContextMenu.Item
+              aria-label="Draw with pen"
+              className={menuItem}
+              onSelect={() => {
+                setPanel(false);
+                setDrawing("pen");
+              }}
+              title="Pen"
+            >
+              <PenTool />
+            </ContextMenu.Item>
+            <ContextMenu.Sub>
+              <ContextMenu.SubTrigger
+                aria-label="Shapes"
+                className={menuItem}
+                title="Shapes"
+              >
+                <Shapes />
+              </ContextMenu.SubTrigger>
+              <ContextMenu.Portal>
+                <ContextMenu.SubContent className="z-50 min-w-36 rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+                  {(
+                    ["rectangle", "ellipse", "line", "arrow", "cloud"] as const
+                  ).map((shape) => (
+                    <ContextMenu.Item
+                      className={menuItem}
+                      key={shape}
+                      onSelect={() => {
+                        setPanel(false);
+                        setDrawing(shape);
+                      }}
+                    >
+                      {shape === "cloud"
+                        ? "Thought cloud"
+                        : shape[0].toUpperCase() + shape.slice(1)}
+                    </ContextMenu.Item>
+                  ))}
+                </ContextMenu.SubContent>
+              </ContextMenu.Portal>
+            </ContextMenu.Sub>
+            <label className="flex items-center px-2" title="Drawing color">
+              <span className="sr-only">Drawing color</span>
+              <input
+                aria-label="Drawing color"
+                className="size-7 cursor-pointer border-0 bg-transparent"
+                onChange={(event) => setDrawingColor(event.target.value)}
+                type="color"
+                value={drawingColor}
+              />
+            </label>
             {contextSelection ? (
               <ContextMenu.Item
                 aria-label="Copy selected text"

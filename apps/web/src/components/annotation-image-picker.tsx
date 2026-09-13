@@ -16,11 +16,15 @@ import { prepareAnnotationImage } from "@/lib/annotation-image";
 
 export function AnnotationImagePicker({
   onLoad,
+  initiallyOpen = false,
+  onClose,
 }: {
   onLoad: (dataUrl: string) => void | Promise<void>;
+  initiallyOpen?: boolean;
+  onClose?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"photos" | "stickers" | "draw">("photos");
+  const [open, setOpen] = useState(initiallyOpen);
+  const [tab, setTab] = useState<"photos" | "stickers" | "draw">("stickers");
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,16 +45,21 @@ export function AnnotationImagePicker({
       onOpenChange={(value) => {
         if (!busy) {
           setOpen(value);
+          if (!value) {
+            onClose?.();
+          }
         }
       }}
       open={open}
     >
-      <DialogTrigger asChild>
-        <Button className="min-h-11 w-full" type="button" variant="outline">
-          <ImagePlus className="size-4" />
-          Photos, stickers & drawings
-        </Button>
-      </DialogTrigger>
+      {initiallyOpen ? null : (
+        <DialogTrigger asChild>
+          <Button className="min-h-11 w-full" type="button" variant="outline">
+            <ImagePlus className="size-4" />
+            Photos, stickers & drawings
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent
         className="sm:max-h-[90dvh] sm:max-w-xl sm:overflow-y-auto"
         onPaste={(event) => {

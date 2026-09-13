@@ -496,14 +496,28 @@ the annotation toolbar with the checkbox in Edit & annotate. Browsers cannot be 
 native menu programmatically. If a browser intercepts right-click before the
 page receives it, use Edit & annotate instead; do not weaken the iframe sandbox
 or native event validation. This is also the mobile entry point.
-Draw supports pen, rectangle, ellipse, a shared color, and lasso/move within the
-drawing. It exports a transparent image, not editable vector strokes. Drawing
-directly over document text is not implemented. Choose Use image, then save the
-annotation. Text notes use Enter to save, Shift+Enter for a new line, and Escape
+The toolbar offers a freehand pen, Shapes (rectangle, ellipse, line, arrow,
+thought cloud), and a shared drawing color. Drag directly over the document;
+release saves an encrypted SVG image annotation. Each mark is limited to 1200
+pixels per dimension and 5000 points. Other readers receive the saved mark, not
+an in-progress stroke. The image picker opens directly to Stickers; Use image
+saves at the chosen anchor without a second description form. Its Draw tab
+still offers a separate sketchpad with lasso/move and transparent PNG export.
+Text notes use Enter to save, Shift+Enter for a new line, and Escape
 to cancel. Link-only text annotations open in a new tab; remote unfurls are not
 implemented. Copy commands appear for a
-link or selected text. Authors resize cards with the corner handle or its arrow
-keys; saved dimensions synchronize encrypted. Earlier-version locations collapse into a corner
+link or selected text. Authors drag images directly or use any card's Move
+handle (arrow keys also work); resize with the opposite corner. Saved placement
+offsets and dimensions synchronize encrypted without changing the original
+element anchor. Brief and Terminal starters prominently include a copyable
+agent connection prompt containing only the public plan ID, never URL-fragment
+secrets. Prefer the agent's own BRC-100 identity: securely create it if absent,
+send only its public identity key to the operator, and ask to be added as a
+decryption recipient. Document recipient access does not grant live-room access.
+CLI fetch returns HTML and metadata, not the live annotation layer. Read notes
+through an already authorized live session or request an export encrypted to
+the agent's identity. Never claim the notes were read when only HTML was fetched.
+Earlier-version locations collapse into a corner
 avatar stack; idle avatars retain their spacing without a cursor arrow.
 Read the `locations` result to distinguish last-known activity from connection
 status. A connected browser is not evidence that an agent is executing.

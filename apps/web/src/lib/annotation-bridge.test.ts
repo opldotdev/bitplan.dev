@@ -4,6 +4,17 @@ import { withAnnotationBridge } from "./annotation-bridge";
 
 const SCRIPT_BODY = /<script>([\s\S]*?)<\/script>/;
 
+test("the template handoff receives only a validated public plan ID", () => {
+  const id = "h_12345678901234567890";
+  expect(withAnnotationBridge("<p>Plan</p>", true, "", false, id)).toContain(
+    id
+  );
+  const secretLink = `https://bitplan.dev/d/${id}#k=reader-secret`;
+  expect(
+    withAnnotationBridge("<p>Plan</p>", true, "", false, secretLink)
+  ).not.toContain("reader-secret");
+});
+
 function bridgeScript(html: string): string {
   const script = SCRIPT_BODY.exec(html)?.[1];
   if (!script) {

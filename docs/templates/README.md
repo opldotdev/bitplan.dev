@@ -128,14 +128,19 @@ Copy link only when applicable. Text and image composers open at the chosen
 anchor.
 Text composers have no submit button: Enter saves and closes, Shift+Enter adds
 a line, and Escape cancels. Failed saves retain the text; IME confirmation does
-not submit a note. Image uploads keep an explicit Save control.
+not submit a note. The image tool opens the visual picker directly; Use image saves.
 The image picker offers Photos, Stickers, and Draw. Raster files up to 20 MB
 are resized locally to fit 170 KB; SVG/GIF must already fit 170 KB. Draw supports
 pen, rectangle, ellipse, color, and lasso/move, then exports a transparent image.
-It is a picker drawing surface, not direct-on-document drawing or a persistent
-vector editor. Choose Use image, then save the annotation. Uploaded image bytes
+The main toolbar also offers direct-on-document pen, rectangle, ellipse, line,
+arrow, thought cloud, and a color picker. Releasing a stroke saves an SVG image
+annotation (1200 pixels per dimension, 5000 points maximum). Other readers see
+the saved mark, not intermediate strokes. This is not a persistent vector editor.
+Uploaded image bytes
 are embedded in encrypted notes. SVG is rendered as an image, never inline markup.
-Authors can resize their own cards by dragging the corner or using its arrow
+Authors can drag images directly or move any card with its Move handle. Offsets
+are saved separately from the original document anchor. They can resize their
+own cards by dragging the corner or using its arrow
 keys. Saved dimensions synchronize through Convex and survive reloads; they do
 not change the document anchor or create a transaction. Existing notes without
 dimensions use the default card size. These are viewer features: a standalone
