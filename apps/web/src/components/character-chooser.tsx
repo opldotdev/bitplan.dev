@@ -1,7 +1,8 @@
 "use client";
 
-import { UserRound } from "lucide-react";
+import { Files, UserRound } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -262,6 +263,20 @@ export function CharacterChooser({
           </p>
         ) : null}
         {children}
+        <div className="mt-3 border-t pt-2">
+          <Button asChild size="sm" variant="ghost">
+            <Link
+              href="/drafts"
+              onClick={() => setOpen(false)}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <Files aria-hidden="true" />
+              My drafts
+              <span className="sr-only"> (opens in a new tab)</span>
+            </Link>
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );
