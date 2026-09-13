@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LockKeyhole } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -14,6 +14,12 @@ import {
 
 import { TemplatePreview } from "@/components/template-preview";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
@@ -27,7 +33,7 @@ import {
 } from "@/lib/draft-publish";
 import type { DraftPlaintext } from "@/lib/envelope";
 import { createInstantDraft } from "@/lib/instant-draft";
-import { PLAN_APPEARANCES, type PlanAppearance } from "@/lib/plan-appearance";
+import { PLAN_APPEARANCES } from "@/lib/plan-appearance";
 import { connectBrowserWalletClient } from "@/lib/wallet";
 
 const PLAN_PLACEHOLDER = `Outcome
@@ -37,12 +43,6 @@ Context
 Constraints
 
 Next steps`;
-
-const STARTER_DESCRIPTIONS: Record<PlanAppearance["layout"], string> = {
-  blank: "A quiet page for a plan from scratch.",
-  brief: "A warm brief with room for context and decisions.",
-  terminal: "A focused technical walkthrough.",
-};
 
 export function PlanComposer() {
   const router = useRouter();
@@ -56,8 +56,8 @@ export function PlanComposer() {
   const [published, setPublished] = useState<PublishedDraft>();
   const [publishing, setPublishing] = useState(false);
   const [repository, setRepository] = useState("");
-  const [starter, setStarter] = useState(PLAN_APPEARANCES[0]);
-  const [title, setTitle] = useState("Untitled plan");
+  const [starter] = PLAN_APPEARANCES;
+  const [title, setTitle] = useState("");
 
   useEffect(
     () =>
@@ -106,7 +106,7 @@ export function PlanComposer() {
   const createSharedDraft = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (creating) {
+      if (creating || !title.trim()) {
         return;
       }
       setCreating(true);
@@ -198,7 +198,7 @@ export function PlanComposer() {
   if (published) {
     const viewer = `/d/${published.origin}`;
     return (
-      <section className="space-y-6">
+      <section className="mx-auto w-full max-w-[42rem] space-y-6 px-6 py-10">
         <div className="space-y-2">
           <h1 className="font-heading font-semibold text-3xl tracking-tight">
             Published
@@ -230,7 +230,7 @@ export function PlanComposer() {
 
   if (prepared) {
     return (
-      <section className="space-y-5">
+      <section className="mx-auto w-full max-w-[42rem] space-y-5 px-6 py-10">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="font-heading font-semibold text-2xl tracking-tight">
@@ -272,92 +272,121 @@ export function PlanComposer() {
     );
   }
 
-  return (
-    <section className="space-y-8">
-      <form className="space-y-6" onSubmit={createSharedDraft}>
-        <div className="space-y-2">
-          <p className="font-medium text-primary text-sm">New shared draft</p>
-          <h1 className="font-heading font-semibold text-3xl tracking-tight sm:text-4xl">
-            Start with a page you like.
-          </h1>
-          <p className="max-w-xl text-muted-foreground">
-            Name it, choose a starting point, and share the link. No account or
-            wallet needed.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="shared-draft-title">Draft name</Label>
-          <Input
-            autoFocus
-            className="h-12 text-base"
-            id="shared-draft-title"
-            maxLength={160}
-            onChange={updateTitle}
-            placeholder="Launch plan"
-            value={title}
-          />
-        </div>
-
-        <fieldset className="space-y-3">
-          <legend className="font-medium text-sm">Choose a page</legend>
-          <div className="-mx-1 grid snap-x snap-mandatory auto-cols-[82%] grid-flow-col gap-3 overflow-x-auto px-1 pb-2 sm:mx-0 sm:auto-cols-auto sm:grid-flow-row sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
-            {PLAN_APPEARANCES.map((preset) => {
-              const selected = starter.layout === preset.layout;
-              return (
-                <button
-                  aria-pressed={selected}
-                  className="group relative snap-start overflow-hidden rounded-xl border bg-background p-1.5 text-left outline-none transition-colors hover:border-foreground/40 focus-visible:ring-2 focus-visible:ring-ring aria-pressed:border-foreground aria-pressed:ring-1 aria-pressed:ring-foreground"
-                  key={preset.layout}
-                  onClick={() => setStarter(preset)}
-                  type="button"
+  if (!advancedOpen) {
+    return (
+      <>
+        <TemplatePreview
+          className="h-[calc(100dvh-3.5rem)] rounded-none blur-sm"
+          dark={resolvedTheme === "dark"}
+          fullSize
+          preset={starter}
+        />
+        <Dialog
+          onOpenChange={(open) => {
+            if (!(open || creating)) {
+              router.push("/");
+            }
+          }}
+          open
+        >
+          <DialogContent
+            className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto bg-background/95 p-6 sm:max-w-lg sm:p-10"
+            fullScreenOnMobile={false}
+            onEscapeKeyDown={(event) => {
+              if (creating) {
+                event.preventDefault();
+              }
+            }}
+            onInteractOutside={(event) => event.preventDefault()}
+            showCloseButton={false}
+          >
+            <form
+              aria-busy={creating}
+              className="space-y-6"
+              onSubmit={createSharedDraft}
+            >
+              <div className="space-y-3">
+                <DialogTitle className="font-heading text-3xl leading-tight sm:text-4xl">
+                  Name your document.
+                </DialogTitle>
+                <DialogDescription>
+                  Start with a name. You can shape the page together.
+                </DialogDescription>
+              </div>
+              <Label className="sr-only" htmlFor="shared-draft-title">
+                Document name
+              </Label>
+              <Input
+                autoComplete="off"
+                autoFocus
+                className="h-14 rounded-none border-0 border-b bg-transparent px-0 text-xl shadow-none focus-visible:ring-0 md:text-2xl dark:bg-transparent"
+                disabled={creating}
+                id="shared-draft-title"
+                maxLength={160}
+                onChange={updateTitle}
+                placeholder="What are you working on?"
+                required
+                value={title}
+              />
+              {error ? (
+                <p className="text-destructive text-sm" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  disabled={creating || !title.trim()}
+                  size="lg"
+                  type="submit"
                 >
-                  <TemplatePreview
-                    className="h-32 sm:h-36"
-                    dark={resolvedTheme === "dark"}
-                    preset={preset}
-                  />
-                  {selected ? (
-                    <Check
-                      aria-hidden="true"
-                      className="absolute top-3 right-3 size-5 rounded-full bg-foreground p-1 text-background"
-                    />
-                  ) : null}
-                  <span className="block px-2 pt-2 font-medium text-sm">
-                    {preset.name}
-                  </span>
-                  <span className="block min-h-12 px-2 pt-1 pb-2 text-muted-foreground text-xs leading-relaxed">
-                    {STARTER_DESCRIPTIONS[preset.layout]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
+                  {creating ? <Spinner /> : <ArrowRight />}
+                  {creating ? "Opening your draft…" : "View shared draft"}
+                </Button>
+                <span className="text-muted-foreground text-xs">
+                  press Enter
+                </span>
+              </div>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                No wallet needed. Anyone with the full private link can read and
+                contribute. This working draft is link-owned; permanent
+                publishing uses a wallet.
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <Button
+                  disabled={creating}
+                  onClick={() => setAdvancedOpen(true)}
+                  size="sm"
+                  type="button"
+                  variant="link"
+                >
+                  Use a wallet instead
+                </Button>
+                <Button
+                  disabled={creating}
+                  onClick={() => router.push("/")}
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
 
-        {error ? (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="space-y-3">
-          <Button className="w-full sm:w-auto" disabled={creating} size="lg">
-            {creating ? <Spinner data-icon="inline-start" /> : null}
-            {creating ? "Creating encrypted draft..." : "Create shared draft"}
-          </Button>
-          <p className="flex max-w-xl items-start gap-2 text-muted-foreground text-xs leading-relaxed">
-            <LockKeyhole
-              aria-hidden="true"
-              className="mt-0.5 size-3.5 shrink-0"
-            />
-            This disposable working draft belongs to its private link, not a
-            wallet. Anyone with the full link can read and edit it, so share it
-            with people you trust. Use a wallet when you are ready to publish a
-            separate permanent version.
-          </p>
-        </div>
-      </form>
+  return (
+    <section className="mx-auto w-full max-w-[42rem] space-y-8 px-6 py-10">
+      <Button
+        onClick={() => setAdvancedOpen(false)}
+        type="button"
+        variant="ghost"
+      >
+        Back to shared draft
+      </Button>
 
       <details
         className="border-t pt-6"

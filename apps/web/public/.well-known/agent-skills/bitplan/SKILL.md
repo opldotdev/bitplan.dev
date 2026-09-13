@@ -6,12 +6,12 @@ description: >
   or update a plan, share one with a person or team, create a private reader
   link, move a hosted draft on chain, or explain bitplan.dev.
 metadata:
-  version: "0.2.11"
+  version: "0.2.12"
 ---
 
 # BitPlan
 
-**Skill version: 0.2.11**
+**Skill version: 0.2.12**
 
 BitPlan turns one self-contained HTML file into an encrypted living plan. A
 BRC-100 wallet owns the keys. A draft can stay hosted as ciphertext while it
@@ -37,8 +37,10 @@ a funding wallet. Its throwaway reader key is generated inside the browser;
 it is not a CLI wallet fallback or permission to handle private keys in model
 context. CLI publishing and contact-based encryption still require a compatible
 BRC-100 wallet. Never substitute a funding key into a reader link.
-Get started offers Brief, Terminal, and Blank, then opens the new draft's
-encrypted collaboration room automatically. Save the full invitation privately.
+Get started shows the Brief base page behind a blurred naming dialog. Enter a
+document name and choose View shared draft, or press Enter. It creates the draft
+and opens its encrypted collaboration room automatically. Page styles remain
+available in the viewer. Save the full invitation privately.
 This disposable draft has no retained hosted-update secret or wallet ownership;
 live room edits do not create base-document versions. Use the wallet/CLI path
 when the user needs controlled recipients, version publishing, or inscription.

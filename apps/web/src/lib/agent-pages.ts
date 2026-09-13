@@ -5,7 +5,7 @@ const PAGES: Record<string, string> = {
 
 Secure agent plans. Encrypted before upload. Keep a draft hosted while it changes, then put it on Bitcoin when it should be permanent.
 
-Get started at /new to create a browser-encrypted shared starter without a funding wallet. Choose Brief, Terminal, or Blank. Keep its complete invitation private. This link-owned working draft is separate from wallet-owned CLI publication.
+Get started at /new to name a browser-encrypted shared starter without a funding wallet. The base page appears behind a blurred naming dialog; View shared draft creates it and opens collaboration. Page styles are available in the viewer. Keep its complete invitation private. This link-owned working draft is separate from wallet-owned CLI publication.
 
 Publish a self-contained HTML file with the CLI:
 
@@ -122,7 +122,7 @@ See ${SITE_URL}/docs/how-it-works
 `,
   "/new": `# New shared draft · BitPlan
 
-Choose Brief, Terminal, or Blank at ${SITE_URL}/new and create an encrypted shared starter without a funding wallet. The viewer joins realtime collaboration automatically. Keep the complete invitation private: its holder can read and contribute. This disposable link-owned draft has no retained hosted-update secret; room edits are not published document versions. Use the wallet/CLI flow for controlled recipients and permanent publication.
+At ${SITE_URL}/new, the Brief base page appears behind a blurred naming dialog. Enter a document name and select View shared draft (or press Enter) to create it without a funding wallet. The viewer joins realtime collaboration automatically. Change page styles after opening the document. Keep the complete invitation private: its holder can read and contribute. This disposable link-owned draft has no retained hosted-update secret; room edits are not published document versions. Use the wallet/CLI flow for controlled recipients and permanent publication.
 
 Browser agents with WebMCP can call \`start_bitplan_plan\` to open the composer, then \`prepare_bitplan_plan\` with a title, plan body, and optional HTTPS repository URL. The tool validates and stages the exact review preview. It never connects a wallet or publishes; the user must approve publishing through their BRC-100 wallet.
 

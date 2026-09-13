@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function NewPlanPage() {
   return (
-    <main className="mx-auto w-full max-w-[42rem] flex-1 px-6 py-10">
+    <main className="w-full flex-1">
       <PlanComposer />
     </main>
   );
