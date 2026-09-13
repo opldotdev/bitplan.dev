@@ -268,8 +268,9 @@ describe("LoadedDrafts behavior", () => {
       hosted: [catalogEntry()],
     });
     expect(both).toContain("Filter drafts");
-    expect(both).toContain("Hosted");
-    expect(both).toContain("On chain");
+    expect(both).toContain(">Drafts</button>");
+    expect(both).toContain(">On Chain</button>");
+    expect(both).not.toContain(">Hosted</button>");
 
     const chainOnly = loadedMarkup({
       catalog: { state: "ready" },

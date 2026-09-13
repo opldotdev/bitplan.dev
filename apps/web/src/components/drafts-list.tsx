@@ -584,7 +584,7 @@ export function LoadedDrafts({
               type="button"
               variant={filter === "hosted" ? "secondary" : "ghost"}
             >
-              Hosted
+              Drafts
             </Button>
             <Button
               onClick={showChain}
@@ -592,7 +592,7 @@ export function LoadedDrafts({
               type="button"
               variant={filter === "chain" ? "secondary" : "ghost"}
             >
-              On chain
+              On Chain
             </Button>
           </fieldset>
         ) : (
@@ -728,7 +728,7 @@ function PlanItem({
           <ItemDescription>Retrieving encrypted plan…</ItemDescription>
         </ItemContent>
         <ItemActions>
-          <Badge variant="secondary">On chain</Badge>
+          <Badge variant="secondary">On Chain</Badge>
         </ItemActions>
         <ItemFooter>
           <span className="text-muted-foreground text-xs">
@@ -768,7 +768,7 @@ function HostedItem({ row }: { row: ViewRow }) {
           ) : null}
         </ItemContent>
         <ItemActions>
-          <Badge variant="secondary">Hosted</Badge>
+          <Badge variant="secondary">Draft</Badge>
           {plan.version ? (
             <Badge variant="outline">v{plan.version}</Badge>
           ) : null}
@@ -810,7 +810,7 @@ function ChainItem({ row }: { row: ViewRow }) {
           </ItemDescription>
         </ItemContent>
         <ItemActions>
-          <Badge variant="secondary">On chain</Badge>
+          <Badge variant="secondary">On Chain</Badge>
           {detail.latestVersion ? (
             <Badge variant="outline">v{detail.latestVersion}</Badge>
           ) : null}
