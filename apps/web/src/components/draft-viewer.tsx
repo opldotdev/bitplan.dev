@@ -874,13 +874,17 @@ function DecryptedView({
             openedWithLink={openedWithLink}
             origin={origin}
           />
-          <MetaInfo meta={plaintext.meta} />
+          <MetaInfo
+            meta={plaintext.meta}
+            openedWithLink={openedWithLink}
+            origin={origin}
+          />
           <CharacterChooser onChange={collaboration.updateProfile}>
             <div className="border-t pt-2">
               {collaboration.connection ? (
                 <p className="text-muted-foreground text-xs" role="status">
                   {collaboration.online
-                    ? "Connected · encrypted collaboration"
+                    ? "Connected · invitation-encrypted collaboration"
                     : "Reconnecting..."}
                 </p>
               ) : (
@@ -898,6 +902,13 @@ function DecryptedView({
                     : "Start collaboration"}
                 </Button>
               )}
+              {collaboration.connection ? (
+                <p className="mt-2 text-muted-foreground text-xs">
+                  Notes are attributed to this browser profile, not a verified
+                  wallet identity. Connecting a wallet does not change who can
+                  read this room.
+                </p>
+              ) : null}
               {collaboration.error ? (
                 <p className="mt-2 text-destructive text-xs" role="alert">
                   {collaboration.error}
@@ -1016,8 +1027,24 @@ function OriginCopy({ origin }: { origin: string }) {
   );
 }
 
-function MetaInfo({ meta }: { meta: DraftMeta }) {
-  const rows = metaRows(meta);
+function MetaInfo({
+  meta,
+  openedWithLink,
+  origin,
+}: {
+  meta: DraftMeta;
+  openedWithLink?: boolean;
+  origin: string;
+}) {
+  const openedWith = openedWithLink ? "Private reader link" : "Wallet";
+  const storage = isHostedId(origin)
+    ? "Hosted ciphertext"
+    : "On-chain ciphertext · permanent";
+  const rows = [
+    { label: "Opened with", value: openedWith },
+    { label: "Storage", value: storage },
+    ...metaRows(meta),
+  ];
   if (rows.length === 0) {
     return null;
   }
@@ -1028,6 +1055,7 @@ function MetaInfo({ meta }: { meta: DraftMeta }) {
         <Button
           aria-label="Draft info"
           size="icon"
+          title={`${openedWith} · ${storage}`}
           type="button"
           variant="ghost"
         >
@@ -1036,8 +1064,11 @@ function MetaInfo({ meta }: { meta: DraftMeta }) {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
         <PopoverHeader>
-          <PopoverTitle>Draft info</PopoverTitle>
-          <PopoverDescription>From the decrypted envelope.</PopoverDescription>
+          <PopoverTitle>Access &amp; draft info</PopoverTitle>
+          <PopoverDescription>
+            How you opened this version, not its complete reader list.
+            Connecting a wallet does not revoke links or change recipients.
+          </PopoverDescription>
         </PopoverHeader>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
           {rows.map((row) => (

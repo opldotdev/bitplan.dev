@@ -7,6 +7,7 @@ import { useTheme } from "next-themes";
 import {
   type ChangeEvent,
   type FormEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useState,
@@ -54,6 +55,25 @@ export function PlanComposer() {
   const [publishing, setPublishing] = useState(false);
   const [repository, setRepository] = useState("");
   const [title, setTitle] = useState("");
+  const [walletStatus, setWalletStatus] = useState("");
+  const [connectingWallet, setConnectingWallet] = useState(false);
+  const openWallet = useCallback(async () => {
+    setAdvancedOpen(true);
+    setConnectingWallet(true);
+    setWalletStatus("Connecting to your wallet…");
+    try {
+      await connectBrowserWalletClient();
+      setWalletStatus(
+        "Wallet connected. Publishing still requires your approval."
+      );
+    } catch {
+      setWalletStatus(
+        "Could not connect. Unlock your BRC-100 wallet and retry. If this browser cannot reach it, open BitPlan in your wallet-enabled browser."
+      );
+    } finally {
+      setConnectingWallet(false);
+    }
+  }, []);
 
   useEffect(
     () =>
@@ -168,7 +188,7 @@ export function PlanComposer() {
   if (published) {
     const viewer = `/d/${published.origin}`;
     return (
-      <section className="mx-auto w-full max-w-[42rem] space-y-6 px-6 py-10">
+      <WalletFlowShell title="Published plan">
         <div className="space-y-2">
           <h1 className="font-heading font-semibold text-3xl tracking-tight">
             Published
@@ -194,13 +214,13 @@ export function PlanComposer() {
             <Link href="/drafts">My drafts</Link>
           </Button>
         </div>
-      </section>
+      </WalletFlowShell>
     );
   }
 
   if (prepared) {
     return (
-      <section className="mx-auto w-full max-w-[42rem] space-y-5 px-6 py-10">
+      <WalletFlowShell title="Review your plan">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="font-heading font-semibold text-2xl tracking-tight">
@@ -238,14 +258,14 @@ export function PlanComposer() {
             {publishing ? "Waiting for wallet..." : "Publish plan"}
           </Button>
         </div>
-      </section>
+      </WalletFlowShell>
     );
   }
 
   if (!advancedOpen) {
     return (
       <SharedStarter
-        onAdvanced={() => setAdvancedOpen(true)}
+        onAdvanced={() => void openWallet()}
         title={title}
         updateTitle={updateTitle}
       />
@@ -253,7 +273,7 @@ export function PlanComposer() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-[42rem] space-y-8 px-6 py-10">
+    <WalletFlowShell title="Use your wallet">
       <Button
         onClick={() => setAdvancedOpen(false)}
         type="button"
@@ -262,18 +282,23 @@ export function PlanComposer() {
         Back to shared draft
       </Button>
 
-      <details
-        className="border-t pt-6"
-        onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-        open={advancedOpen}
-      >
-        <summary className="cursor-pointer text-muted-foreground text-sm">
-          Publish permanently with a wallet
-        </summary>
+      <div className="border-t pt-6">
+        <h2 className="font-heading text-2xl">Wallet access</h2>
+        <p className="mt-3 text-muted-foreground text-sm" role="status">
+          {walletStatus}
+        </p>
+        <Button
+          className="mt-3"
+          disabled={connectingWallet}
+          onClick={() => void openWallet()}
+          type="button"
+          variant="outline"
+        >
+          {connectingWallet ? "Connecting…" : "Reconnect wallet"}
+        </Button>
         <form className="mt-6 space-y-6" onSubmit={review}>
           <p className="text-muted-foreground text-sm">
-            Compose a text plan for encrypted on-chain publishing through a
-            BRC-100 wallet.
+            Only your wallet can open this plan. Review it before publishing.
           </p>
           <div className="space-y-2">
             <Label htmlFor="plan-title">Title</Label>
@@ -316,8 +341,43 @@ export function PlanComposer() {
             <Button type="submit">Review plan</Button>
           </div>
         </form>
-      </details>
-    </section>
+      </div>
+    </WalletFlowShell>
+  );
+}
+
+function WalletFlowShell({
+  children,
+  title,
+}: {
+  children: ReactNode;
+  title: string;
+}) {
+  const { resolvedTheme } = useTheme();
+  return (
+    <>
+      <TemplatePreview
+        className="h-[calc(100dvh-3.5rem)] rounded-none blur-sm"
+        dark={resolvedTheme === "dark"}
+        fullSize
+        preset={PLAN_APPEARANCES[0]}
+      />
+      <Dialog open>
+        <DialogContent
+          className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto bg-background/95 p-6 motion-reduce:animate-none sm:max-w-2xl sm:p-10"
+          fullScreenOnMobile={false}
+          onInteractOutside={(event) => event.preventDefault()}
+          showCloseButton={false}
+        >
+          <DialogTitle className="sr-only">{title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Wallet-controlled encryption and permanent publication. No
+            transaction is sent until you review and approve publishing.
+          </DialogDescription>
+          {children}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -505,7 +565,7 @@ function SharedStarter({
                 type="button"
                 variant="link"
               >
-                Use a wallet instead
+                Use wallet
               </Button>
               <Button
                 disabled={creating}
