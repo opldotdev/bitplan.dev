@@ -135,10 +135,12 @@ export function CollaborationCanvas({
   settingsOpen,
   onSettingsOpenChange,
   settingsDetails,
+  revisions,
 }: {
   settingsOpen: boolean;
   onSettingsOpenChange: (open: boolean) => void;
   settingsDetails: ReactNode;
+  revisions?: ReactNode;
   html: string;
   title: string;
   target: DocumentTarget;
@@ -191,6 +193,7 @@ export function CollaborationCanvas({
   const annotationActionBusy = useRef(false);
   const [publishSection, setPublishSection] = useState("Review changes");
   const preferenceSection = [
+    "Revisions",
     "Interaction",
     "Appearance",
     "Sound",
@@ -1965,6 +1968,7 @@ export function CollaborationCanvas({
             >
               {[
                 "Review changes",
+                "Revisions",
                 "Access",
                 "Export PDF",
                 "Interaction",
@@ -2009,7 +2013,8 @@ export function CollaborationCanvas({
                   ? `Next version · v${target.version + 1}`
                   : "Your annotation layer")}
             </p>
-            {preferenceSection ? (
+            {publishSection === "Revisions" ? revisions : null}
+            {preferenceSection && publishSection !== "Revisions" ? (
               <PlanSettings
                 browserMenu={browserMenu}
                 details={settingsDetails}

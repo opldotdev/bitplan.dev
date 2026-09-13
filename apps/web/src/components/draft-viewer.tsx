@@ -8,6 +8,7 @@ import { CharacterChooser } from "@/components/character-chooser";
 import { CollaborationCanvas } from "@/components/collaboration-canvas";
 import { InlinePlanTitle } from "@/components/inline-plan-title";
 import { PlanPublishing } from "@/components/plan-publishing";
+import { PlanRevisions } from "@/components/plan-revisions";
 import { PlanSwitcher } from "@/components/plan-switcher";
 import {
   RevisionSharingProvider,
@@ -1047,6 +1048,14 @@ function DecryptedView({
             : undefined
         }
         onSettingsOpenChange={setSettingsOpen}
+        revisions={
+          <PlanRevisions
+            currentVersion={currentVersion}
+            latestVersion={latestVersion}
+            onVersion={onVersion}
+            origin={origin}
+          />
+        }
         room={collaboration}
         settingsDetails={
           <MetaInfo
