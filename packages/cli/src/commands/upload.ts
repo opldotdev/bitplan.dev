@@ -90,9 +90,6 @@ export async function uploadCommand(
 	if (options.new && options.draft) {
 		throw new CliError('--new and --draft cannot be used together.')
 	}
-	if (options.private && (options.shareWith?.length ?? 0) > 0) {
-		throw new CliError('--private and --share-with cannot be used together.')
-	}
 	if (options.json && !options.yes) {
 		throw new CliError('--json requires --yes because publishing is permanent.')
 	}
@@ -140,7 +137,7 @@ export async function uploadCommand(
 	const defaultRawReaders = targetOrigin ? [] : (config.shareWith ?? [])
 	const defaultNamedRefs = targetOrigin ? [] : (config.shareWithRefs ?? [])
 	let namedRefs = options.private
-		? []
+		? requestedReaders.namedRefs
 		: [
 				...new Set([
 					...(targetOrigin ? [] : defaultNamedRefs),
@@ -195,7 +192,7 @@ export async function uploadCommand(
 		previousRecipients = local.sharedWith ?? []
 		fixedReaders = local.sharedWithRaw ?? previousRecipients
 		namedRefs = options.private
-			? []
+			? requestedReaders.namedRefs
 			: [
 					...new Set([
 						...(local.shareWithRefs ?? []),
@@ -213,7 +210,7 @@ export async function uploadCommand(
 			previousRecipients = local.sharedWith ?? []
 			fixedReaders = local.sharedWithRaw ?? previousRecipients
 			namedRefs = options.private
-				? []
+				? requestedReaders.namedRefs
 				: [
 						...new Set([
 							...(local.shareWithRefs ?? []),
@@ -238,7 +235,7 @@ export async function uploadCommand(
 			nextVersion = adopted.sequence === null ? null : adopted.sequence + 2
 			previousRecipients = adopted.sharedWith
 			fixedReaders = adopted.sharedWith
-			namedRefs = options.private ? [] : requestedReaders.namedRefs
+			namedRefs = requestedReaders.namedRefs
 			resolvedNamedReaders = resolveNamedReaders(namedRefs, config)
 			if (options.description === undefined) {
 				meta.description = adopted.description
@@ -249,7 +246,7 @@ export async function uploadCommand(
 		nextVersion = 1
 	}
 	fixedReaders = options.private
-		? []
+		? requestedReaders.rawKeys.map(normalizeIdentityKey)
 		: [
 				...new Set(
 					[...fixedReaders, ...requestedReaders.rawKeys].map(
@@ -257,9 +254,7 @@ export async function uploadCommand(
 					),
 				),
 			]
-	let sharedWith = options.private
-		? []
-		: [...new Set([...fixedReaders, ...resolvedNamedReaders])]
+	let sharedWith = [...new Set([...fixedReaders, ...resolvedNamedReaders])]
 	if (options.link && options.private) {
 		throw new CliError('--link and --private cannot be used together.')
 	}

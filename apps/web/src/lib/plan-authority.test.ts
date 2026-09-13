@@ -68,7 +68,9 @@ test("revision prompts freeze inclusion choices without granting destructive aut
   expect(prompt).toContain("Preserve original annotation layers");
   expect(prompt).toContain("Requested destination: hosted draft only");
   expect(prompt).toContain("Save the revised hosted draft now");
-  expect(prompt).toContain("create and immediately save the next hosted version");
+  expect(prompt).toContain(
+    "create and immediately save the next hosted version"
+  );
   expect(prompt).toContain("using my publish-sidebar selections below");
   expect(prompt).toContain("Append a version to the same hosted ID");
   expect(prompt).toContain("Verify the saved version by reading it back");
@@ -79,7 +81,9 @@ test("revision prompts freeze inclusion choices without granting destructive aut
     publishOnChain: true,
   });
   expect(chainPrompt).toContain("Requested destination: on-chain");
-  expect(chainPrompt).toContain("prepare the next on-chain version for approval");
+  expect(chainPrompt).toContain(
+    "prepare the next on-chain version for approval"
+  );
   expect(chainPrompt).not.toContain("create and immediately save");
   expect(chainPrompt).toContain(
     "explicit approval before signing or broadcasting"
@@ -125,13 +129,15 @@ test("revision audience is explicit and only private-copy selections disclose re
   });
   expect(privatePrompt).toContain(desktop);
   expect(privatePrompt).toContain(
-    "a new private copy, not an update that inherits old readers"
+    "selected people on the next version of this same plan, not a new copy"
   );
   expect(privatePrompt).toContain(
-    "Do not reuse the bearer-access collaboration room"
+    "Do not send restricted content into the old bearer-access collaboration room"
   );
   expect(privatePrompt).toContain("hosted draft only");
-  expect(privatePrompt).toContain("a private copy starts at v1 under a new ID");
+  expect(privatePrompt).toContain("Use --private with --share-with");
+  expect(privatePrompt).toContain(`--hosted --draft ${hosted}`);
+  expect(privatePrompt).toContain("clean overlay, not deleted history");
   for (const mode of ["preserve", "link"] as const) {
     const prompt = revisionSelectionPrompt(hosted, {
       ...review,

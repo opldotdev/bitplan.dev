@@ -2103,9 +2103,7 @@ export function CollaborationCanvas({
               <p className="text-muted-foreground text-xs">
                 {publishOnChain
                   ? "Agent prepares publication; you approve before signing."
-                  : sharing?.value.mode === "private"
-                    ? "Agent saves a new private copy at v1. This plan stays unchanged."
-                    : "Agent saves the next version here and returns its link."}
+                  : "Agent saves the next version here with your access selections and returns its link."}
               </p>
             ) : null}
             <Button
@@ -2122,7 +2120,13 @@ export function CollaborationCanvas({
                       ? revisionSelectionPrompt(target.origin, {
                           annotations: room.annotations
                             .filter(
-                              (item) => !item.replyTo && item.status === "open"
+                              (item) =>
+                                !item.replyTo &&
+                                item.status === "open" &&
+                                sameDocumentTarget(
+                                  item.target,
+                                  room.activeTarget
+                                )
                             )
                             .map((item) => ({
                               id: item.id,

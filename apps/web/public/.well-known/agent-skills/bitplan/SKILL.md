@@ -156,8 +156,17 @@ link. Verify the contact's public identity key with the operator, then use
 `--link`. A complete reader link is a bearer credential; a collaboration
 invitation also permits contributions. Keep both out of public artifacts.
 Omitting `--link` on an existing draft does not revoke inherited readers.
-Do not combine `--private` with `--share-with`; inspect the current access and
-CLI help before changing recipients, and explain that old versions stay shared.
+Use `--private --share-with <team|key>` to replace the next version's readers
+with the selected identities plus the publishing wallet. Verify CLI support
+first: older releases reject this combination. Without `--share-with`, `--private`
+means wallet-only. Old versions keep their original access.
+
+The Publish sidebar's Selected people setting updates the same plan; it does
+not request a fork. Use `--hosted --draft <id>` for the next hosted version.
+Only use `--new` when the user explicitly requests a separate copy. Hosted
+versions increment without a blockchain transaction. New versions start with
+a clean annotation overlay; previous layers remain on their exact original
+targets. Do not delete or silently retarget them.
 
 Choose the format before authoring:
 

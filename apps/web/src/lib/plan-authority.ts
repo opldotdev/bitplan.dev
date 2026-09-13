@@ -95,14 +95,14 @@ export function revisionSelectionPrompt(
   }
   const destination = review.publishOnChain
     ? "Requested destination: on-chain. Present content, recipients, assets, checkpoint limitations and fee for explicit approval before signing or broadcasting."
-    : "Requested destination: hosted draft only. Save the revised hosted draft now using the sidebar selections below. This request authorizes that hosted save: do not stop at a proposal, local file, or another approval request. Append a version to the same hosted ID unless a new private copy is requested; a private copy starts at v1 under a new ID and leaves the source unchanged. Verify the saved version by reading it back, then return and open its BitPlan viewer URL and actual version. Do not inscribe or spend BSV.";
+    : `Requested destination: hosted draft only. Save the revised hosted draft now using the sidebar selections below. This request authorizes that hosted save: do not stop at a proposal, local file, or another approval request. Append a version to the same hosted ID using --hosted --draft ${origin}; do not use --new or fork because recipients changed. Verify the saved version by reading it back, then return and open its BitPlan viewer URL and actual incremented version. Earlier annotation layers stay attached to their original targets; the new version starts with a clean overlay, not deleted history. Do not inscribe or spend BSV.`;
   const audience = review.sharing;
   if (
     audience?.mode === "private" &&
     (!audience.recipients.length ||
       audience.recipients.some((key) => !normalizeIdentityKey(key)))
   ) {
-    throw new Error("Choose valid public identity keys for the private copy.");
+    throw new Error("Choose valid public identity keys for the next version.");
   }
   let sharing =
     "Requested access: preserve the saved version's current recipients and sharing mode; verify the envelope, not the avatars.";
@@ -123,7 +123,7 @@ export function revisionSelectionPrompt(
         }
       : { mode: audience?.mode };
   if (audience?.mode === "private") {
-    sharing = `Requested access: a new private copy, not an update that inherits old readers. ${teams.length ? `Share with the ${teams.map((team) => team.name).join(", ")} team${teams.length > 1 ? "s" : ""}${extraRecipients.length ? " plus the additional keys below" : ""}. Resolve each team with bitplan team list <name> --json; verify its count and SHA-256 of sorted unique lowercase keys joined by newline (no trailing newline). If missing or different, ask; never substitute another roster. Use repeated --share-with for teams and extra keys. ` : ""}Encrypt only to this selection plus the verified publishing wallet, without a reader-link identity. Old copies remain accessible. Do not reuse the bearer-access collaboration room; wallet-restricted realtime access is not implemented. Report that limitation with the new link.`;
+    sharing = `Requested access: selected people on the next version of this same plan, not a new copy. ${teams.length ? `Share with the ${teams.map((team) => team.name).join(", ")} team${teams.length > 1 ? "s" : ""}${extraRecipients.length ? " plus the additional keys below" : ""}. Resolve each team with bitplan team list <name> --json; verify its count and SHA-256 of sorted unique lowercase keys joined by newline (no trailing newline). If missing or different, ask; never substitute another roster. Use repeated --share-with for teams and extra keys. ` : ""}Use --private with --share-with to replace inherited readers with exactly this selection plus the verified publishing wallet, without a reader-link identity. Verify CLI support before saving; never silently retain extra readers. Old versions remain accessible to their original readers. Do not send restricted content into the old bearer-access collaboration room; wallet-restricted realtime access is not implemented. Report that limitation with the saved link.`;
   } else if (audience?.mode === "link") {
     sharing =
       "Requested access: anyone with the full reader link. Confirm this access expansion before saving. Create or retain a reader-link recipient using supported wallet/CLI tools, never expose funding keys. Return the invitation only through a private channel, not in document HTML or public logs. Keep existing named readers unless separately approved otherwise. Document reader access and room contribution access are separate.";

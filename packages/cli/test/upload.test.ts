@@ -694,13 +694,6 @@ if (!CHILD_RUN) {
 			await expect(
 				uploadCommand(htmlFile, { draft: 'not-an-outpoint', yes: true }),
 			).rejects.toThrow('--draft must be an outpoint')
-			await expect(
-				uploadCommand(htmlFile, {
-					private: true,
-					shareWith: ['identity'],
-					yes: true,
-				}),
-			).rejects.toThrow('--private and --share-with')
 
 			expect(calls.connectWallet).toEqual([])
 			expect(calls.seals).toEqual([])
@@ -967,6 +960,33 @@ if (!CHILD_RUN) {
 			expect(console.log).toHaveBeenCalledWith(
 				`Hosted:   ${HOSTED}  version 1  (not on chain)`,
 			)
+		})
+
+		test('private selection replaces hosted readers without forking or carrying a link', async () => {
+			const selected = PREVIOUS_OWNER_IDENTITY_KEY
+			config.shareWith = ['default-reader']
+			knownByFile = {
+				...existingRecord(),
+				origin: HOSTED,
+				latestOutpoint: HOSTED,
+				hostedSecret: HOSTED_SECRET,
+				linkKey: '11'.repeat(32),
+				sharedWith: ['old-reader'],
+				sharedWithRaw: ['old-reader'],
+				shareWithRefs: ['missing-old-team'],
+			}
+			await uploadCommand(htmlFile, {
+				private: true,
+				shareWith: [selected],
+				hosted: true,
+				yes: true,
+			})
+			expect(calls.seals[0]?.sharedWith).toEqual([selected])
+			expect(calls.hostedCreates).toEqual([])
+			expect(calls.hostedAppends[0]?.id).toBe(HOSTED)
+			expect(calls.saves[0]?.record.latestVersion).toBe(4)
+			expect(calls.saves[0]?.record.linkKey).toBeUndefined()
+			expect(calls.genesis).toEqual([])
 		})
 
 		test('a hosted local record updates without --hosted', async () => {

@@ -164,7 +164,7 @@ export function buildProgram(): Command {
 		)
 		.option(
 			'--private',
-			'Remove shared readers from the new version (older versions stay shared)',
+			'Replace readers with --share-with selections, or wallet only if omitted; older versions stay shared',
 		)
 		.option(
 			'--link',

@@ -168,7 +168,7 @@ export function PlanAccessPanel({
                 : `Private · ${currentAccess.recipients.length} identities · current`}
             </option>
             <option value="link">Anyone with link</option>
-            <option value="private">Private copy</option>
+            <option value="private">Selected people</option>
           </select>
           {value.mode === "private" ||
           (value.mode === "preserve" && !currentAccess.link) ? (
@@ -209,7 +209,7 @@ export function PlanAccessPanel({
           ) : null}
           <p className="text-muted-foreground text-xs">
             {value.mode === "private"
-              ? "Creates a private copy. Existing access is unchanged."
+              ? "Applies to the next version. Earlier versions keep their access."
               : "Saved access is kept unless you change it."}
           </p>
         </div>
