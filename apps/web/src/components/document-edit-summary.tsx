@@ -1,5 +1,6 @@
 import { Undo2 } from "lucide-react";
 import { ReviewAuthor } from "@/components/review-author";
+import { ReviewSelection } from "@/components/review-selection";
 import { Button } from "@/components/ui/button";
 import type { CollaboratorProfile } from "@/lib/collaborator";
 import type { AuthorTextEdit } from "@/lib/inline-text";
@@ -63,22 +64,18 @@ export function DocumentEditSummary({
           className="group/review flex items-start gap-3 border-border/50 border-b py-5 text-sm"
           key={`${block.roomId}:${block.participantId}:${block.path}`}
         >
-          <div className="flex shrink-0 flex-col items-center gap-2 pt-3">
+          <div className="order-last flex shrink-0 flex-col items-end gap-2 pt-1">
             {onToggle ? (
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  checked={
-                    !excluded.has(
-                      JSON.stringify([block.participantId, block.path])
-                    )
-                  }
-                  onChange={() =>
-                    onToggle(JSON.stringify([block.participantId, block.path]))
-                  }
-                  type="checkbox"
-                />
-                <span className="sr-only">Consider in revision</span>
-              </label>
+              <ReviewSelection
+                included={
+                  !excluded.has(
+                    JSON.stringify([block.participantId, block.path])
+                  )
+                }
+                onToggle={() =>
+                  onToggle(JSON.stringify([block.participantId, block.path]))
+                }
+              />
             ) : null}
             {onRevert &&
             block.participantId === currentParticipantId &&

@@ -8,6 +8,7 @@ import {
   getSoundPreference,
   playUiSound,
   setSoundPreference,
+  soundPreference,
 } from "@/lib/ui-sound";
 
 const shortcuts = [
@@ -40,7 +41,7 @@ export function PlanSettings({
   onResetView?: () => void;
 }) {
   const { theme, setTheme } = useTheme();
-  const [sound, setSound] = useState({ muted: false, volume: 1 });
+  const [sound, setSound] = useState(() => soundPreference(null));
   useEffect(() => {
     setSound(getSoundPreference());
   }, []);

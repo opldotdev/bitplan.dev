@@ -38,7 +38,7 @@ let unlocked = false;
 let lastHoverAt = 0;
 let lastHoverTarget: EventTarget | null = null;
 const activeSounds = new Set<HTMLAudioElement>();
-let sessionPreference = { muted: false, volume: 1 };
+let sessionPreference = soundPreference(null);
 export const UI_SOUND_PREFERENCE = "bitplan.ui-sound";
 export function soundPreference(value: unknown): {
   muted: boolean;
@@ -50,7 +50,7 @@ export function soundPreference(value: unknown): {
     volume:
       typeof input?.volume === "number" && Number.isFinite(input.volume)
         ? Math.max(0, Math.min(1, input.volume))
-        : 1,
+        : 0.25,
   };
 }
 export function getSoundPreference() {

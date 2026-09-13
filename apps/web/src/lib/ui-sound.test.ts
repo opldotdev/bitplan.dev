@@ -11,14 +11,14 @@ import {
 
 describe("ui sound catalog", () => {
   test("sound preference bounds volume and keeps mute explicit", () => {
-    expect(soundPreference(null)).toEqual({ muted: false, volume: 1 });
+    expect(soundPreference(null)).toEqual({ muted: false, volume: 0.25 });
     expect(soundPreference({ muted: true, volume: 0.4 })).toEqual({
       muted: true,
       volume: 0.4,
     });
     expect(soundPreference({ volume: -10 }).volume).toBe(0);
     expect(soundPreference({ volume: 10 }).volume).toBe(1);
-    expect(soundPreference({ volume: Number.NaN }).volume).toBe(1);
+    expect(soundPreference({ volume: Number.NaN }).volume).toBe(0.25);
   });
   test("every mapped file is a public audio path", () => {
     for (const [name, src] of Object.entries(UI_SOUND_FILES)) {

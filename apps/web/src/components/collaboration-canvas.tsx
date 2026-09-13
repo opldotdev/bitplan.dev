@@ -25,6 +25,7 @@ import { DocumentEditSummary } from "@/components/document-edit-summary";
 import { PlanAccessPanel } from "@/components/plan-access-panel";
 import { PlanSettings } from "@/components/plan-settings";
 import { ReviewAuthor } from "@/components/review-author";
+import { ReviewSelection } from "@/components/review-selection";
 import { useRevisionSharing } from "@/components/revision-sharing";
 import { usePlanAppearance } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
@@ -2239,43 +2240,41 @@ export function CollaborationCanvas({
                     data-annotation-id={item.id}
                     key={item.id}
                   >
-                    {isPublisher ? (
-                      <label className="flex items-center gap-2 text-xs">
-                        <input
-                          checked={!excluded.has(item.id)}
-                          onChange={() =>
-                            setExcluded((previous) => {
-                              const next = new Set(previous);
-                              if (!next.delete(item.id)) {
-                                next.add(item.id);
-                              }
-                              return next;
-                            })
-                          }
-                          type="checkbox"
-                        />
-                        <span className="sr-only">Consider in revision</span>
-                      </label>
-                    ) : null}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <ReviewAuthor
                           detail={`${item.replyTo ? "Reply" : item.content.type} · edit ${item.revision}`}
                           profile={room.profiles[item.participantId]}
                         />
-                        {item.participantId ===
-                        room.connection?.participantId ? (
-                          <Button
-                            aria-label="Remove my annotation"
-                            className="shrink-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => void resolve(item)}
-                            size="icon-sm"
-                            title="Remove contribution; history is retained"
-                            variant="ghost"
-                          >
-                            <Trash2 />
-                          </Button>
-                        ) : null}
+                        <div className="ml-auto flex items-center gap-1">
+                          {isPublisher ? (
+                            <ReviewSelection
+                              included={!excluded.has(item.id)}
+                              onToggle={() =>
+                                setExcluded((previous) => {
+                                  const next = new Set(previous);
+                                  if (!next.delete(item.id)) {
+                                    next.add(item.id);
+                                  }
+                                  return next;
+                                })
+                              }
+                            />
+                          ) : null}
+                          {item.participantId ===
+                          room.connection?.participantId ? (
+                            <Button
+                              aria-label="Remove my annotation"
+                              className="shrink-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => void resolve(item)}
+                              size="icon-sm"
+                              title="Remove contribution; history is retained"
+                              variant="ghost"
+                            >
+                              <Trash2 />
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="mt-3 rounded-xl bg-muted/45 px-4 py-3 leading-relaxed">
                         <AnnotationAttachmentStatus
