@@ -32,6 +32,7 @@ done
 agent-browser --session "$reader" snapshot -i | rg -q 'heading ".*Version two verified'
 agent-browser --session "$author" find role button click --name Publish --exact >/dev/null
 agent-browser --session "$author" wait --fn 'Math.abs(document.querySelector("[data-slot=sidebar-container]").getBoundingClientRect().right-innerWidth)<1' >/dev/null
+agent-browser --session "$author" eval '(()=>{const b=Array.from(document.querySelectorAll("button")).find(b=>b.textContent.trim()==="Copy prompt");const r=b?.getBoundingClientRect();return !!b&&!b.closest("details")&&r.height>0&&r.bottom<=innerHeight;})()' | rg -q true
 agent-browser --session "$author" find role button click --name 'Save current document' --exact >/dev/null
 agent-browser --session "$author" wait '[aria-label="Version 2, latest"]' >/dev/null
 agent-browser --session "$author" reload >/dev/null

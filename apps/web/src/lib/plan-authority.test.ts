@@ -66,6 +66,8 @@ test("revision prompts freeze inclusion choices without granting destructive aut
   expect(prompt).toContain("Read baseHtml");
   expect(prompt).toContain("Preserve original annotation layers");
   expect(prompt).toContain("Requested destination: hosted draft only");
+  expect(prompt).toContain("Save the revised hosted draft now");
+  expect(prompt).not.toContain("Ask me to review the revision before saving");
   const chainPrompt = revisionSelectionPrompt(hosted, {
     ...review,
     publishOnChain: true,
@@ -80,7 +82,12 @@ test("revision prompts freeze inclusion choices without granting destructive aut
 
 test("publication handoff preserves live layers and never copies credentials", () => {
   expect(iterationPrompt(hosted)).toContain("per-author textEdits");
-  expect(iterationPrompt(hosted)).toContain("Ask me to review");
+  expect(iterationPrompt(hosted)).toContain(
+    "a local HTML file is only an intermediate artifact"
+  );
+  expect(iterationPrompt(hosted)).toContain(
+    "If no destination was specified, ask before saving"
+  );
   expect(() => iterationPrompt(`${hosted}#k=secret`)).toThrow();
   expect(publicationPrompt(hosted, false)).toContain(
     "do not inscribe or spend BSV"

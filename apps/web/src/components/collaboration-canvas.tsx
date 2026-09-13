@@ -1855,7 +1855,7 @@ export function CollaborationCanvas({
                 </article>
               ))}
           </div>
-          <div className="space-y-3 border-t bg-background p-4">
+          <div className="shrink-0 space-y-3 border-t bg-background p-4">
             {onSaveHosted &&
             !publishOnChain &&
             sharing?.value.mode === "preserve" ? (
@@ -1914,7 +1914,7 @@ export function CollaborationCanvas({
               </div>
             ) : null}
             <details
-              className="group space-y-3"
+              className="group max-h-[35dvh] space-y-3 overflow-y-auto"
               open={onSaveHosted ? undefined : true}
             >
               <summary className="cursor-pointer py-1 text-sm">
@@ -1945,68 +1945,64 @@ export function CollaborationCanvas({
                   ? "Selection is just for this draft. Nothing is deleted or published."
                   : "Your notes and replies stay yours. Copying a prompt does not publish them."}
               </p>
-              <Button
-                className="w-full"
-                disabled={
-                  isPublisher &&
-                  sharing?.value.mode === "private" &&
-                  !sharing.value.recipients.length
-                }
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(
-                      draftingRevision
-                        ? revisionSelectionPrompt(target.origin, {
-                            annotations: room.annotations
-                              .filter(
-                                (item) =>
-                                  !item.replyTo && item.status === "open"
-                              )
-                              .map((item) => ({
-                                id: item.id,
-                                include: !excluded.has(item.id),
-                                revision: item.revision,
-                              })),
-                            cursor: room.sequence,
-                            documentRevision: room.documentRevision,
-                            notes: revisionNotes,
-                            publishOnChain,
-                            sharing: sharing?.value,
-                            target: room.activeTarget,
-                            textEdits: reviewEdits
-                              .filter((item) =>
-                                sameDocumentTarget(item.base, room.activeTarget)
-                              )
-                              .map((item) => ({
-                                include: !excluded.has(
-                                  JSON.stringify([
-                                    item.participantId,
-                                    item.path,
-                                  ])
-                                ),
-                                participantId: item.participantId,
-                                path: item.path,
-                                revision: item.revision,
-                              })),
-                          })
-                        : annotationPublicationPrompt(target.origin, {
-                            cursor: room.sequence,
-                            notes: revisionNotes,
-                            participantId: room.connection?.participantId ?? "",
-                            publishOnChain,
-                            sharingMode: "preserve",
-                            target: room.activeTarget,
-                          })
-                    );
-                    toast.success("Revision prompt copied");
-                  } catch {
-                    toast.error("Could not copy the prompt");
-                  }
-                }}
-              >
-                <Copy /> Copy prompt
-              </Button>
             </details>
+            <Button
+              className="w-full"
+              disabled={
+                isPublisher &&
+                sharing?.value.mode === "private" &&
+                !sharing.value.recipients.length
+              }
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(
+                    draftingRevision
+                      ? revisionSelectionPrompt(target.origin, {
+                          annotations: room.annotations
+                            .filter(
+                              (item) => !item.replyTo && item.status === "open"
+                            )
+                            .map((item) => ({
+                              id: item.id,
+                              include: !excluded.has(item.id),
+                              revision: item.revision,
+                            })),
+                          cursor: room.sequence,
+                          documentRevision: room.documentRevision,
+                          notes: revisionNotes,
+                          publishOnChain,
+                          sharing: sharing?.value,
+                          target: room.activeTarget,
+                          textEdits: reviewEdits
+                            .filter((item) =>
+                              sameDocumentTarget(item.base, room.activeTarget)
+                            )
+                            .map((item) => ({
+                              include: !excluded.has(
+                                JSON.stringify([item.participantId, item.path])
+                              ),
+                              participantId: item.participantId,
+                              path: item.path,
+                              revision: item.revision,
+                            })),
+                        })
+                      : annotationPublicationPrompt(target.origin, {
+                          cursor: room.sequence,
+                          notes: revisionNotes,
+                          participantId: room.connection?.participantId ?? "",
+                          publishOnChain,
+                          sharingMode: "preserve",
+                          target: room.activeTarget,
+                        })
+                  );
+                  toast.success("Revision prompt copied");
+                } catch {
+                  toast.error("Could not copy the prompt");
+                }
+              }}
+            >
+              <Copy /> Copy prompt
+            </Button>
           </div>
         </Sidebar>
       ) : null}
