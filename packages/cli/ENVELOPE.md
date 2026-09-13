@@ -32,7 +32,21 @@ header. A same-transaction relationship must use an agreed output reference,
 not embed the transaction's own ID before signing. The native annotation
 schema and its viewer integration remain separate work.
 
-### Annotation recovery contract (proposed, not implemented)
+### Annotation recovery contract (library implementation; viewer integration pending)
+
+The web library now validates `bitplan-annotation-checkpoint/1` participant
+snapshots, seals them independently with the existing v2 envelope, and replays
+supplied checkpoint heads. Embedded image bytes stay inside that encrypted
+payload. Same-transaction references use an output index; optional source
+metadata retains the hosted version reviewed. The ordinary document decoder
+still requires HTML and does not mistake a checkpoint for a replacement plan.
+
+Replay reports missing references and forks. Its input locations are unverified
+until a caller checks actual transaction lineage and content hashes; it does not
+fetch transactions, discover unknown streams, or verify participant signatures.
+Native checkpoint publishing, a durable transaction journal, chain recovery UI,
+and verified handles remain unfinished. No viewer action invokes these new
+publishing primitives yet.
 
 An annotation payload must bind the document's stable origin, exact version
 outpoint, and SHA-256 of its original UTF-8 HTML. In a combined transaction,

@@ -17,6 +17,9 @@
 
 ### Changed
 
+- Added internal encrypted annotation checkpoint parsing/replay and no-send
+  multi-output signing helpers. These are not yet connected to native Publish;
+  transaction journaling, lineage verification, and verified handles remain pending.
 - Decrypted plans start collaboration automatically after loading a character.
   Existing invitations are preserved; failed connections can be retried.
 - Publishing options distinguish hosted encryption senders from wallets holding
