@@ -130,8 +130,8 @@ export async function createInstantDraft(
     throw new Error("The hosted draft service returned an invalid response.");
   }
   return readerSecret
-    ? `/d/${result.id}?collaborate=1#k=${linkFragment(readerSecret)}`
-    : `/d/${result.id}?collaborate=1`;
+    ? `/d/${result.id}#k=${linkFragment(readerSecret)}`
+    : `/d/${result.id}`;
 }
 
 function mediaType(value: string | null): string {

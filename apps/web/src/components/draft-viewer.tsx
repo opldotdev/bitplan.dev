@@ -9,6 +9,7 @@ import { CharacterChooser } from "@/components/character-chooser";
 import { CollaborationCanvas } from "@/components/collaboration-canvas";
 import { HostedShareDialog } from "@/components/hosted-share-dialog";
 import { InlinePlanTitle } from "@/components/inline-plan-title";
+import { PlanPublishing } from "@/components/plan-publishing";
 import { ShareDraftDialog } from "@/components/share-draft-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -35,9 +36,15 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { sameDocumentTarget } from "@/lib/annotations";
+import { collaborationFragment } from "@/lib/collaboration-crypto";
+import type { CollaboratorProfile } from "@/lib/collaborator";
 import { type DraftsWallet, walletOwnsDraft } from "@/lib/drafts";
 import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
-import { EnvelopeAccessError, openEnvelope } from "@/lib/envelope";
+import {
+  EnvelopeAccessError,
+  openEnvelope,
+  parseEnvelope,
+} from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
 import { isHostedId } from "@/lib/hosted-id";
 import {
@@ -570,13 +577,16 @@ export function DraftViewer() {
       <DecryptedView
         canPublish={view.canPublish}
         currentVersion={view.draft.currentVersion}
+        latestOutpoint={view.draft.latestOutpoint}
         latestVersion={view.draft.latestVersion}
         onVersion={handleVersion}
         openedWithLink={view.openedWithLink}
         origin={view.draft.origin}
         outpoint={view.draft.content.outpoint}
         plaintext={view.plaintext}
-        startCollaboration={searchParams.get("collaborate") === "1"}
+        senderIdentityKey={
+          parseEnvelope(view.draft.content.bytes).header.key.senderIdentityKey
+        }
       />
     );
   }
@@ -801,20 +811,22 @@ function DecryptedView({
   plaintext,
   currentVersion,
   latestVersion,
+  latestOutpoint,
+  senderIdentityKey,
   onVersion,
   origin,
   outpoint,
-  startCollaboration,
 }: {
   canPublish: boolean;
   openedWithLink?: boolean;
   plaintext: DraftPlaintext;
   currentVersion: number;
   latestVersion: number;
+  latestOutpoint: string | null;
+  senderIdentityKey: string;
   onVersion: (version: number) => void;
   origin: string;
   outpoint: string | null;
-  startCollaboration: boolean;
 }) {
   const baseTitle = plaintext.meta.title;
   const target = {
@@ -832,15 +844,40 @@ function DecryptedView({
   const title = liveDraft?.title ?? baseTitle ?? "Untitled plan";
   const startRoom = useRef(collaboration.start);
   startRoom.current = collaboration.start;
+  const [profile, setProfile] = useState<CollaboratorProfile | null>(null);
+  const autoStarted = useRef(false);
 
   useEffect(() => {
-    if (
-      !(startCollaboration && isHostedId(origin) && collaboration.configured)
-    ) {
+    if (profile && collaboration.connection) {
+      void collaboration.updateProfile(profile);
+    }
+  }, [profile, collaboration.connection, collaboration.updateProfile]);
+
+  useEffect(() => {
+    if (!(profile && collaboration.configured)) {
       return;
     }
+    let hasInvitation = false;
+    try {
+      hasInvitation = collaborationFragment(window.location.hash) !== null;
+    } catch {
+      hasInvitation = true;
+    }
+    if (hasInvitation || collaboration.connection || collaboration.connecting) {
+      return;
+    }
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: this ref persists across effect runs
+    if (autoStarted.current) {
+      return;
+    }
+    autoStarted.current = true;
     void startRoom.current();
-  }, [collaboration.configured, origin, startCollaboration]);
+  }, [
+    collaboration.configured,
+    collaboration.connection,
+    collaboration.connecting,
+    profile,
+  ]);
 
   useEffect(() => {
     const genericTitle = document.title;
@@ -885,6 +922,11 @@ function DecryptedView({
           ) : null}
         </div>
         <div className="ml-auto flex items-center gap-1">
+          <PlanPublishing
+            latestOutpoint={latestOutpoint}
+            origin={origin}
+            senderIdentityKey={senderIdentityKey}
+          />
           <DecryptedShare
             canPublish={canPublish}
             collaboration={collaboration}
@@ -896,7 +938,7 @@ function DecryptedView({
             openedWithLink={openedWithLink}
             origin={origin}
           />
-          <CharacterChooser onChange={collaboration.updateProfile}>
+          <CharacterChooser onChange={setProfile}>
             <div className="border-t pt-2">
               {collaboration.connection ? (
                 <p className="text-muted-foreground text-xs" role="status">
@@ -904,21 +946,12 @@ function DecryptedView({
                     ? "Connected · invitation-encrypted collaboration"
                     : "Reconnecting..."}
                 </p>
-              ) : (
-                <Button
-                  className="w-full"
-                  disabled={
-                    !collaboration.configured || collaboration.connecting
-                  }
-                  onClick={() => void collaboration.start()}
-                  size="sm"
-                  variant="outline"
-                >
-                  {collaboration.connecting
-                    ? "Connecting…"
-                    : "Start collaboration"}
-                </Button>
-              )}
+              ) : null}
+              {!collaboration.connection && collaboration.connecting ? (
+                <p className="text-muted-foreground text-xs" role="status">
+                  Connecting…
+                </p>
+              ) : null}
               {collaboration.connection ? (
                 <p className="mt-2 text-muted-foreground text-xs">
                   Notes are attributed to this browser profile, not a verified
@@ -930,6 +963,17 @@ function DecryptedView({
                 <p className="mt-2 text-destructive text-xs" role="alert">
                   {collaboration.error}
                 </p>
+              ) : null}
+              {collaboration.error && !collaboration.connection ? (
+                <Button
+                  className="mt-2 w-full"
+                  disabled={collaboration.connecting}
+                  onClick={() => void collaboration.start()}
+                  size="sm"
+                  variant="outline"
+                >
+                  Retry connection
+                </Button>
               ) : null}
             </div>
           </CharacterChooser>

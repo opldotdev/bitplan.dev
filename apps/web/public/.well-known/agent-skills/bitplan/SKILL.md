@@ -346,7 +346,11 @@ versions; do not key the preference by version outpoint. Clicking the icon
 opens the roster. A change updates the local preference and the hosted draft
 participant record, without signing or broadcasting a transaction. A default
 character is presentation, not verified identity or a user's endorsement.
-Keep ordinary reader links read-only. Remember display preferences locally,
+After decrypting a plan, start collaboration automatically once the selected
+or default character is available. Join an existing invitation without replacing
+it. A document-only link creates a separate room; it grants no access to another
+room's annotations. Retry failed connections from the character menu.
+Remember display preferences locally,
 but persist shared notes and participant records in encrypted hosted state.
 Use a stable participant ID and separate session IDs for browser and agent
 input. An agent acting for a participant reuses that participant ID, name,

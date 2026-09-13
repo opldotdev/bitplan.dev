@@ -62,6 +62,12 @@ The CLI validates the HTML, then your wallet encrypts it. BitPlan either keeps
 the sealed envelope in hosted storage or loads it through OrdFS after an
 on-chain publish. Decryption happens in the browser.
 
+The viewer shows publishing options when the connected wallet matches a hosted
+version’s encryption sender, or holds the latest on-chain ordinal. These are
+different: hosted updates still require the saved draft-update secret. Reading
+a plan does not grant permission to replace it. The menu copies an agent/CLI
+handoff using only the public plan ID; it does not sign or publish a transaction.
+
 Versions keep the same origin:
 
 ```mermaid

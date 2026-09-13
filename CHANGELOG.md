@@ -17,6 +17,10 @@
 
 ### Changed
 
+- Decrypted plans start collaboration automatically after loading a character.
+  Existing invitations are preserved; failed connections can be retried.
+- Publishing options distinguish hosted encryption senders from wallets holding
+  the latest ordinal and copy a public-plan-ID-only agent handoff.
 - Starter actions say “Start with {plan name}”; templates lead with project
   questions and a public-ID-only agent prompt. Live collaboration reads include
   materialized text edits; whole-document writes require the observed cursor.

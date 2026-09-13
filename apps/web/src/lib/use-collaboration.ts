@@ -85,6 +85,7 @@ export function useCollaboration(target: DocumentTarget) {
   const [online, setOnline] = useState(false);
   const connectionRef = useRef<Connection | null>(null);
   const connectionEpoch = useRef(0);
+  const starting = useRef(false);
   const lastCursor = useRef(0);
   const cursorQueue = useRef<Promise<unknown>>(Promise.resolve());
   const targetRef = useRef(target);
@@ -457,21 +458,38 @@ export function useCollaboration(target: DocumentTarget) {
   }, [connection]);
 
   async function start() {
-    if (!url || connecting || connection) {
+    if (!url || starting.current || connecting || connectionRef.current) {
       return;
     }
+    starting.current = true;
     setConnecting(true);
-    const client = new ConvexClient(url);
+    setError(null);
+    const epoch = connectionEpoch.current;
+    let client: ConvexClient | undefined;
     try {
+      const invite = collaborationFragment(window.location.hash);
+      if (invite) {
+        await connect(invite);
+        return;
+      }
       const secret = newCapability();
+      const metadataCipher = await encryptRoomValue(
+        secret,
+        "metadata",
+        parseDocumentTarget(targetRef.current)
+      );
+      const proof = await roomProof(secret);
+      if (epoch !== connectionEpoch.current) {
+        return;
+      }
+      client = new ConvexClient(url);
       const roomId = await client.mutation(api.collaboration.create, {
-        metadataCipher: await encryptRoomValue(
-          secret,
-          "metadata",
-          parseDocumentTarget(targetRef.current)
-        ),
-        proof: await roomProof(secret),
+        metadataCipher,
+        proof,
       });
+      if (epoch !== connectionEpoch.current) {
+        return;
+      }
       const params = new URLSearchParams(window.location.hash.slice(1));
       params.set("room", roomId);
       params.set("collab", secret);
@@ -483,7 +501,8 @@ export function useCollaboration(target: DocumentTarget) {
     } catch (failure) {
       setError(message(failure));
     } finally {
-      await client.close();
+      await client?.close();
+      starting.current = false;
       setConnecting(false);
     }
   }

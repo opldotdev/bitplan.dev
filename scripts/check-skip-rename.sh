@@ -10,6 +10,11 @@ agent-browser --session "$session" find role button click --name 'Skip' --exact
 agent-browser --session "$session" wait 'input[value="brief"]'
 agent-browser --session "$session" find role button click --name 'Start with Master Plan' --exact
 agent-browser --session "$session" wait 'button[aria-label="Rename Master Plan"]'
+agent-browser --session "$session" wait --fn 'document.querySelector("[data-bitplan-connected]")?.dataset.bitplanConnected === "true" && !location.search.includes("collaborate")'
+# A default character joins immediately; selecting another keeps the same room.
+agent-browser --session "$session" click 'button[aria-label$="Change profile"]'
+agent-browser --session "$session" find role button click --name 'Martha' --exact
+agent-browser --session "$session" wait 'button[aria-label="Martha, Martha. Change profile"]'
 invitation=$(agent-browser --session "$session" get url)
 agent-browser --session "$reader" open "$invitation" >/dev/null
 agent-browser --session "$reader" wait 'button[aria-label="Rename Master Plan"]'
@@ -23,3 +28,5 @@ agent-browser --session "$session" press Escape
 agent-browser --session "$session" wait 'button[aria-label="Rename Renamed together"]'
 agent-browser --session "$session" reload >/dev/null
 agent-browser --session "$session" wait 'button[aria-label="Rename Renamed together"]'
+agent-browser --session "$session" wait 'button[aria-label="Martha, Martha. Change profile"]'
+printf 'Automatic collaboration, character persistence, shared rename, and reload passed.\n'

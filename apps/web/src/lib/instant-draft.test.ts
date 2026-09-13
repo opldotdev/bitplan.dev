@@ -7,8 +7,7 @@ import { linkWallet, parseLinkFragment } from "./link-reader";
 
 const HTML =
   '<!doctype html><html data-bitplan-template="brief"><title>Brief</title><body>hello</body></html>';
-const VIEWER_PATTERN =
-  /^\/d\/h_abcdefghijklmnopqrst\?collaborate=1#k=[A-Za-z0-9_-]{43}$/;
+const VIEWER_PATTERN = /^\/d\/h_abcdefghijklmnopqrst#k=[A-Za-z0-9_-]{43}$/;
 
 describe("createInstantDraft", () => {
   test("wallet starters open hosted without a reader key or on-chain action", async () => {
@@ -31,7 +30,7 @@ describe("createInstantDraft", () => {
       fetchMock,
       wallet
     );
-    expect(viewer).toBe("/d/h_abcdefghijklmnopqrst?collaborate=1");
+    expect(viewer).toBe("/d/h_abcdefghijklmnopqrst");
     const opened = await openEnvelope(wallet, uploaded as Uint8Array);
     expect(opened.plaintext.html).toBe(HTML);
     expect(opened.plaintext.meta.title).toBe("Wallet starter");
