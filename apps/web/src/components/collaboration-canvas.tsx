@@ -166,6 +166,9 @@ export function CollaborationCanvas({
   const frame = useRef<HTMLIFrameElement>(null);
   const connectedFrame = useRef<HTMLIFrameElement | null>(null);
   const geometryPort = useRef<MessagePort | null>(null);
+  const [viewScale, setViewScale] = useState(1);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const viewportPan = useRef<{ x: number; y: number } | null>(null);
   const textPort = useRef<MessagePort | null>(null);
   const textRecovery = useRef(
     new Map<string, TextBlock & { revision: number }>()
@@ -580,7 +583,13 @@ export function CollaborationCanvas({
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the private-port receiver validates each supported message shape before updating UI state
   function received(event: MessageEvent) {
     try {
-      if (event.data.type === "resolved-anchor") {
+      if (event.data.type === "camera") {
+        const scale = event.data.payload?.scale;
+        if (typeof scale === "number" && scale >= 0.25 && scale <= 4) {
+          setViewScale(scale);
+          setToolsOpen(false);
+        }
+      } else if (event.data.type === "resolved-anchor") {
         resolveDrawingAnchor.current?.(parseAnchor(event.data.payload?.anchor));
       } else if (event.data.type === "hover-end") {
         setHighlight(null);
@@ -733,6 +742,7 @@ export function CollaborationCanvas({
         return;
       }
       connectedFrame.current = currentFrame;
+      setViewScale(1);
       geometryPort.current?.close();
       geometryPort.current = port;
       port.addEventListener("message", received);
@@ -796,10 +806,46 @@ export function CollaborationCanvas({
       }
     }
     window.addEventListener("keydown", keyboardTools);
+    function zoomOverOverlay(event: WheelEvent) {
+      const element = event.target instanceof Element ? event.target : null;
+      if (
+        !(
+          event.isTrusted &&
+          event.shiftKey &&
+          element &&
+          (trigger.current?.contains(element) ||
+            element.closest("[data-plan-tools]"))
+        )
+      ) {
+        return;
+      }
+      const bounds = frame.current?.getBoundingClientRect();
+      if (!bounds) {
+        return;
+      }
+      event.preventDefault();
+      setToolsOpen(false);
+      geometryPort.current?.postMessage({
+        payload: {
+          delta:
+            (event.deltaY || event.deltaX) *
+            ([1, 16, bounds.height][event.deltaMode] ?? 1),
+          kind: "zoom",
+          x: event.clientX - bounds.left,
+          y: event.clientY - bounds.top,
+        },
+        type: "navigate",
+      });
+    }
+    window.addEventListener("wheel", zoomOverOverlay, {
+      capture: true,
+      passive: false,
+    });
     setBridgeHostReady(true);
     return () => {
       window.removeEventListener("message", acceptGeometryPort);
       window.removeEventListener("keydown", keyboardTools);
+      window.removeEventListener("wheel", zoomOverOverlay, true);
       geometryPort.current?.close();
       geometryPort.current = null;
       connectedFrame.current = null;
@@ -1299,7 +1345,7 @@ export function CollaborationCanvas({
           </div>
         </div>
       ) : null}
-      <ContextMenu.Root>
+      <ContextMenu.Root onOpenChange={setToolsOpen} open={toolsOpen}>
         <ContextMenu.Trigger
           asChild
           disabled={!room.connection || browserMenu || !showEdits}
@@ -1308,6 +1354,12 @@ export function CollaborationCanvas({
             className="relative min-h-0 flex-1 overflow-hidden"
             data-bitplan-connected={room.connection ? room.online : undefined}
             data-bitplan-sequence={room.connection ? room.sequence : undefined}
+            onAuxClickCapture={(event) => {
+              if (event.button === 1) {
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }}
             onContextMenuCapture={(event) => {
               if (browserMenu || !room.connection || !showEdits) {
                 event.stopPropagation();
@@ -1331,6 +1383,38 @@ export function CollaborationCanvas({
                   type: "point",
                 });
               }
+            }}
+            onPointerCancel={() => {
+              viewportPan.current = null;
+            }}
+            onPointerDownCapture={(event) => {
+              if (event.button !== 1) {
+                return;
+              }
+              event.preventDefault();
+              event.stopPropagation();
+              viewportPan.current = { x: event.clientX, y: event.clientY };
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMoveCapture={(event) => {
+              const pan = viewportPan.current;
+              if (!pan) {
+                return;
+              }
+              event.preventDefault();
+              event.stopPropagation();
+              geometryPort.current?.postMessage({
+                payload: {
+                  kind: "pan",
+                  x: event.clientX - pan.x,
+                  y: event.clientY - pan.y,
+                },
+                type: "navigate",
+              });
+              viewportPan.current = { x: event.clientX, y: event.clientY };
+            }}
+            onPointerUpCapture={() => {
+              viewportPan.current = null;
             }}
             ref={trigger}
           >
@@ -1392,7 +1476,10 @@ export function CollaborationCanvas({
                       },
                       at,
                       undefined,
-                      asset.size
+                      {
+                        height: Math.round(asset.size.height / viewScale),
+                        width: Math.round(asset.size.width / viewScale),
+                      }
                     );
                     roomRef.current.moveCursor(at, true);
                   }}
@@ -1493,6 +1580,7 @@ export function CollaborationCanvas({
                       left: point.x,
                       top: point.y,
                     }}
+                    viewScale={viewScale}
                   >
                     <button
                       className={
@@ -1719,6 +1807,7 @@ export function CollaborationCanvas({
           <ContextMenu.Content
             aria-label="Annotation tools"
             className="z-50 flex gap-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            data-plan-tools=""
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               inlineInput.current?.focus();
@@ -1989,6 +2078,12 @@ export function CollaborationCanvas({
                   </>
                 }
                 onBrowserMenuChange={changeBrowserMenu}
+                onResetView={() =>
+                  geometryPort.current?.postMessage({
+                    payload: { kind: "reset" },
+                    type: "navigate",
+                  })
+                }
                 section={publishSection}
               />
             ) : null}

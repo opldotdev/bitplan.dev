@@ -16,6 +16,9 @@ test("preferences render within the host menu, without another dialog or publish
   const interaction = render("Interaction");
   expect(interaction).toContain("Keyboard shortcuts");
   expect(interaction).toContain("Undo removal");
+  expect(interaction).toContain("Hold middle mouse + drag");
+  expect(interaction).toContain("Shift + wheel");
+  expect(interaction).toContain("Reset view");
   expect(interaction).not.toContain('role="dialog"');
   expect(interaction).not.toContain("Open Publish");
   expect(render("Sound")).toContain("UI sound volume");

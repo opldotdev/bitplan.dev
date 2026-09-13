@@ -105,12 +105,15 @@ test("click anchors round-trip over a private port, including blank space", asyn
     document: {
       addEventListener: (name: string, callback: (event: unknown) => void) =>
         handlers.set(name, callback),
+      body: { offsetLeft: 0, offsetTop: 0 },
+      createElement: () => ({ textContent: "" }),
       documentElement: {
         scrollHeight: 2000,
         scrollWidth: 800,
         style: { cursor: "" },
       },
       elementFromPoint: () => element,
+      head: { append: () => undefined },
       querySelectorAll: () => {
         scans += 1;
         return candidates;
@@ -346,6 +349,34 @@ test("click anchors round-trip over a private port, including blank space", asyn
   element.textContent = "Changed paragraph";
   await locate({ point: { x: 0.5, y: 0.5 }, quote: { exact: "A paragraph" } });
   expect(messages.at(-1)?.payload[0].position).toBeNull();
+  handlers.get("wheel")?.(
+    trustedEvent({
+      clientX: 200,
+      clientY: 100,
+      deltaMode: 0,
+      deltaX: 0,
+      deltaY: -100,
+      preventDefault() {
+        /* Native event stub. */
+      },
+      shiftKey: true,
+      stopImmediatePropagation() {
+        /* Native event stub. */
+      },
+    })
+  );
+  await flushMessages();
+  const camera = messages.findLast(
+    (message) => message.type === "camera"
+  )?.payload;
+  expect(camera.scale).toBeGreaterThan(1);
+  expect((200 - camera.x) / camera.scale).toBeCloseTo(200);
+  port.postMessage({ payload: { kind: "reset" }, type: "navigate" });
+  await flushMessages();
+  await flushMessages();
+  expect(
+    messages.findLast((message) => message.type === "camera")?.payload
+  ).toEqual({ scale: 1, x: 0, y: 0 });
   port.close();
 });
 

@@ -600,6 +600,11 @@ The annotation toolbar gear and navbar Settings button open the same centered
 plan menu as Publish. Interaction contains Plan right-click tools (off uses the
 native browser menu), the shortcut legend, comparison and editing controls.
 The menu preference persists on this device; opening Settings does not change it.
+In a connected live viewer, hold the middle mouse button and drag to pan.
+Shift + mouse wheel zooms around the pointer (25–400%). These are local view
+changes, not document edits or collaborator camera movements. Interaction lists
+the gestures and offers Reset view · 100%. Annotation placement and resize
+deltas remain in document units at every zoom level.
 Sound controls UI mute and overall volume for the existing sound theme. Audio never
 changes save, signature, or transaction status.
 Select your own drawing, image, HTML widget, or note and press Delete to remove it.

@@ -1,4 +1,5 @@
 import { installInlineTextBridge } from "./inline-text-bridge";
+import { zoomPlanCamera } from "./plan-camera";
 import { withRenderPolicy } from "./render-policy";
 
 const PUBLIC_PLAN_ID = /^(?:h_[a-zA-Z0-9_-]{20}|[0-9a-f]{64}_\d+)$/;
@@ -12,7 +13,7 @@ export function withAnnotationBridge(
   planId = ""
 ): string {
   const publicId = PUBLIC_PLAN_ID.test(planId) ? planId : "";
-  const script = `;(${installGeometryBridge.toString()})(${collaboration},${browserMenu},${JSON.stringify(publicId)});`;
+  const script = `;(${installGeometryBridge.toString()})(${collaboration},${browserMenu},${JSON.stringify(publicId)},${zoomPlanCamera.toString()});`;
   const tag = `<script>${script.replaceAll("</script", "<\\/script")}</script>`;
   // Only the host's validated preset compiler supplies this style text.
   return withRenderPolicy(
@@ -30,7 +31,8 @@ export function withAnnotationBridge(
 function installGeometryBridge(
   collaboration: boolean,
   browserMenu: boolean,
-  planId: string
+  planId: string,
+  zoomCamera: typeof zoomPlanCamera
 ) {
   if (planId) {
     document.documentElement.setAttribute("data-bitplan-id", planId);
@@ -141,6 +143,147 @@ function installGeometryBridge(
     postPortMessage.call(bridgePort, { payload, type });
   const trustedActivity = (event: Event) =>
     readEventTrusted?.call(event) === true;
+  let camera = { scale: 1, x: 0, y: 0 };
+  let pageSize: { width: number; height: number } | null = null;
+  let cameraStyle: HTMLStyleElement | null = null;
+  let pan: { x: number; y: number; pointerId: number } | null = null;
+  function applyCamera() {
+    if (!document.body) {
+      return;
+    }
+    pageSize ??= {
+      height: document.documentElement.scrollHeight,
+      width: document.documentElement.scrollWidth,
+    };
+    if (!cameraStyle) {
+      cameraStyle = document.createElement("style");
+      document.head.append(cameraStyle);
+    }
+    cameraStyle.textContent =
+      camera.scale === 1 && camera.x === 0 && camera.y === 0
+        ? ""
+        : `body{transform-origin:${-document.body.offsetLeft}px ${-document.body.offsetTop}px!important;transform:translate(${camera.x}px,${camera.y}px) scale(${camera.scale})!important}`;
+    send("camera", camera);
+    geometry();
+  }
+  function navigate(payload: unknown) {
+    if (!payload || typeof payload !== "object") {
+      return;
+    }
+    const value = payload as {
+      kind?: unknown;
+      x?: unknown;
+      y?: unknown;
+      delta?: unknown;
+    };
+    if (value.kind === "reset") {
+      camera = { scale: 1, x: 0, y: 0 };
+      applyCamera();
+      return;
+    }
+    if (
+      typeof value.x !== "number" ||
+      typeof value.y !== "number" ||
+      !Number.isFinite(value.x) ||
+      !Number.isFinite(value.y)
+    ) {
+      return;
+    }
+    if (value.kind === "pan") {
+      camera = {
+        ...camera,
+        x: camera.x + Math.max(-2000, Math.min(2000, value.x)),
+        y: camera.y + Math.max(-2000, Math.min(2000, value.y)),
+      };
+    } else if (
+      value.kind === "zoom" &&
+      typeof value.delta === "number" &&
+      Number.isFinite(value.delta)
+    ) {
+      camera = zoomCamera(
+        camera,
+        value.x + scrollX,
+        value.y + scrollY,
+        value.delta
+      );
+    } else {
+      return;
+    }
+    applyCamera();
+  }
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (!trustedActivity(event) || event.button !== 1) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      pan = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+      document.documentElement.setPointerCapture(event.pointerId);
+      document.documentElement.style.cursor = "grabbing";
+    },
+    true
+  );
+  document.addEventListener(
+    "pointermove",
+    (event) => {
+      if (!(pan && trustedActivity(event))) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      navigate({
+        kind: "pan",
+        x: event.clientX - pan.x,
+        y: event.clientY - pan.y,
+      });
+      pan = { ...pan, x: event.clientX, y: event.clientY };
+    },
+    true
+  );
+  function endPan() {
+    if (!pan) {
+      return;
+    }
+    if (document.documentElement.hasPointerCapture(pan.pointerId)) {
+      document.documentElement.releasePointerCapture(pan.pointerId);
+    }
+    pan = null;
+    document.documentElement.style.cursor = "";
+  }
+  document.addEventListener("pointerup", endPan, true);
+  document.addEventListener("pointercancel", endPan, true);
+  window.addEventListener("blur", endPan);
+  document.addEventListener(
+    "auxclick",
+    (event) => {
+      if (event.button === 1) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },
+    true
+  );
+  document.addEventListener(
+    "wheel",
+    (event) => {
+      if (!(event.shiftKey && trustedActivity(event))) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      navigate({
+        delta:
+          (event.deltaY || event.deltaX) *
+          ([1, 16, innerHeight][event.deltaMode] ?? 1),
+        kind: "zoom",
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    { capture: true, passive: false }
+  );
   const clamp = (n: number) => Math.max(0, Math.min(1, n));
   const selectedText = () =>
     window.getSelection?.()?.toString().slice(0, 32_000) ?? "";
@@ -155,10 +298,17 @@ function installGeometryBridge(
     const documentPoint = () => ({
       point: {
         x: clamp(
-          (x + scrollX) / Math.max(1, document.documentElement.scrollWidth)
+          (x + scrollX - camera.x) /
+            camera.scale /
+            Math.max(1, pageSize?.width ?? document.documentElement.scrollWidth)
         ),
         y: clamp(
-          (y + scrollY) / Math.max(1, document.documentElement.scrollHeight)
+          (y + scrollY - camera.y) /
+            camera.scale /
+            Math.max(
+              1,
+              pageSize?.height ?? document.documentElement.scrollHeight
+            )
         ),
       },
     });
@@ -253,8 +403,18 @@ function installGeometryBridge(
       element = quotes?.get(anchor.quote.exact) ?? null;
     } else {
       return {
-        x: document.documentElement.scrollWidth * anchor.point.x - scrollX,
-        y: document.documentElement.scrollHeight * anchor.point.y - scrollY,
+        x:
+          (pageSize?.width ?? document.documentElement.scrollWidth) *
+            anchor.point.x *
+            camera.scale +
+          camera.x -
+          scrollX,
+        y:
+          (pageSize?.height ?? document.documentElement.scrollHeight) *
+            anchor.point.y *
+            camera.scale +
+          camera.y -
+          scrollY,
       };
     }
     if (!element) {
@@ -303,6 +463,10 @@ function installGeometryBridge(
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one private-port dispatcher validates each message shape before changing bridge state
   function receive(data: unknown) {
     if (!(data && typeof data === "object" && "type" in data)) {
+      return;
+    }
+    if (data.type === "navigate") {
+      navigate("payload" in data ? data.payload : null);
       return;
     }
     if (data.type === "pick") {
@@ -457,6 +621,7 @@ function installGeometryBridge(
       !event.isComposing &&
       event.key === "Escape"
     ) {
+      endPan();
       picking = false;
       document.documentElement.style.cursor = "";
       send("shortcut", "Escape");

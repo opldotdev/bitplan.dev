@@ -11,6 +11,8 @@ import {
 } from "@/lib/ui-sound";
 
 const shortcuts = [
+  ["Pan document", "Hold middle mouse + drag"],
+  ["Zoom document", "Shift + wheel"],
   ["Select text", "V"],
   ["Add note", "T"],
   ["Add image", "I"],
@@ -28,12 +30,14 @@ export function PlanSettings({
   onBrowserMenuChange,
   interaction,
   details,
+  onResetView,
 }: {
   section: string;
   browserMenu: boolean;
   onBrowserMenuChange: (enabled: boolean) => void;
   interaction: ReactNode;
   details: ReactNode;
+  onResetView?: () => void;
 }) {
   const { theme, setTheme } = useTheme();
   const [sound, setSound] = useState({ muted: false, volume: 1 });
@@ -47,6 +51,9 @@ export function PlanSettings({
     >
       {section === "Interaction" ? (
         <>
+          <Button className="mb-6" onClick={onResetView} variant="outline">
+            Reset view · 100%
+          </Button>
           <div className="flex items-center justify-between gap-3">
             <label className="text-base" htmlFor="plan-context-tools">
               Plan right-click tools

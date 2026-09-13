@@ -25,6 +25,7 @@ export function AnnotationCard({
   save,
   children,
   onSelect,
+  viewScale = 1,
 }: {
   item: Annotation;
   label: string;
@@ -35,6 +36,7 @@ export function AnnotationCard({
   ) => Promise<unknown>;
   children: ReactNode;
   onSelect?: () => void;
+  viewScale?: number;
 }) {
   const card = useRef<HTMLElement>(null);
   const drag = useRef<{
@@ -91,8 +93,8 @@ export function AnnotationCard({
   function moved(x: number, y: number) {
     const start = moving.current;
     return moveAnnotationPlacement(start ?? position, {
-      x: x - (start?.x ?? x),
-      y: y - (start?.y ?? y),
+      x: (x - (start?.x ?? x)) / viewScale,
+      y: (y - (start?.y ?? y)) / viewScale,
     });
   }
   return (
@@ -150,9 +152,11 @@ export function AnnotationCard({
       style={{
         ...style,
         height: size?.height ?? (item.content.type === "html" ? 96 : undefined),
+        scale: viewScale,
         touchAction:
           item.content.type === "image" && canResize ? "none" : undefined,
-        translate: `${position.dx}px ${position.dy}px`,
+        transformOrigin: "0 0",
+        translate: `${position.dx * viewScale}px ${position.dy * viewScale}px`,
         width: size?.width ?? 224,
       }}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: focus selects the spatial widget for keyboard deletion
@@ -211,8 +215,10 @@ export function AnnotationCard({
             event.preventDefault();
             const rect = card.current.getBoundingClientRect();
             const next = clamp(
-              rect.width + keyDelta(event.key, "ArrowRight", "ArrowLeft"),
-              rect.height + keyDelta(event.key, "ArrowDown", "ArrowUp")
+              rect.width / viewScale +
+                keyDelta(event.key, "ArrowRight", "ArrowLeft"),
+              rect.height / viewScale +
+                keyDelta(event.key, "ArrowDown", "ArrowUp")
             );
             setDraft(next);
             void persist(next);
@@ -228,8 +234,8 @@ export function AnnotationCard({
             event.preventDefault();
             const rect = card.current.getBoundingClientRect();
             drag.current = {
-              height: rect.height,
-              width: rect.width,
+              height: rect.height / viewScale,
+              width: rect.width / viewScale,
               x: event.clientX,
               y: event.clientY,
             };
@@ -241,8 +247,8 @@ export function AnnotationCard({
             if (start) {
               setDraft(
                 clamp(
-                  start.width + event.clientX - start.x,
-                  start.height + event.clientY - start.y
+                  start.width + (event.clientX - start.x) / viewScale,
+                  start.height + (event.clientY - start.y) / viewScale
                 )
               );
             }
@@ -255,8 +261,8 @@ export function AnnotationCard({
             }
             drag.current = null;
             const next = clamp(
-              start.width + event.clientX - start.x,
-              start.height + event.clientY - start.y
+              start.width + (event.clientX - start.x) / viewScale,
+              start.height + (event.clientY - start.y) / viewScale
             );
             setDraft(next);
             void persist(next);
