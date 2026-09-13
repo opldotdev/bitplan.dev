@@ -1,4 +1,45 @@
-import { PublicKey } from "@bsv/sdk";
+import { Hash, PublicKey, Utils } from "@bsv/sdk";
+
+export interface SelectedTeam {
+  name: string;
+  recipients: string[];
+}
+const TEAM_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+
+/** Keep only complete, explicitly selected teams; individual removals dissolve the alias. */
+export function selectedTeams(
+  value: unknown,
+  recipients: string[]
+): SelectedTeam[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter(
+      (team): team is SelectedTeam =>
+        !!team &&
+        typeof team.name === "string" &&
+        TEAM_NAME.test(team.name) &&
+        Array.isArray(team.recipients) &&
+        team.recipients.length > 0 &&
+        team.recipients.every(
+          (key: unknown) => typeof key === "string" && recipients.includes(key)
+        )
+    )
+    .map((team) => ({
+      name: team.name,
+      recipients: [...new Set(team.recipients)],
+    }));
+}
+
+/** A compact commitment prevents a stale/different CLI team silently widening access. */
+export function recipientFingerprint(keys: string[]): string {
+  return Utils.toHex(
+    Hash.sha256([
+      ...new TextEncoder().encode([...new Set(keys)].sort().join("\n")),
+    ])
+  );
+}
 
 const COMPRESSED_IDENTITY_KEY = /^(02|03)[0-9a-f]{64}$/i;
 const IDENTITY_KEY_SEPARATOR = /[\s,]+/;

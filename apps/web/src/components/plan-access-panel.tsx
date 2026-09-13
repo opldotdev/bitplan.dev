@@ -1,6 +1,13 @@
 "use client";
 
-import { Copy, FileText, ListX, LockKeyhole } from "lucide-react";
+import {
+  Copy,
+  FileText,
+  ListX,
+  LockKeyhole,
+  Plus,
+  RotateCcw,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PrivateContacts } from "@/components/private-contacts";
@@ -24,22 +31,37 @@ export function PlanAccessPanel({
 }) {
   const sharing = useRevisionSharing();
   const [annotations, setAnnotations] = useState(false);
-  const [keys, setKeys] = useState("");
-  const parsed = parseIdentityKeys(keys);
   if (!sharing) {
     return null;
   }
   const { currentAccess, value, update } = sharing;
+  const defaults = currentAccess.link ? [] : currentAccess.recipients;
+  const selectedRecipients =
+    value.mode === "preserve" ? defaults : value.recipients;
   return (
     <section aria-label="Plan access" className="space-y-3 border-b pb-4">
-      <h3 className="flex items-center gap-2 font-medium text-sm">
-        <LockKeyhole className="size-4" />
-        Current access
-      </h3>
-      {currentAccess.link ? (
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-2 font-medium text-sm">
+          <LockKeyhole className="size-4" />
+          Access
+        </h3>
+        {publisher ? (
+          <Button
+            onClick={sharing.reset}
+            size="sm"
+            title="Restore this document's saved permissions"
+            variant="ghost"
+          >
+            <RotateCcw className="size-3" /> Reset
+          </Button>
+        ) : null}
+      </div>
+      {!publisher && currentAccess.link ? (
         <p className="text-sm">Anyone with the full link</p>
-      ) : (
+      ) : null}
+      {publisher || currentAccess.link ? null : (
         <PrivateContacts
+          currentRecipients={currentAccess.recipients}
           onChange={() => {
             /* Read-only envelope recipients. */
           }}
@@ -117,10 +139,8 @@ export function PlanAccessPanel({
       </div>
       {publisher ? (
         <div className="space-y-3">
-          <label className="text-sm" htmlFor="revision-access">
-            Share next revision
-          </label>
           <select
+            aria-label="Share next revision"
             className="w-full rounded-lg border bg-background p-2 text-sm"
             id="revision-access"
             onChange={(event) => {
@@ -130,22 +150,31 @@ export function PlanAccessPanel({
                 mode === "link" ||
                 mode === "private"
               ) {
-                update({ ...value, mode });
+                update({
+                  ...value,
+                  mode,
+                  recipients:
+                    value.mode === "preserve" && mode === "private"
+                      ? defaults
+                      : value.recipients,
+                });
               }
             }}
             value={value.mode}
           >
-            <option value="preserve">Keep current access</option>
+            <option value="preserve">
+              {currentAccess.link
+                ? "Anyone with the full link · current"
+                : `Private · ${currentAccess.recipients.length} identities · current`}
+            </option>
             <option value="link">Anyone with link</option>
             <option value="private">Private copy</option>
           </select>
-          {value.mode === "private" ? (
+          {value.mode === "private" ||
+          (value.mode === "preserve" && !currentAccess.link) ? (
             <>
               <div className="flex items-center justify-between text-xs">
-                <span>
-                  {value.recipients.length} selected · publishing wallet
-                  included
-                </span>
+                <span>{selectedRecipients.length} selected</span>
                 <Button
                   aria-label="Clear selection"
                   onClick={() => update({ mode: "private", recipients: [] })}
@@ -156,45 +185,73 @@ export function PlanAccessPanel({
                 </Button>
               </div>
               <PrivateContacts
-                onChange={(recipients) =>
-                  update({ mode: "private", recipients })
+                actions={
+                  <AddRecipient
+                    onAdd={(added) =>
+                      update({
+                        ...value,
+                        mode: "private",
+                        recipients: [
+                          ...new Set([...selectedRecipients, ...added]),
+                        ],
+                      })
+                    }
+                  />
                 }
-                selected={value.recipients}
+                currentRecipients={defaults}
+                onChange={(recipients, teams) =>
+                  update({ mode: "private", recipients, teams })
+                }
+                selected={selectedRecipients}
+                teams={value.teams}
               />
-              <details>
-                <summary className="cursor-pointer text-xs">
-                  Add public key
-                </summary>
-                <textarea
-                  aria-label="Recipient public keys"
-                  className="mt-2 w-full rounded-lg border p-2 font-mono text-xs"
-                  onChange={(event) => setKeys(event.target.value)}
-                  value={keys}
-                />
-                <Button
-                  disabled={!parsed.valid.length || !!parsed.invalid.length}
-                  onClick={() => {
-                    update({
-                      mode: "private",
-                      recipients: [
-                        ...new Set([...value.recipients, ...parsed.valid]),
-                      ],
-                    });
-                    setKeys("");
-                  }}
-                  size="sm"
-                  variant="outline"
-                >
-                  Add
-                </Button>
-              </details>
             </>
           ) : null}
           <p className="text-muted-foreground text-xs">
-            Applied when the next version or copy is created.
+            {value.mode === "private"
+              ? "Creates a private copy. Existing access is unchanged."
+              : "Saved access is kept unless you change it."}
           </p>
         </div>
       ) : null}
     </section>
+  );
+}
+
+function AddRecipient({ onAdd }: { onAdd: (keys: string[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [keys, setKeys] = useState("");
+  const parsed = parseIdentityKeys(keys);
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger asChild>
+        <Button aria-label="Add public key" size="icon-sm" variant="outline">
+          <Plus />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="space-y-3 p-3">
+        <label className="text-sm" htmlFor="extra-recipient-keys">
+          Public identity key
+        </label>
+        <textarea
+          aria-label="Recipient public keys"
+          className="w-full rounded-lg border p-2 font-mono text-xs"
+          id="extra-recipient-keys"
+          onChange={(event) => setKeys(event.target.value)}
+          value={keys}
+        />
+        <Button
+          disabled={!parsed.valid.length || !!parsed.invalid.length}
+          onClick={() => {
+            onAdd(parsed.valid);
+            setKeys("");
+            setOpen(false);
+          }}
+          size="sm"
+        >
+          Add
+        </Button>
+      </PopoverContent>
+    </Popover>
   );
 }

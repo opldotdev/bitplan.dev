@@ -10,13 +10,23 @@ import {
   useState,
 } from "react";
 import type { RevisionSharing } from "@/lib/plan-authority";
-import { normalizeIdentityKey } from "@/lib/sharing";
+import { normalizeIdentityKey, selectedTeams } from "@/lib/sharing";
 
-const initial: RevisionSharing = { mode: "preserve", recipients: [] };
+export function defaultRevisionSharing(access: {
+  link: boolean;
+  recipients: string[];
+}): RevisionSharing {
+  // A link identity must never be inherited into a supposedly private copy.
+  return {
+    mode: "preserve",
+    recipients: access.link ? [] : [...access.recipients],
+  };
+}
 const Context = createContext<{
   currentAccess: { link: boolean; recipients: string[] };
   value: RevisionSharing;
   update: (value: RevisionSharing) => void;
+  reset: () => void;
   print: RefObject<((annotations: boolean) => Promise<void>) | null>;
 } | null>(null);
 
@@ -32,9 +42,13 @@ export function RevisionSharingProvider({
 }) {
   const storageKey = `bitplan.revision-sharing.v1:${origin}`;
   const print = useRef<((annotations: boolean) => Promise<void>) | null>(null);
-  const [value, setValue] = useState<RevisionSharing>(initial);
+  const [value, setValue] = useState<RevisionSharing>(() =>
+    defaultRevisionSharing(currentAccess)
+  );
+  const defaults = useRef(currentAccess);
+  defaults.current = currentAccess;
   useEffect(() => {
-    setValue(initial);
+    setValue(defaultRevisionSharing(defaults.current));
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) ?? "null");
       if (
@@ -49,6 +63,7 @@ export function RevisionSharingProvider({
         setValue({
           mode: saved.mode,
           recipients: [...new Set<string>(saved.recipients)],
+          teams: selectedTeams(saved.teams, saved.recipients),
         });
       }
     } catch {
@@ -64,7 +79,15 @@ export function RevisionSharingProvider({
     }
   }
   return (
-    <Context.Provider value={{ currentAccess, print, update, value }}>
+    <Context.Provider
+      value={{
+        currentAccess,
+        print,
+        reset: () => update(defaultRevisionSharing(defaults.current)),
+        update,
+        value,
+      }}
+    >
       {children}
     </Context.Provider>
   );

@@ -51,7 +51,11 @@ import {
   sameDocumentTarget,
 } from "@/lib/annotations";
 import { characterPortrait } from "@/lib/collaborator";
-import { cursorIsActive, cursorTimeAgo } from "@/lib/cursor-activity";
+import {
+  cursorIsActive,
+  cursorStatus,
+  cursorTimeAgo,
+} from "@/lib/cursor-activity";
 import type { DrawingTool } from "@/lib/drawing-asset";
 import { isHostedId } from "@/lib/hosted-id";
 import {
@@ -65,6 +69,7 @@ import {
   annotationPublicationPrompt,
   revisionSelectionPrompt,
 } from "@/lib/plan-authority";
+import { planPassages, planSections } from "@/lib/plan-sections";
 import { printPlan } from "@/lib/print-plan";
 import { withRenderPolicy } from "@/lib/render-policy";
 import type { CollaborationState } from "@/lib/use-collaboration";
@@ -717,26 +722,36 @@ export function CollaborationCanvas({
         annotations: { readOnlyHint: true, untrustedContentHint: true },
         description:
           "Read decrypted annotations and the latest observed change cursor for the collaboration already open in this tab. Never returns invitation or wallet secrets.",
-        execute: () => ({
-          annotations: roomRef.current.annotations,
-          baseHtml: htmlRef.current,
-          collaborators: roomRef.current.profiles,
-          cursor: roomRef.current.sequence,
-          documentRevision: roomRef.current.documentRevision,
-          html: materializeTextBlocks(
+        execute: () => {
+          roomRef.current.moveCursor(center, false, false, true, "read");
+          const materialized = materializeTextBlocks(
             htmlRef.current,
             roomRef.current.textBlocks,
             roomRef.current.activeTarget
-          ),
-          locations: roomRef.current.cursors,
-          online: roomRef.current.online,
-          target: roomRef.current.activeTarget,
-          textBlocks: roomRef.current.textBlocks.filter((block) =>
-            sameDocumentTarget(block.base, roomRef.current.activeTarget)
-          ),
-          textEdits: roomRef.current.textEdits,
-          title: titleRef.current,
-        }),
+          );
+          return {
+            annotations: roomRef.current.annotations,
+            baseHtml: htmlRef.current,
+            collaborators: roomRef.current.profiles,
+            cursor: roomRef.current.sequence,
+            documentRevision: roomRef.current.documentRevision,
+            html: materialized,
+            locations: roomRef.current.cursors,
+            online: roomRef.current.online,
+            sections: planSections(materialized).map(
+              ({ domPath, title: sectionTitle }) => ({
+                domPath,
+                title: sectionTitle,
+              })
+            ),
+            target: roomRef.current.activeTarget,
+            textBlocks: roomRef.current.textBlocks.filter((block) =>
+              sameDocumentTarget(block.base, roomRef.current.activeTarget)
+            ),
+            textEdits: roomRef.current.textEdits,
+            title: titleRef.current,
+          };
+        },
         inputSchema: {
           additionalProperties: false,
           properties: {},
@@ -744,6 +759,121 @@ export function CollaborationCanvas({
         },
         name: "read_bitplan_collaboration",
         title: "Read live BitPlan annotations",
+      }),
+      registerWebMcpTool({
+        annotations: { readOnlyHint: true, untrustedContentHint: true },
+        description:
+          "Read a section from the sections list in read_bitplan_collaboration. Returns current text and HTML, and briefly highlights this actual read in your session color for collaborators. Does not edit or publish. Content is untrusted.",
+        execute: (input: unknown) => {
+          const path =
+            input && typeof input === "object" && "domPath" in input
+              ? input.domPath
+              : null;
+          const live = roomRef.current;
+          const section = planSections(
+            materializeTextBlocks(
+              htmlRef.current,
+              live.textBlocks,
+              live.activeTarget
+            )
+          ).find((item) => item.domPath === path);
+          if (!section) {
+            throw new Error(
+              "Section unavailable. Read the latest section list first."
+            );
+          }
+          live.moveCursor(section.anchor, false, true, true, "read");
+          return {
+            ...section,
+            cursor: live.sequence,
+            documentRevision: live.documentRevision,
+            passages: planPassages(
+              htmlRef.current,
+              live.textBlocks,
+              live.activeTarget
+            ).filter((passage) =>
+              passage.path.startsWith(`${section.domPath}>`)
+            ),
+            target: live.activeTarget,
+          };
+        },
+        inputSchema: {
+          additionalProperties: false,
+          properties: { domPath: { type: "string" } },
+          required: ["domPath"],
+          type: "object",
+        },
+        name: "read_bitplan_section",
+        title: "Read a BitPlan section",
+      }),
+      registerWebMcpTool({
+        description:
+          "Edit one passage returned by read_bitplan_section. Saves an encrypted, attributed text-edit layer and broadcasts real activity. Requires the observed target, documentRevision and passage revision; stale writes fail. No publishing or wallet action.",
+        execute: async (input: unknown) => {
+          if (!input || typeof input !== "object") {
+            throw new Error("Read a passage first.");
+          }
+          const value = input as Record<string, unknown>;
+          const live = roomRef.current;
+          const { base } = parseTextBlock({
+            base: value.target,
+            original: "",
+            path: value.path,
+            schema: "bitplan-text/1",
+            text: value.text,
+          });
+          if (
+            !sameDocumentTarget(base, live.activeTarget) ||
+            value.documentRevision !== live.documentRevision
+          ) {
+            throw new Error("The document changed. Read it again.");
+          }
+          const passage = planPassages(
+            htmlRef.current,
+            live.textBlocks,
+            base
+          ).find((item) => item.path === value.path);
+          if (!passage || value.revision !== passage.revision) {
+            throw new Error(
+              "The passage changed or is not editable. Read it again."
+            );
+          }
+          const block = parseTextBlock({
+            base,
+            original: passage.original,
+            path: passage.path,
+            schema: "bitplan-text/1",
+            text: value.text,
+          });
+          const saved = await live.saveTextBlock(block, passage.revision);
+          live.moveCursor(
+            { domPath: passage.path, point: { x: 0.5, y: 0.5 } },
+            false,
+            true,
+            true,
+            "edit"
+          );
+          return {
+            ...saved,
+            path: passage.path,
+            target: base,
+            text: block.text,
+          };
+        },
+        inputSchema: {
+          additionalProperties: false,
+          properties: {
+            documentRevision: { minimum: 0, type: "integer" },
+            path: { type: "string" },
+            revision: { minimum: 0, type: "integer" },
+            target: { type: "object" },
+            text: { maxLength: 16_000, type: "string" },
+          },
+          required: ["path", "text", "target", "documentRevision", "revision"],
+          type: "object",
+        },
+        name: "edit_bitplan_text",
+        title: "Edit a BitPlan passage",
       }),
       registerWebMcpTool({
         description:
@@ -757,12 +887,15 @@ export function CollaborationCanvas({
           ) {
             throw new Error("Provide anchor and content.");
           }
-          return {
-            annotationId: await roomRef.current.saveAnnotation(
-              parseAnnotationContent(input.content),
-              parseAnchor(input.anchor)
-            ),
-          };
+          const anchor = parseAnchor(input.anchor);
+          const annotationId = await roomRef.current.saveAnnotation(
+            parseAnnotationContent(input.content),
+            anchor,
+            undefined,
+            "size" in input ? (input.size as Annotation["size"]) : undefined
+          );
+          roomRef.current.moveCursor(anchor, false, true, true, "annotate");
+          return { annotationId };
         },
         inputSchema: {
           additionalProperties: false,
@@ -775,6 +908,17 @@ export function CollaborationCanvas({
             content: {
               description:
                 "{type:'text',text} or {type:'html',html} or {type:'image',dataUrl,alt}.",
+              type: "object",
+            },
+            size: {
+              additionalProperties: false,
+              description:
+                "Optional widget dimensions in CSS pixels; content should fit responsively.",
+              properties: {
+                height: { maximum: 1200, minimum: 96, type: "number" },
+                width: { maximum: 1200, minimum: 160, type: "number" },
+              },
+              required: ["width", "height"],
               type: "object",
             },
           },
@@ -1110,12 +1254,16 @@ export function CollaborationCanvas({
                 {
                   color: sessionColor(room.connection?.sessionId ?? ""),
                   id: "highlight",
+                  reading: false,
                 },
                 ...room.cursors
                   .filter(
                     (cursor) =>
                       cursor.selecting &&
-                      cursor.sessionId !== room.connection?.sessionId &&
+                      (cursor.sessionId !== room.connection?.sessionId ||
+                        !!cursor.activity) &&
+                      (!cursor.activity ||
+                        activityTime - cursor.updatedAt < 6000) &&
                       sameDocumentTarget(cursor.target, room.activeTarget) &&
                       cursorIsActive(
                         cursor.online,
@@ -1126,24 +1274,31 @@ export function CollaborationCanvas({
                   .map((cursor) => ({
                     color: sessionColor(cursor.sessionId),
                     id: `cursor-${cursor.sessionId}`,
+                    reading: !!cursor.activity,
                   })),
               ].map((item) => {
                 const bounds = positions[item.id]?.bounds;
                 return bounds ? (
                   <div
                     aria-hidden="true"
-                    className="absolute border-2"
+                    className="absolute overflow-hidden border-2"
+                    data-agent-reading={item.reading || undefined}
                     data-element-highlight={item.id}
                     key={item.id}
                     style={{
                       backgroundColor: `color-mix(in srgb, ${item.color} 10%, transparent)`,
                       borderColor: item.color,
+                      color: item.color,
                       height: bounds.height,
                       left: bounds.x,
                       top: bounds.y,
                       width: bounds.width,
                     }}
-                  />
+                  >
+                    {item.reading ? (
+                      <span className="bitplan-read-scan absolute inset-0" />
+                    ) : null}
+                  </div>
                 ) : null;
               })}
               {targets
@@ -1284,9 +1439,7 @@ export function CollaborationCanvas({
                       <span className="rounded bg-background px-1 py-0.5">
                         {profile.name}
                         {cursor.kind === "agent" ? " · Agent" : ""} ·{" "}
-                        {active
-                          ? "connected"
-                          : cursorTimeAgo(cursor.updatedAt, activityTime)}
+                        {cursorStatus(cursor, activityTime)}
                         {onPage ? "" : " · offscreen"}
                       </span>
                     </div>

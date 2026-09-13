@@ -8,6 +8,27 @@ export function cursorIsActive(
 }
 
 /** Age of the last cursor activity, using the viewer's existing refresh clock. */
+export function cursorStatus(
+  cursor: {
+    activity?: "read" | "edit" | "annotate";
+    online: boolean;
+    updatedAt: number;
+  },
+  now: number
+): string {
+  if (cursor.activity && cursor.online && now - cursor.updatedAt < 6000) {
+    return {
+      annotate: "Agent annotation",
+      edit: "Agent edit",
+      read: "Agent read",
+    }[cursor.activity];
+  }
+  return cursorIsActive(cursor.online, cursor.updatedAt, now)
+    ? "connected"
+    : cursorTimeAgo(cursor.updatedAt, now);
+}
+
+/** Age of the last cursor activity, using the viewer's existing refresh clock. */
 export function cursorTimeAgo(updatedAt: number, now: number): string {
   if (!Number.isFinite(updatedAt) || updatedAt <= 0) {
     return "Time unavailable";

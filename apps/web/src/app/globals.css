@@ -219,6 +219,31 @@
 .decipher-text[data-pending="true"] .decipher-glyph::after {
   animation: bitplan-scramble 720ms steps(1) var(--scramble-delay) infinite;
 }
+.bitplan-read-scan {
+  background: linear-gradient(
+    110deg,
+    transparent 30%,
+    currentColor 50%,
+    transparent 70%
+  );
+  opacity: 0.15;
+  animation: bitplan-read-scan 1.5s ease-in-out 4;
+}
+@keyframes bitplan-read-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bitplan-read-scan {
+    background: currentColor;
+    opacity: 0.08;
+    animation: none;
+  }
+}
 @keyframes bitplan-scramble {
   0%,
   100% {

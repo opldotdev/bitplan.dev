@@ -1,7 +1,14 @@
 "use client";
 
 import { ChevronDown, LockKeyhole } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { CommandCopy } from "@/components/command-copy";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { type SelectedTeam, selectedTeams } from "@/lib/sharing";
 import {
   connectBrowserWallet,
   getConnectedWalletClient,
@@ -26,10 +34,16 @@ import {
 export function PrivateContacts({
   selected,
   onChange,
+  teams = [],
+  currentRecipients = [],
+  actions,
   readOnly = false,
 }: {
   selected: string[];
-  onChange: (keys: string[]) => void;
+  onChange: (keys: string[], teams?: SelectedTeam[]) => void;
+  teams?: SelectedTeam[];
+  currentRecipients?: string[];
+  actions?: ReactNode;
   readOnly?: boolean;
 }) {
   const [book, setBook] = useState<PrivateAddressBook | null>(null);
@@ -107,12 +121,18 @@ export function PrivateContacts({
     }
   }
 
-  function toggle(keys: string[], checked: boolean) {
-    onChange(
-      checked
-        ? [...new Set([...selected, ...keys])]
-        : selected.filter((key) => !keys.includes(key))
-    );
+  function toggle(keys: string[], checked: boolean, name?: string) {
+    const recipients = checked
+      ? [...new Set([...selected, ...keys])]
+      : selected.filter((key) => !keys.includes(key));
+    const nextTeams =
+      name && checked
+        ? [
+            ...teams.filter((team) => team.name !== name),
+            { name, recipients: keys },
+          ]
+        : teams;
+    onChange(recipients, selectedTeams(nextTeams, recipients));
   }
 
   if (readOnly) {
@@ -179,7 +199,7 @@ export function PrivateContacts({
           </p>
         </div>
       ) : null}
-      {book ? (
+      {book || selected.length || currentRecipients.length || actions ? (
         <>
           <div className="flex items-center gap-2">
             <Input
@@ -192,14 +212,19 @@ export function PrivateContacts({
             <Popover>
               <PopoverTrigger asChild>
                 <Button size="sm" variant="outline">
-                  Teams <ChevronDown className="size-3" />
+                  {teams.length
+                    ? teams.map((team) => team.name).join(", ")
+                    : "Teams"}{" "}
+                  <ChevronDown className="size-3" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-52 gap-1 p-1">
-                {Object.entries(book.teams)
+                {Object.entries(book?.teams ?? {})
                   .filter(([name]) => name.includes(query.toLowerCase()))
                   .map(([name, members]) => {
-                    const keys = members.map((member) => book.contacts[member]);
+                    const keys = members.flatMap((member) =>
+                      book?.contacts[member] ? [book.contacts[member]] : []
+                    );
                     const checked =
                       keys.length > 0 &&
                       keys.every((key) => selected.includes(key));
@@ -208,7 +233,7 @@ export function PrivateContacts({
                         aria-pressed={checked}
                         disabled={!keys.length}
                         key={name}
-                        onClick={() => toggle(keys, !checked)}
+                        onClick={() => toggle(keys, !checked, name)}
                         size="sm"
                         variant={checked ? "secondary" : "outline"}
                       >
@@ -218,9 +243,25 @@ export function PrivateContacts({
                   })}
               </PopoverContent>
             </Popover>
+            {actions}
           </div>
           <div className="max-h-56 overflow-y-auto overscroll-contain">
-            {Object.entries(book.contacts)
+            {[
+              ...Object.entries(book?.contacts ?? {}),
+              ...[...new Set([...currentRecipients, ...selected])]
+                .filter(
+                  (key) => !Object.values(book?.contacts ?? {}).includes(key)
+                )
+                .map((key): [string, string] => [
+                  `${key.slice(0, 8)}…${key.slice(-6)}`,
+                  key,
+                ]),
+            ]
+              .sort(
+                (a, b) =>
+                  Number(selected.includes(b[1])) -
+                  Number(selected.includes(a[1]))
+              )
               .filter(
                 ([name, key]) =>
                   name.includes(query.toLowerCase()) ||
@@ -254,9 +295,21 @@ export function PrivateContacts({
                       {key.slice(0, 10)}…{key.slice(-6)}
                     </span>
                   </span>
+                  {currentRecipients.includes(key) ? (
+                    <span
+                      aria-label="Has current access"
+                      className="ml-auto text-muted-foreground"
+                      role="img"
+                      title="Can open the current document"
+                    >
+                      <LockKeyhole className="size-3.5" />
+                    </span>
+                  ) : null}
                 </label>
               ))}
-            {Object.keys(book.contacts).length ? null : (
+            {Object.keys(book?.contacts ?? {}).length ||
+            selected.length ||
+            currentRecipients.length ? null : (
               <p className="text-muted-foreground text-sm">
                 Your synced book is empty.
               </p>

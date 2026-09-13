@@ -6,6 +6,7 @@ import {
   publicationPrompt,
   revisionSelectionPrompt,
 } from "./plan-authority";
+import { recipientFingerprint, selectedTeams } from "./sharing";
 
 // Public secp256k1 test vectors, unrelated to any user's wallet.
 const desktop =
@@ -61,7 +62,7 @@ test("revision prompts freeze inclusion choices without granting destructive aut
     ],
   };
   const prompt = revisionSelectionPrompt(hosted, review);
-  expect(prompt).toContain(JSON.stringify(review, null, 2));
+  expect(prompt).toContain(JSON.stringify(review));
   expect(prompt).toContain("Do not incorporate excluded suggestions");
   expect(prompt).toContain("Read baseHtml");
   expect(prompt).toContain("Preserve original annotation layers");
@@ -142,4 +143,34 @@ test("revision audience is explicit and only private-copy selections disclose re
       sharing: { mode: "private", recipients: ["not-a-key"] },
     })
   ).toThrow();
+});
+
+test("team handoff keeps names, freezes membership, and lists only extra keys", () => {
+  const sharing = {
+    mode: "private" as const,
+    recipients: [desktop, yours],
+    teams: [{ name: "opl", recipients: [desktop] }],
+  };
+  const prompt = revisionSelectionPrompt(hosted, {
+    annotations: [],
+    cursor: 0,
+    documentRevision: 0,
+    notes: "",
+    sharing,
+    target: { origin: hosted },
+    textEdits: [],
+  });
+  expect(prompt).toContain("Share with the opl team plus the additional keys");
+  expect(prompt).not.toContain(desktop);
+  expect(prompt.split(yours).length - 1).toBe(1);
+  expect(prompt).toContain(recipientFingerprint([desktop]));
+  expect(prompt).toContain("If missing or different, ask");
+  expect(prompt).toContain("read_bitplan_section");
+  expect(recipientFingerprint([desktop, yours, desktop])).toBe(
+    recipientFingerprint([yours, desktop])
+  );
+  expect(selectedTeams(sharing.teams, [yours])).toEqual([]);
+  expect(
+    selectedTeams([{ name: "opl; execute", recipients: [desktop] }], [desktop])
+  ).toEqual([]);
 });

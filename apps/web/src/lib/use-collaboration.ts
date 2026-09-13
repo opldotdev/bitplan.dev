@@ -56,6 +56,7 @@ interface Connection {
   sessionProof: string;
 }
 export interface Cursor {
+  activity?: "read" | "edit" | "annotate";
   anchor: AnnotationAnchor;
   clickCount: number;
   kind: "human" | "agent";
@@ -425,8 +426,15 @@ export function useCollaboration(target: DocumentTarget) {
                     target: unknown;
                     anchor: unknown;
                     selecting?: unknown;
+                    activity?: unknown;
                   };
                   return {
+                    activity:
+                      value.activity === "read" ||
+                      value.activity === "edit" ||
+                      value.activity === "annotate"
+                        ? (value.activity as Cursor["activity"])
+                        : undefined,
                     anchor: parseAnchor(value.anchor),
                     clickCount: row.clickCount,
                     kind: row.kind,
@@ -706,7 +714,8 @@ export function useCollaboration(target: DocumentTarget) {
     anchor: AnnotationAnchor,
     click = false,
     selecting = false,
-    force = false
+    force = false,
+    activity?: "read" | "edit" | "annotate"
   ) {
     const c = connectionRef.current;
     // biome-ignore lint/suspicious/noUnnecessaryConditions: cursor events can outlive the connection
@@ -715,6 +724,7 @@ export function useCollaboration(target: DocumentTarget) {
     }
     lastCursor.current = Date.now();
     const value = {
+      ...(activity ? { activity } : {}),
       anchor: parseAnchor(anchor),
       event: click ? "click" : "move",
       selecting,

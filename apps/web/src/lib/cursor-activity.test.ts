@@ -1,5 +1,23 @@
 import { expect, test } from "bun:test";
-import { cursorIsActive, cursorTimeAgo } from "./cursor-activity";
+import { cursorIsActive, cursorStatus, cursorTimeAgo } from "./cursor-activity";
+
+test("actual tool activities expire and disconnected sessions do not claim activity", () => {
+  for (const [activity, label] of [
+    ["read", "Agent read"],
+    ["edit", "Agent edit"],
+    ["annotate", "Agent annotation"],
+  ] as const) {
+    expect(
+      cursorStatus({ activity, online: true, updatedAt: 1000 }, 1001)
+    ).toBe(label);
+    expect(
+      cursorStatus({ activity, online: true, updatedAt: 1000 }, 7000)
+    ).toBe("connected");
+    expect(
+      cursorStatus({ activity, online: false, updatedAt: 1000 }, 1001)
+    ).toBe("just now");
+  }
+});
 
 test("idle and disconnected avatars retain their place without a cursor arrow", () => {
   expect(cursorIsActive(true, 1000, 2000)).toBe(true);

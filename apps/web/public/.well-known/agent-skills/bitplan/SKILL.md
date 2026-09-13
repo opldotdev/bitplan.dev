@@ -6,12 +6,12 @@ description: >
   or update a plan, share one with a person or team, create a private reader
   link, move a hosted draft on chain, or explain bitplan.dev.
 metadata:
-  version: "0.2.15"
+  version: "0.2.16"
 ---
 
 # BitPlan
 
-**Skill version: 0.2.15**
+**Skill version: 0.2.16**
 
 BitPlan turns one self-contained HTML file into an encrypted living plan. A
 BRC-100 wallet owns the keys. A draft can stay hosted as ciphertext while it
@@ -66,7 +66,8 @@ currently saved live document edits as a new hosted version, preserves envelope
 recipients, and rejects stale base versions. Notes remain on their original
 version; this action does not checkpoint annotation layers or spend BSV.
 For selective annotation-informed redesign or access changes, use the revision
-prompt and review the result before saving. Never extract browser credentials
+prompt and follow its explicit hosted-save destination; return the saved viewer
+URL and version for review in BitPlan, not a local file. Never extract browser credentials
 to make a CLI update.
 
 ## Check the live product first
@@ -504,14 +505,34 @@ On conflict, reread and reapply only the intended change; never retry stale HTML
 or substitute a CLI fetch that omits live edits and annotations.
 
 The viewer’s “Copy revision prompt” uses only the public plan ID and asks the
-agent to read live layers, reconcile changes, and request review before saving
-or publishing. “Show edits” and “Show annotations” are local comparison controls,
+agent to read live layers and reconcile changes. An explicitly requested hosted
+save proceeds without duplicate approval; signing or spending still requires approval.
+“Show live changes” is a local comparison control,
 not undo operations; hiding edits shows the original loaded version.
 WebMCP tools belong to the trusted outer viewer, not the plan iframe. Discover
 the available API in the running browser; newer Chrome accepts an object in
 `executeTool`, while older experimental builds require JSON-stringified input.
 Browser support is a progressive enhancement, not a prerequisite for reading
 and editing through the UI.
+
+`read_bitplan_collaboration` returns a `sections` list. Use the discovered
+`read_bitplan_section` tool with a listed `domPath` for focused reads. It returns
+materialized section text/HTML, target, cursor and documentRevision. Actual tool
+reads emit encrypted presence: a brief session-colored scan marks the section,
+then expires. A full-document read marks activity without claiming a section
+focus. Raw fetches do not emit reading events. The indicator describes a tool
+read, not proof of attention or a verified agent identity. Keep the session
+clearly labeled; never impersonate another participant.
+
+For a focused edit, use `read_bitplan_section` and choose one of its `passages`.
+Call `edit_bitplan_text` with that passage's `path` and `revision`, the read's
+`target` and `documentRevision`, and replacement `text`. This saves to the
+current participant's encrypted text-edit layer, not a new plan version. Stale
+writes fail: reread rather than overwrite. Successful edits and annotations emit
+brief session-colored activity. They do not simulate typing or prove wallet identity.
+Use `annotate_bitplan` with an anchor and `{type:"html",html:"..."}` for a movable
+HTML design overlay. Keep it self-contained, responsive, and script-free; HTML is
+isolated from the player. Read the layers again to verify the saved contribution.
 
 Hosted drafts enable plain-text editing by default; “Edit text in place” toggles it.
 Editing supports
@@ -766,8 +787,17 @@ before uploading. Never upload the full config or draft store. The website
 receives ciphertext, not readable names or membership; the connected matching
 wallet decrypts the book privately in the Share dialog. Different wallet
 identities have separate books. No contact data belongs in plan HTML, live-room
-profiles, annotations, or agent prompts. Only explicitly selected public keys
-enter the sharing handoff. Contacts use initials, not guessed roster portraits
+profiles or annotations. Only selected teams and extra public keys enter the
+sharing handoff, never the full book. Team prompts keep the name, member count,
+and a membership fingerprint rather than enumerating its keys. Resolve with
+`bitplan team list <name> --json`; compare SHA-256 of sorted unique lowercase
+identity keys joined by newline, with no trailing newline. If the team is absent
+or differs, ask for reconciliation; do not silently grant a different audience.
+Repeat `--share-with` to combine verified teams and additional keys.
+The Publish panel uses one contact list: a lock marks existing document access;
+selection controls the next copy. Reset restores the envelope recipients and
+preserve mode. Current readers remain able to open older copies.
+Contacts use initials, not guessed roster portraits
 or verified-presence claims. Syncing or selecting recipients does not change
 plan access. Direct private-live-copy creation remains an agent handoff until
 wallet-restricted room access is implemented.
