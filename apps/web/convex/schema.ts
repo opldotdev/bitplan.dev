@@ -1,7 +1,11 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-export const itemKind = v.union(v.literal("annotation"), v.literal("document"));
+export const itemKind = v.union(
+  v.literal("annotation"),
+  v.literal("document"),
+  v.literal("text-block")
+);
 export default defineSchema({
   changes: defineTable({
     ciphertext: v.string(),
@@ -40,6 +44,7 @@ export default defineSchema({
   rooms: defineTable({
     authHash: v.string(),
     contributorCount: v.number(),
+    hasTextBlocks: v.optional(v.boolean()),
     itemCount: v.number(),
     metadataCipher: v.string(),
     participantCount: v.number(),

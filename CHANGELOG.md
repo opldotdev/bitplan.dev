@@ -4,6 +4,12 @@
 
 ### Added
 
+- Hosted inline text editing with encrypted per-passage updates, conflict
+  recovery, and reload persistence. This edits text leaves, not arbitrary rich text.
+- Inline annotation replies and room-profile mentions, plus curated stickers
+  and pending image-generation requests for an agent to fulfill.
+- A Decision starter alongside refreshed Brief, Terminal, and Blank templates.
+
 - Package the canonical BitPlan skill as a Claude Code, Codex, and Grok plugin
   so external catalogs can install it without copying the skill.
 - Wire Lisa’s accepted BitPlan emblem into the Codex plugin as `composerIcon`
@@ -11,6 +17,13 @@
 
 ### Changed
 
+- Decrypted plans start collaboration automatically after loading a character.
+  Existing invitations are preserved; failed connections can be retried.
+- Publishing options distinguish hosted encryption senders from wallets holding
+  the latest ordinal and copy a public-plan-ID-only agent handoff.
+- Starter actions say “Start with {plan name}”; templates lead with project
+  questions and a public-ID-only agent prompt. Live collaboration reads include
+  materialized text edits; whole-document writes require the observed cursor.
 - Document the wallet selection contract: prefer an existing BRC-100 wallet
   and do not present the current 1Sat wallet-storage server as a compatible
   BitPlan fallback.

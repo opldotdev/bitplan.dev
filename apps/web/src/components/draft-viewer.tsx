@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { CharacterChooser } from "@/components/character-chooser";
 import { CollaborationCanvas } from "@/components/collaboration-canvas";
 import { HostedShareDialog } from "@/components/hosted-share-dialog";
+import { InlinePlanTitle } from "@/components/inline-plan-title";
+import { PlanPublishing } from "@/components/plan-publishing";
 import { ShareDraftDialog } from "@/components/share-draft-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -33,9 +35,16 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { sameDocumentTarget } from "@/lib/annotations";
+import { collaborationFragment } from "@/lib/collaboration-crypto";
+import type { CollaboratorProfile } from "@/lib/collaborator";
 import { type DraftsWallet, walletOwnsDraft } from "@/lib/drafts";
 import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
-import { EnvelopeAccessError, openEnvelope } from "@/lib/envelope";
+import {
+  EnvelopeAccessError,
+  openEnvelope,
+  parseEnvelope,
+} from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
 import { isHostedId } from "@/lib/hosted-id";
 import {
@@ -568,13 +577,16 @@ export function DraftViewer() {
       <DecryptedView
         canPublish={view.canPublish}
         currentVersion={view.draft.currentVersion}
+        latestOutpoint={view.draft.latestOutpoint}
         latestVersion={view.draft.latestVersion}
         onVersion={handleVersion}
         openedWithLink={view.openedWithLink}
         origin={view.draft.origin}
         outpoint={view.draft.content.outpoint}
         plaintext={view.plaintext}
-        startCollaboration={searchParams.get("collaborate") === "1"}
+        senderIdentityKey={
+          parseEnvelope(view.draft.content.bytes).header.key.senderIdentityKey
+        }
       />
     );
   }
@@ -799,22 +811,24 @@ function DecryptedView({
   plaintext,
   currentVersion,
   latestVersion,
+  latestOutpoint,
+  senderIdentityKey,
   onVersion,
   origin,
   outpoint,
-  startCollaboration,
 }: {
   canPublish: boolean;
   openedWithLink?: boolean;
   plaintext: DraftPlaintext;
   currentVersion: number;
   latestVersion: number;
+  latestOutpoint: string | null;
+  senderIdentityKey: string;
   onVersion: (version: number) => void;
   origin: string;
   outpoint: string | null;
-  startCollaboration: boolean;
 }) {
-  const { title } = plaintext.meta;
+  const baseTitle = plaintext.meta.title;
   const target = {
     origin,
     sha256: plaintext.meta.fileSha256,
@@ -822,17 +836,48 @@ function DecryptedView({
     ...(!isHostedId(origin) && outpoint ? { outpoint } : {}),
   };
   const collaboration = useCollaboration(target);
+  const liveDraft =
+    collaboration.documentDraft &&
+    sameDocumentTarget(collaboration.documentDraft.base, target)
+      ? collaboration.documentDraft
+      : null;
+  const title = liveDraft?.title ?? baseTitle ?? "Untitled plan";
   const startRoom = useRef(collaboration.start);
   startRoom.current = collaboration.start;
+  const [profile, setProfile] = useState<CollaboratorProfile | null>(null);
+  const autoStarted = useRef(false);
 
   useEffect(() => {
-    if (
-      !(startCollaboration && isHostedId(origin) && collaboration.configured)
-    ) {
+    if (profile && collaboration.connection) {
+      void collaboration.updateProfile(profile);
+    }
+  }, [profile, collaboration.connection, collaboration.updateProfile]);
+
+  useEffect(() => {
+    if (!(profile && collaboration.configured)) {
       return;
     }
+    let hasInvitation = false;
+    try {
+      hasInvitation = collaborationFragment(window.location.hash) !== null;
+    } catch {
+      hasInvitation = true;
+    }
+    if (hasInvitation || collaboration.connection || collaboration.connecting) {
+      return;
+    }
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: this ref persists across effect runs
+    if (autoStarted.current) {
+      return;
+    }
+    autoStarted.current = true;
     void startRoom.current();
-  }, [collaboration.configured, origin, startCollaboration]);
+  }, [
+    collaboration.configured,
+    collaboration.connection,
+    collaboration.connecting,
+    profile,
+  ]);
 
   useEffect(() => {
     const genericTitle = document.title;
@@ -852,60 +897,101 @@ function DecryptedView({
           latestVersion={latestVersion}
           onVersion={onVersion}
         />
-        {title ? (
-          <p className="min-w-0 flex-1 truncate text-muted-foreground text-sm">
-            {title}
-            {collaboration.contributorCount > 1 ? (
-              <span
-                className="ml-2 text-xs"
-                title="Multiple people have contributed to this plan"
-              >
-                · Collaborative
-              </span>
-            ) : null}
-          </p>
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex min-w-0 flex-1 items-center text-muted-foreground text-sm">
+          <InlinePlanTitle
+            key={`${origin}:${currentVersion}`}
+            onSave={
+              isHostedId(origin) && collaboration.online
+                ? (nextTitle) =>
+                    collaboration.saveDocument(
+                      undefined,
+                      collaboration.documentRevision,
+                      nextTitle
+                    )
+                : undefined
+            }
+            title={title}
+          />
+          {collaboration.contributorCount > 1 ? (
+            <span
+              className="ml-2 text-xs"
+              title="Multiple people have contributed to this plan"
+            >
+              · Collaborative
+            </span>
+          ) : null}
+        </div>
         <div className="ml-auto flex items-center gap-1">
+          <PlanPublishing
+            latestOutpoint={latestOutpoint}
+            origin={origin}
+            senderIdentityKey={senderIdentityKey}
+          />
           <DecryptedShare
             canPublish={canPublish}
             collaboration={collaboration}
             openedWithLink={openedWithLink}
             origin={origin}
           />
-          <MetaInfo meta={plaintext.meta} />
-          <CharacterChooser onChange={collaboration.updateProfile}>
+          <MetaInfo
+            meta={plaintext.meta}
+            openedWithLink={openedWithLink}
+            origin={origin}
+          />
+          <CharacterChooser onChange={setProfile}>
             <div className="border-t pt-2">
               {collaboration.connection ? (
                 <p className="text-muted-foreground text-xs" role="status">
                   {collaboration.online
-                    ? "Connected · encrypted collaboration"
+                    ? "Connected · invitation-encrypted collaboration"
                     : "Reconnecting..."}
                 </p>
-              ) : (
-                <Button
-                  className="w-full"
-                  disabled={
-                    !collaboration.configured || collaboration.connecting
-                  }
-                  onClick={() => void collaboration.start()}
-                  size="sm"
-                  variant="outline"
-                >
-                  {collaboration.connecting
-                    ? "Connecting…"
-                    : "Start collaboration"}
-                </Button>
-              )}
+              ) : null}
+              {!collaboration.connection && collaboration.connecting ? (
+                <p className="text-muted-foreground text-xs" role="status">
+                  Connecting…
+                </p>
+              ) : null}
+              {collaboration.connection ? (
+                <p className="mt-2 text-muted-foreground text-xs">
+                  Notes are attributed to this browser profile, not a verified
+                  wallet identity. Connecting a wallet does not change who can
+                  read this room.
+                </p>
+              ) : null}
               {collaboration.error ? (
                 <p className="mt-2 text-destructive text-xs" role="alert">
                   {collaboration.error}
                 </p>
               ) : null}
+              {collaboration.error && !collaboration.connection ? (
+                <Button
+                  className="mt-2 w-full"
+                  disabled={collaboration.connecting}
+                  onClick={() => void collaboration.start()}
+                  size="sm"
+                  variant="outline"
+                >
+                  Retry connection
+                </Button>
+              ) : null}
             </div>
           </CharacterChooser>
-          <ThemeToggle templates />
+          <ThemeToggle
+            onTemplateRequest={
+              collaboration.online
+                ? (preset) =>
+                    collaboration.saveAnnotation(
+                      {
+                        text: `Template change request: ${preset.name}. Use https://bitplan.dev/templates/${preset.layout}.html as the content and design starting point, not just a global CSS change. Read this plan and its annotations before revising. ${preset.layout === "blank" ? "I want a clear page; confirm before replacing existing content." : "Preserve the plan's useful content and decisions while adapting its composition."} Keep existing annotation records attached to their original version. Do not publish on chain without approval.`,
+                        type: "text",
+                      },
+                      { point: { x: 0.5, y: 0.1 } }
+                    )
+                : undefined
+            }
+            templates
+          />
         </div>
       </header>
       <CollaborationCanvas
@@ -1016,8 +1102,24 @@ function OriginCopy({ origin }: { origin: string }) {
   );
 }
 
-function MetaInfo({ meta }: { meta: DraftMeta }) {
-  const rows = metaRows(meta);
+function MetaInfo({
+  meta,
+  openedWithLink,
+  origin,
+}: {
+  meta: DraftMeta;
+  openedWithLink?: boolean;
+  origin: string;
+}) {
+  const openedWith = openedWithLink ? "Private reader link" : "Wallet";
+  const storage = isHostedId(origin)
+    ? "Hosted ciphertext"
+    : "On-chain ciphertext · permanent";
+  const rows = [
+    { label: "Opened with", value: openedWith },
+    { label: "Storage", value: storage },
+    ...metaRows(meta),
+  ];
   if (rows.length === 0) {
     return null;
   }
@@ -1028,6 +1130,7 @@ function MetaInfo({ meta }: { meta: DraftMeta }) {
         <Button
           aria-label="Draft info"
           size="icon"
+          title={`${openedWith} · ${storage}`}
           type="button"
           variant="ghost"
         >
@@ -1036,8 +1139,11 @@ function MetaInfo({ meta }: { meta: DraftMeta }) {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
         <PopoverHeader>
-          <PopoverTitle>Draft info</PopoverTitle>
-          <PopoverDescription>From the decrypted envelope.</PopoverDescription>
+          <PopoverTitle>Access &amp; draft info</PopoverTitle>
+          <PopoverDescription>
+            How you opened this version, not its complete reader list.
+            Connecting a wallet does not revoke links or change recipients.
+          </PopoverDescription>
         </PopoverHeader>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
           {rows.map((row) => (

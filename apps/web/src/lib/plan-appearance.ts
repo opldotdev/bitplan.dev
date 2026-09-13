@@ -1,6 +1,6 @@
 export interface PlanAppearance {
   dark: { paper: string; ink: string; muted: string; accent: string };
-  layout: "brief" | "terminal" | "blank";
+  layout: "brief" | "terminal" | "decision" | "blank";
   light: { paper: string; ink: string; muted: string; accent: string };
   name: string;
 }
@@ -43,6 +43,22 @@ export const PLAN_APPEARANCES: PlanAppearance[] = [
   },
   {
     dark: {
+      accent: "#91aee8",
+      ink: "#eef1f7",
+      muted: "#aeb9ca",
+      paper: "#11151c",
+    },
+    layout: "decision",
+    light: {
+      accent: "#345cb4",
+      ink: "#171e2b",
+      muted: "#586477",
+      paper: "#fafbfe",
+    },
+    name: "Decision",
+  },
+  {
+    dark: {
       accent: "#c5cec7",
       ink: "#f0f0e9",
       muted: "#adb5af",
@@ -68,10 +84,10 @@ export function parsePlanAppearance(value: unknown): PlanAppearance {
   if (
     typeof input.name !== "string" ||
     !APPEARANCE_NAME.test(input.name) ||
-    !["brief", "terminal", "blank"].includes(String(input.layout))
+    !["brief", "terminal", "decision", "blank"].includes(String(input.layout))
   ) {
     throw new Error(
-      "A preset needs a name and a brief, terminal, or blank layout."
+      "A preset needs a name and a brief, terminal, decision, or blank layout."
     );
   }
   const palette = (rawPalette: unknown) => {
@@ -130,6 +146,12 @@ function ditherArt(ink: string) {
 /** View-only CSS: never changes source text, IDs, media, or annotation targets. */
 export function planAppearanceCss(raw: PlanAppearance): string {
   const preset = parsePlanAppearance(raw);
+  const font = {
+    blank: "system-ui,sans-serif",
+    brief: "Georgia,serif",
+    decision: "system-ui,sans-serif",
+    terminal: "ui-monospace,monospace",
+  }[preset.layout];
   const tokens = (p: PlanAppearance["light"]) =>
     `--bp-paper:${p.paper};--bp-ink:${p.ink};--bp-muted:${p.muted};--bp-accent:${p.accent};--bp-art:${preset.layout === "terminal" ? ditherArt(p.ink) : "none"};`;
   if (preset.layout === "blank") {
@@ -145,7 +167,7 @@ export function planAppearanceCss(raw: PlanAppearance): string {
   return `:root{${tokens(preset.light)}}@media(prefers-color-scheme:dark){:root{${tokens(preset.dark)}}}
   :root{--paper:var(--bp-paper)!important;--ink:var(--bp-ink)!important;--muted:var(--bp-muted)!important;--accent:var(--bp-accent)!important;--line:color-mix(in srgb,var(--bp-ink) 23%,transparent)!important;--surface:color-mix(in srgb,var(--bp-ink) 5%,var(--bp-paper))!important;--wash:var(--surface)!important;color-scheme:light dark}
   html,body{background:var(--bp-paper)!important;color:var(--bp-ink)!important}
-  body{font-family:${preset.layout === "terminal" ? "ui-monospace,monospace" : "Georgia,serif"}!important;font-size:16px!important;line-height:1.65!important}
+  body{font-family:${font}!important;font-size:16px!important;line-height:1.65!important}
   main{max-width:1240px!important;margin-inline:auto!important;padding:48px clamp(20px,4vw,64px)!important}
   h1,h2,h3{font-family:Georgia,serif!important;font-weight:400!important;color:var(--bp-ink)!important;text-transform:none!important;letter-spacing:-.035em!important}
   h1{font-size:clamp(44px,6vw,84px)!important;line-height:1.08!important;max-width:18ch}

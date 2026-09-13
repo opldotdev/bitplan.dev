@@ -37,8 +37,11 @@ components should compose those primitives rather than duplicating them.
 
 ### Hosted collaboration (preview)
 
-Set `NEXT_PUBLIC_CONVEX_URL` to the deployed collaboration backend. Reader links
-do not grant collaboration authority; use an explicit encrypted room invitation.
+Set `NEXT_PUBLIC_CONVEX_URL` to the deployed collaboration backend. Opening a
+decrypted plan starts a room automatically once a character is selected or loaded.
+An existing invitation joins its room; a document-only link starts a separate
+room and cannot reveal annotations from another room. Share the full invitation
+to collaborate together. Failed connections offer Retry in the character menu.
 Right-click the document → **Add Annotation** → type at the anchor → **Save**.
 Saved notes stream through Convex to connected clients and survive reloads.
 Text/element-relative anchors follow scrolling and responsive layout; a small

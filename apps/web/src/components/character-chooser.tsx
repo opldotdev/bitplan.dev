@@ -1,8 +1,15 @@
 "use client";
 
-import { UserRound } from "lucide-react";
+import { Files, UserRound } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useId, useState } from "react";
+import Link from "next/link";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +26,11 @@ import {
   PROFILE_STORAGE_KEY,
   parseProfile,
 } from "@/lib/collaborator";
+import {
+  connectBrowserWalletClient,
+  isWalletConnected,
+  onWalletChange,
+} from "@/lib/wallet";
 
 function characterFromButton(button: HTMLButtonElement): Character {
   return button.value as Character;
@@ -119,6 +131,7 @@ export function CharacterChooser({
   const selectCharacter = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       const character = characterFromButton(event.currentTarget);
+      setOpen(false);
       choose({
         character,
         name:
@@ -182,6 +195,7 @@ export function CharacterChooser({
         align="end"
         className="max-h-[var(--radix-popover-content-available-height)] w-[640px] max-w-[calc(100vw-1rem)] overflow-y-auto p-3"
       >
+        <CharacterWalletStatus />
         <label className="grid gap-1.5" htmlFor={displayNameId}>
           <span className="font-medium text-sm">Display name</span>
           <Input
@@ -249,7 +263,67 @@ export function CharacterChooser({
           </p>
         ) : null}
         {children}
+        <div className="mt-3 border-t pt-2">
+          <Button asChild size="sm" variant="ghost">
+            <Link
+              href="/drafts"
+              onClick={() => setOpen(false)}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <Files aria-hidden="true" />
+              My drafts
+              <span className="sr-only"> (opens in a new tab)</span>
+            </Link>
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function CharacterWalletStatus() {
+  const connected = useSyncExternalStore(
+    onWalletChange,
+    isWalletConnected,
+    () => false
+  );
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState("");
+  const connect = async () => {
+    setConnecting(true);
+    setError("");
+    try {
+      await connectBrowserWalletClient();
+    } catch {
+      setError("Unlock your wallet and try again.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+  return (
+    <div className="mb-3 border-b pb-3">
+      <div className="flex items-center justify-between gap-3">
+        <Button
+          disabled={connected || connecting}
+          onClick={connect}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          {connected ? "Wallet connected" : "Connect wallet"}
+        </Button>
+        <span
+          aria-label={connected ? "Wallet connected" : "Wallet disconnected"}
+          className={`size-2 rounded-full ${connected ? "bg-emerald-500" : "bg-muted-foreground"}`}
+          role="status"
+        />
+      </div>
+      {error ? (
+        <p className="mt-1 text-destructive text-xs" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }

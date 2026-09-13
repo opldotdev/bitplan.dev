@@ -50,11 +50,29 @@ Learned the hard way over five drafts of one plan.
   collaboration room to use the viewer's annotation tools on it.
 - `brief.html`: a warm editorial brief with two columns and embedded paper artwork.
 - `terminal.html`: a technical walkthrough with monochrome dither artwork.
+- `decision.html`: a cool editorial decision brief adapted from the Decision
+  concept's light/dark pair. Two approaches receive equal weight, with an
+  evidence section and an unselected questionnaire.
 
-The player's Appearance picker can restyle an existing document locally. Blank
-removes decorative background artwork but never deletes text, images, or notes.
-Use the empty starter when creating a genuinely blank document. Appearance
-preferences do not publish a new version or modify shared document contents.
+The player's Appearance picker previews all four starters. Choosing one on an
+existing plan offers a shared annotation asking an agent to adapt the content,
+an explicit colors-and-typography-only change, or a new plan. Blank never
+silently deletes the current document. New Plan initializes actual template
+content. The final onboarding action is “Start with [document name].”
+
+Brief, Terminal, and Decision are project starters, not product demonstrations.
+Keep the opening questions specific to the work; replace them as answers become
+known. The prominent Copy agent prompt action uses only the public plan ID
+injected by the viewer as `data-bitplan-id`. Never derive it from `location`, a
+reader link, or a collaboration invitation. The agent uses its own identity and
+asks the operator to invite its public key. Connecting a wallet does not grant
+recipients access to an existing document or live room automatically.
+
+CLI `fetch` returns HTML and metadata, **not live annotations**. The handoff
+instructs the agent to read an already authorized live session or obtain an
+annotation export encrypted to its identity. It must disclose missing layers.
+The template points to real Share/wallet controls in the player rather than
+imitating their state or exposing credentials through an iframe message.
 
 Brief, Terminal, and Editorial include a private-sharing walkthrough: complete
 reader links and collaboration invitations are bearer credentials. For sensitive
@@ -128,18 +146,37 @@ Copy link only when applicable. Text and image composers open at the chosen
 anchor.
 Text composers have no submit button: Enter saves and closes, Shift+Enter adds
 a line, and Escape cancels. Failed saves retain the text; IME confirmation does
-not submit a note. Image uploads keep an explicit Save control.
-The image picker offers Photos, Stickers, and Draw. Raster files up to 20 MB
+not submit a note. The image tool opens the visual picker directly; Use image saves.
+Text annotations also support inline replies: Enter sends and Shift+Enter adds
+a line. Replies synchronize and survive reloads. @ suggestions and highlights
+refer to room-profile display names only; they do not send notifications, claim
+stable handles, verify wallet identities, or acknowledge agent delivery.
+The image picker offers Photos, Stickers, Draw, and Generate. Generate places a
+pending image request at the chosen anchor for the agent's next revision; it
+does not run a model. Preserve the request and placement when generating the
+real asset. Raster files up to 20 MB
 are resized locally to fit 170 KB; SVG/GIF must already fit 170 KB. Draw supports
 pen, rectangle, ellipse, color, and lasso/move, then exports a transparent image.
-It is a picker drawing surface, not direct-on-document drawing or a persistent
-vector editor. Choose Use image, then save the annotation. Uploaded image bytes
+The main toolbar also offers direct-on-document pen, rectangle, ellipse, line,
+arrow, thought cloud, and a color picker. Releasing a stroke saves an SVG image
+annotation (1200 pixels per dimension, 5000 points maximum). Other readers see
+the saved mark, not intermediate strokes. This is not a persistent vector editor.
+Uploaded image bytes
 are embedded in encrypted notes. SVG is rendered as an image, never inline markup.
-Authors can resize their own cards by dragging the corner or using its arrow
+Authors can drag images directly or move any card with its Move handle. Offsets
+are saved separately from the original document anchor. They can resize their
+own cards by dragging the corner or using its arrow
 keys. Saved dimensions synchronize through Convex and survive reloads; they do
 not change the document anchor or create a transaction. Existing notes without
 dimensions use the default card size. These are viewer features: a standalone
 downloaded HTML file does not carry the live overlay or its credentials.
+“Edit text in place” edits supported plain-text leaf passages through the viewer;
+it is not an arbitrary rich-text or script editor. Live reads return HTML with
+those edits materialized, matching `textBlocks`, a `documentRevision`, and a
+`cursor`. Full-document agent writes must pass that revision as `expectedRevision`
+and cursor as `expectedSequence`, then reread and merge if either is stale.
+Use this current HTML when preparing a hosted version; CLI fetch alone does not
+contain live room edits. A live save is not a new hosted envelope or inscription.
 React-authored plans must be built into self-contained HTML with bundled inline
 scripts and a readable scripts-off fallback. Uploading JSX or a Next.js project
 is not supported, and remote runtime imports are not allowed.
@@ -151,6 +188,29 @@ targets, and missing-reference warnings. Do not silently load today's layers
 over yesterday's document or describe a document-only HTML fetch as complete.
 For a static export, render an explicitly labeled annotation appendix with
 links to stable sections; keep original document and checkpoint references.
+
+### Group handles and annotation lineages (planned)
+
+A handle belongs to a collaboration group, not a global namespace. Before
+publication it is a provisional group claim. The first annotation checkpoint
+should record the group ID, claimed handle, verified author identity public key,
+and exact document target inside its encrypted payload. The resulting ordinal
+origin identifies that author's annotation lineage; later checkpoints retain
+that origin and reference the preceding checkpoint. The genesis record does
+not embed its own transaction ID: resolve its origin from the containing output.
+
+Keep a group-scoped handle-to-identity-and-lineage mapping in the manifest.
+Resolve conflicting claims within the group before marking a handle claimed;
+an inscription alone does not establish name uniqueness. A handle change is a
+new checkpoint, not a rewrite of historical attribution. Mentions and replies
+bind to stable participant/lineage IDs, not mutable display text. Keep the
+binding encrypted rather than exposing a public collaboration graph.
+
+An ordinal owner's publishing action is not proof of every note author's
+identity. Verify the author's binding separately when another wallet publishes
+on their behalf; guest attribution stays provisional until verified. Neither
+a handle nor its ordinal grants decryption access. This is a checkpoint design
+requirement, not a claim that handle registration or on-chain replay is shipped.
 
 The current template's response button is a copy fallback, not live delivery.
 “Submit to agent” must only appear as working when the host provides a durable

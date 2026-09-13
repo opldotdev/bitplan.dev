@@ -2,6 +2,13 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
+import {
+  CodeBlock,
+  CodeBlockActions,
+  CodeBlockCopyButton,
+  CodeBlockHeader,
+  CodeBlockTitle,
+} from "@/components/ai-elements/code-block";
 import { CommandCopy } from "@/components/command-copy";
 import { HomeCta } from "@/components/home-cta";
 import { SkillInstall } from "@/components/skill-install";
@@ -83,22 +90,53 @@ export default function Home() {
               Give Grok or another bot its own decryption identity. Copy this
               prompt to your bot; only its public key comes back to you.
             </p>
-            <p className="mt-3 select-all rounded border p-3 text-sm">
-              Use your operator-approved local wallet tooling to create or reuse
-              a dedicated BitPlan reader identity. Inspect @1sat/cli help first.
-              Keep private keys and seeds inside secure wallet storage, never in
-              chat, model context, logs, or source control. Return only your
-              public identity key and a verified BRC-100 decryption method. If
-              that interface is unavailable, report the gap rather than building
-              an unauthenticated key server. After I add you and republish,
-              verify you can decrypt the new version and read its annotations
-              before proposing revisions.
-            </p>
+            <CodeBlock
+              className="mt-3"
+              code={`Use your operator-approved local wallet tooling to create or reuse
+a dedicated BitPlan reader identity. Inspect @1sat/cli help first.
+Keep private keys and seeds inside secure wallet storage, never in
+chat, model context, logs, or source control.
+
+Return only your public identity key and a verified BRC-100
+decryption method. If that interface is unavailable, report the gap
+rather than building an unauthenticated key server.
+
+After I add you and republish, verify you can decrypt the new version
+and read its annotations before proposing revisions.`}
+              language="markdown"
+            >
+              <CodeBlockHeader>
+                <CodeBlockTitle>Prompt for your bot</CodeBlockTitle>
+                <CodeBlockActions>
+                  <CodeBlockCopyButton aria-label="Copy bot prompt" />
+                </CodeBlockActions>
+              </CodeBlockHeader>
+            </CodeBlock>
             <p className="mt-3 text-muted-foreground text-sm">
               On your publishing device, add the public key as a contact, add
               that contact to your team, and publish a new version shared with
               the team. This grants reading access—not ownership or publishing
               permission.
+            </p>
+            <CodeBlock
+              className="mt-3"
+              code={`npx bitplan contact set my-bot <verified-public-identity-key>
+npx bitplan team add my-team my-bot
+npx bitplan upload ./plan.html --hosted --share-with my-team`}
+              language="bash"
+            >
+              <CodeBlockHeader>
+                <CodeBlockTitle>On your publishing device</CodeBlockTitle>
+                <CodeBlockActions>
+                  <CodeBlockCopyButton aria-label="Copy bot contact commands" />
+                </CodeBlockActions>
+              </CodeBlockHeader>
+            </CodeBlock>
+            <p className="mt-3 text-muted-foreground text-sm">
+              Replace the placeholders and verify the public key with your bot.
+              These commands share a document version. Live collaboration still
+              needs a separate private invitation; connecting a wallet does not
+              yet verify annotation authorship or grant room access.
             </p>
             <Link
               className="mt-3 inline-block text-sm underline underline-offset-4"

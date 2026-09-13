@@ -2,15 +2,62 @@ import { describe, expect, test } from "bun:test";
 import { Utils } from "@bsv/sdk";
 
 import { openEnvelope } from "./envelope";
-import { createInstantDraft } from "./instant-draft";
+import { createInstantDraft, prepareStarterDraft } from "./instant-draft";
 import { linkWallet, parseLinkFragment } from "./link-reader";
 
 const HTML =
   '<!doctype html><html data-bitplan-template="brief"><title>Brief</title><body>hello</body></html>';
-const VIEWER_PATTERN =
-  /^\/d\/h_abcdefghijklmnopqrst\?collaborate=1#k=[A-Za-z0-9_-]{43}$/;
+const VIEWER_PATTERN = /^\/d\/h_abcdefghijklmnopqrst#k=[A-Za-z0-9_-]{43}$/;
 
 describe("createInstantDraft", () => {
+  test("wallet starters open hosted without a reader key or on-chain action", async () => {
+    const wallet = linkWallet("11".repeat(32));
+    let uploaded: Uint8Array | undefined;
+    const fetchMock = ((input: URL | RequestInfo, init?: RequestInit) => {
+      if (String(input) === "/templates/brief.html") {
+        return Promise.resolve(
+          new Response(HTML, { headers: { "content-type": "text/html" } })
+        );
+      }
+      expect(String(input)).toBe("/api/hosted");
+      uploaded = new Uint8Array(init?.body as ArrayBuffer);
+      return Promise.resolve(
+        Response.json({ id: "h_abcdefghijklmnopqrst", version: 1 })
+      );
+    }) as typeof fetch;
+    const viewer = await createInstantDraft(
+      { layout: "brief", title: "Wallet starter" },
+      fetchMock,
+      wallet
+    );
+    expect(viewer).toBe("/d/h_abcdefghijklmnopqrst");
+    const opened = await openEnvelope(wallet, uploaded as Uint8Array);
+    expect(opened.plaintext.html).toBe(HTML);
+    expect(opened.plaintext.meta.title).toBe("Wallet starter");
+    await expect(
+      openEnvelope(linkWallet("22".repeat(32)), uploaded as Uint8Array)
+    ).rejects.toThrow();
+  });
+
+  test("prepares a wallet starter without uploading or requiring plan prose", async () => {
+    const requests: string[] = [];
+    const fetchMock = ((input: URL | RequestInfo, init?: RequestInit) => {
+      requests.push(String(input));
+      expect(init?.method ?? "GET").toBe("GET");
+      return Promise.resolve(
+        new Response(HTML, { headers: { "content-type": "text/html" } })
+      );
+    }) as typeof fetch;
+    const draft = await prepareStarterDraft(
+      { layout: "brief", title: "Master Plan" },
+      fetchMock
+    );
+    expect(requests).toEqual(["/templates/brief.html"]);
+    expect(draft.html).toBe(HTML);
+    expect(draft.meta.title).toBe("Master Plan");
+    expect(draft.meta.repoName).toBeNull();
+  });
+
   test("seals the template for a throwaway reader and keeps the hosted secret out of the link", async () => {
     let uploaded: Uint8Array | undefined;
     let bearer = "";

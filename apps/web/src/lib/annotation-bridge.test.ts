@@ -4,6 +4,17 @@ import { withAnnotationBridge } from "./annotation-bridge";
 
 const SCRIPT_BODY = /<script>([\s\S]*?)<\/script>/;
 
+test("the template handoff receives only a validated public plan ID", () => {
+  const id = "h_12345678901234567890";
+  expect(withAnnotationBridge("<p>Plan</p>", true, "", false, id)).toContain(
+    id
+  );
+  const secretLink = `https://bitplan.dev/d/${id}#k=reader-secret`;
+  expect(
+    withAnnotationBridge("<p>Plan</p>", true, "", false, secretLink)
+  ).not.toContain("reader-secret");
+});
+
 function bridgeScript(html: string): string {
   const script = SCRIPT_BODY.exec(html)?.[1];
   if (!script) {
@@ -92,7 +103,11 @@ test("click anchors round-trip over a private port, including blank space", asyn
     document: {
       addEventListener: (name: string, callback: (event: unknown) => void) =>
         handlers.set(name, callback),
-      documentElement: { scrollHeight: 2000, scrollWidth: 800 },
+      documentElement: {
+        scrollHeight: 2000,
+        scrollWidth: 800,
+        style: { cursor: "" },
+      },
       elementFromPoint: () => element,
       querySelectorAll: () => [element],
     },
@@ -169,7 +184,11 @@ test("click anchors round-trip over a private port, including blank space", asyn
     await flushMessages();
   };
   await locate(anchor);
-  expect(messages.at(-1)?.payload[0].position).toEqual({ x: 140, y: 120 });
+  expect(messages.at(-1)?.payload[0].position).toMatchObject({
+    bounds: { height: 80, width: 400, x: 40, y: 100 },
+    x: 140,
+    y: 120,
+  });
   rect = {
     bottom: 120,
     height: 160,
@@ -179,7 +198,7 @@ test("click anchors round-trip over a private port, including blank space", asyn
     width: 200,
   };
   await locate(anchor);
-  expect(messages.at(-1)?.payload[0].position).toEqual({ x: 70, y: 0 });
+  expect(messages.at(-1)?.payload[0].position).toMatchObject({ x: 70, y: 0 });
   handlers.get("click")?.(
     trustedEvent({ clientX: 10, clientY: 60, target: null })
   );
@@ -219,10 +238,10 @@ test("click anchors round-trip over a private port, including blank space", asyn
     })
   );
   await flushMessages();
-  expect(passthroughPrevented).toBe(false);
+  expect(passthroughPrevented).toBe(true);
   expect(
     messages.slice(beforePassthrough).map((message) => message.type)
-  ).toEqual(["click"]);
+  ).toEqual(["click", "context"]);
   const afterContext = messages.length;
   handlers.get("auxclick")?.(
     trustedEvent({
@@ -241,6 +260,38 @@ test("click anchors round-trip over a private port, including blank space", asyn
   await flushMessages();
   expect(messages.at(-1)?.payload.anchor.point).toEqual({ x: 0.25, y: 0.25 });
   expect(messages.at(-1)?.type).toBe("context");
+  port.postMessage({ payload: true, type: "pick" });
+  await flushMessages();
+  expect(context.document.documentElement.style.cursor).toContain("crosshair");
+  handlers.get("pointermove")?.(
+    trustedEvent({ clientX: 70, clientY: 0, target: element })
+  );
+  await flushMessages();
+  expect(messages.at(-1)?.payload.selecting).toBe(true);
+  handlers.get("click")?.(
+    trustedEvent({
+      button: 0,
+      clientX: 70,
+      clientY: 0,
+      preventDefault() {
+        /* Native cancellation stub. */
+      },
+      stopImmediatePropagation() {
+        /* Native propagation stub. */
+      },
+      target: element,
+    })
+  );
+  await flushMessages();
+  expect(messages.at(-1)?.type).toBe("picked");
+  expect(messages.at(-1)?.payload.anchor.elementId).toBe("section");
+  expect(context.document.documentElement.style.cursor).toBe("");
+  handlers.get("keydown")?.(
+    trustedEvent({ key: "Shift", repeat: false, target: null })
+  );
+  await flushMessages();
+  expect(messages.at(-1)?.type).toBe("context");
+  expect(messages.at(-1)?.payload.x).toBe(70);
   port.close();
 });
 

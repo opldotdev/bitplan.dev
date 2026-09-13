@@ -9,10 +9,12 @@ import { cn } from "@/lib/utils";
 export function TemplatePreview({
   className,
   dark,
+  fullSize = false,
   preset,
 }: {
   className?: string;
   dark: boolean;
+  fullSize?: boolean;
   preset: PlanAppearance;
 }) {
   const [html, setHtml] = useState("");
@@ -64,10 +66,10 @@ export function TemplatePreview({
           style={{
             border: 0,
             colorScheme: isDark ? "dark" : "light",
-            height: 1280,
-            transform: "scale(0.15)",
+            height: fullSize ? "100%" : 1280,
+            transform: fullSize ? undefined : "scale(0.15)",
             transformOrigin: "top left",
-            width: "666.667%",
+            width: fullSize ? "100%" : "666.667%",
           }}
           tabIndex={-1}
           title={`${preset.name} template preview`}

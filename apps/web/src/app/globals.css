@@ -3,6 +3,65 @@
 @import "shadcn/tailwind.css";
 @import "./typeset.css";
 
+/* Shared control motion: small, quick, and independent of layout dimensions. */
+[data-slot="button"],
+[data-slot="input"],
+[data-slot="item"] {
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-duration: 160ms;
+  transition-property:
+    color, background-color, border-color, box-shadow, opacity, transform;
+}
+[data-slot="popover-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dialog-content"] {
+  animation-duration: 160ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.draft-list [data-slot="item"] {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr) auto;
+  align-content: center;
+  min-height: 8rem;
+}
+.draft-list [data-slot="item-content"] {
+  min-height: 4rem;
+  overflow: hidden;
+}
+.draft-list [data-slot="item-title"] {
+  display: block;
+  width: 100%;
+  height: 1.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draft-list [data-slot="item-description"] {
+  height: 2.625rem;
+}
+.draft-list [data-slot="item-footer"] {
+  grid-column: 1 / -1;
+  min-height: 1rem;
+}
+.draft-list [data-slot="item-actions"] {
+  flex-wrap: wrap;
+  justify-content: end;
+  min-width: 4.5rem;
+  max-width: 7rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="button"],
+  [data-slot="input"],
+  [data-slot="item"] {
+    transition: none;
+  }
+  [data-slot="popover-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dialog-content"] {
+    animation: none;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

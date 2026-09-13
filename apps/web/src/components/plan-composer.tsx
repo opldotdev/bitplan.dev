@@ -1,23 +1,30 @@
 "use client";
 
-import { Check, LockKeyhole } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
   type ChangeEvent,
   type FormEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 import { TemplatePreview } from "@/components/template-preview";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
 import { registerWebMcpTool } from "@/components/webmcp-tools";
 import {
   draftInputFromAgent,
@@ -27,37 +34,38 @@ import {
 } from "@/lib/draft-publish";
 import type { DraftPlaintext } from "@/lib/envelope";
 import { createInstantDraft } from "@/lib/instant-draft";
-import { PLAN_APPEARANCES, type PlanAppearance } from "@/lib/plan-appearance";
-import { connectBrowserWalletClient } from "@/lib/wallet";
-
-const PLAN_PLACEHOLDER = `Outcome
-
-Context
-
-Constraints
-
-Next steps`;
-
-const STARTER_DESCRIPTIONS: Record<PlanAppearance["layout"], string> = {
-  blank: "A quiet page for a plan from scratch.",
-  brief: "A warm brief with room for context and decisions.",
-  terminal: "A focused technical walkthrough.",
-};
+import { PLAN_APPEARANCES } from "@/lib/plan-appearance";
+import {
+  connectBrowserWalletClient,
+  isWalletConnected,
+  onWalletChange,
+} from "@/lib/wallet";
 
 export function PlanComposer() {
-  const router = useRouter();
-  const { resolvedTheme } = useTheme();
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [body, setBody] = useState("");
   const [copied, setCopied] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string>();
   const [prepared, setPrepared] = useState<DraftPlaintext>();
   const [published, setPublished] = useState<PublishedDraft>();
   const [publishing, setPublishing] = useState(false);
   const [repository, setRepository] = useState("");
-  const [starter, setStarter] = useState(PLAN_APPEARANCES[0]);
-  const [title, setTitle] = useState("Untitled plan");
+  const [title, setTitle] = useState("");
+  const [walletMode, setWalletMode] = useState(false);
+  const [walletError, setWalletError] = useState("");
+  const [connectingWallet, setConnectingWallet] = useState(false);
+  const openWallet = useCallback(async () => {
+    setWalletMode(true);
+    setConnectingWallet(true);
+    setWalletError("");
+    try {
+      await connectBrowserWalletClient();
+    } catch {
+      setWalletError(
+        "Could not connect. Unlock your BRC-100 wallet and retry. If this browser cannot reach it, open BitPlan in your wallet-enabled browser."
+      );
+    } finally {
+      setConnectingWallet(false);
+    }
+  }, []);
 
   useEffect(
     () =>
@@ -67,7 +75,6 @@ export function PlanComposer() {
         execute: (value) => {
           const input = draftInputFromAgent(value);
           const next = prepareDraft(input);
-          setBody(input.body);
           setError(undefined);
           setPrepared(next);
           setRepository(input.repository);
@@ -101,45 +108,6 @@ export function PlanComposer() {
         title: "Prepare a BitPlan",
       }),
     []
-  );
-
-  const createSharedDraft = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (creating) {
-        return;
-      }
-      setCreating(true);
-      setError(undefined);
-      try {
-        const viewer = await createInstantDraft({
-          layout: starter.layout,
-          title,
-        });
-        router.push(viewer);
-      } catch (cause) {
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "The shared draft could not be created. Try again."
-        );
-        setCreating(false);
-      }
-    },
-    [creating, router, starter.layout, title]
-  );
-
-  const review = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      try {
-        setPrepared(prepareDraft({ body, repository, title }));
-        setError(undefined);
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Check the plan.");
-      }
-    },
-    [body, repository, title]
   );
 
   const publish = useCallback(async () => {
@@ -180,16 +148,7 @@ export function PlanComposer() {
 
   const edit = useCallback(() => {
     setPrepared(undefined);
-    setAdvancedOpen(true);
   }, []);
-  const updateBody = useCallback(
-    (event: ChangeEvent<HTMLTextAreaElement>) => setBody(event.target.value),
-    []
-  );
-  const updateRepository = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => setRepository(event.target.value),
-    []
-  );
   const updateTitle = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => setTitle(event.target.value),
     []
@@ -198,7 +157,7 @@ export function PlanComposer() {
   if (published) {
     const viewer = `/d/${published.origin}`;
     return (
-      <section className="space-y-6">
+      <WalletFlowShell title="Published plan">
         <div className="space-y-2">
           <h1 className="font-heading font-semibold text-3xl tracking-tight">
             Published
@@ -224,13 +183,13 @@ export function PlanComposer() {
             <Link href="/drafts">My drafts</Link>
           </Button>
         </div>
-      </section>
+      </WalletFlowShell>
     );
   }
 
   if (prepared) {
     return (
-      <section className="space-y-5">
+      <WalletFlowShell title="Review your plan">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="font-heading font-semibold text-2xl tracking-tight">
@@ -268,152 +227,413 @@ export function PlanComposer() {
             {publishing ? "Waiting for wallet..." : "Publish plan"}
           </Button>
         </div>
-      </section>
+      </WalletFlowShell>
     );
   }
 
   return (
-    <section className="space-y-8">
-      <form className="space-y-6" onSubmit={createSharedDraft}>
-        <div className="space-y-2">
-          <p className="font-medium text-primary text-sm">New shared draft</p>
-          <h1 className="font-heading font-semibold text-3xl tracking-tight sm:text-4xl">
-            Start with a page you like.
-          </h1>
-          <p className="max-w-xl text-muted-foreground">
-            Name it, choose a starting point, and share the link. No account or
-            wallet needed.
-          </p>
-        </div>
+    <SharedStarter
+      connectingWallet={walletMode && connectingWallet}
+      onAdvanced={() => void openWallet()}
+      onUseLink={() => setWalletMode(false)}
+      setTitle={setTitle}
+      title={title}
+      updateTitle={updateTitle}
+      walletError={walletMode ? walletError : ""}
+      walletMode={walletMode}
+    />
+  );
+}
 
-        <div className="space-y-2">
-          <Label htmlFor="shared-draft-title">Draft name</Label>
-          <Input
-            autoFocus
-            className="h-12 text-base"
-            id="shared-draft-title"
-            maxLength={160}
-            onChange={updateTitle}
-            placeholder="Launch plan"
-            value={title}
-          />
-        </div>
+function WalletFlowShell({
+  children,
+  title,
+  connecting = false,
+}: {
+  children: ReactNode;
+  title: string;
+  connecting?: boolean;
+}) {
+  const { resolvedTheme } = useTheme();
+  return (
+    <>
+      <TemplatePreview
+        className="h-[calc(100dvh-3.5rem)] rounded-none blur-sm"
+        dark={resolvedTheme === "dark"}
+        fullSize
+        preset={PLAN_APPEARANCES[0]}
+      />
+      <Dialog open>
+        <DialogContent
+          className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto bg-background/95 p-6 motion-reduce:animate-none sm:max-w-2xl sm:p-10"
+          fullScreenOnMobile={false}
+          onInteractOutside={(event) => event.preventDefault()}
+          showCloseButton={false}
+        >
+          <DialogTitle className="sr-only">{title}</DialogTitle>
+          <WalletStatus connecting={connecting} />
+          <DialogDescription className="sr-only">
+            Wallet-controlled encryption and permanent publication. No
+            transaction is sent until you review and approve publishing.
+          </DialogDescription>
+          {children}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
-        <fieldset className="space-y-3">
-          <legend className="font-medium text-sm">Choose a page</legend>
-          <div className="-mx-1 grid snap-x snap-mandatory auto-cols-[82%] grid-flow-col gap-3 overflow-x-auto px-1 pb-2 sm:mx-0 sm:auto-cols-auto sm:grid-flow-row sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
-            {PLAN_APPEARANCES.map((preset) => {
-              const selected = starter.layout === preset.layout;
-              return (
-                <button
-                  aria-pressed={selected}
-                  className="group relative snap-start overflow-hidden rounded-xl border bg-background p-1.5 text-left outline-none transition-colors hover:border-foreground/40 focus-visible:ring-2 focus-visible:ring-ring aria-pressed:border-foreground aria-pressed:ring-1 aria-pressed:ring-foreground"
-                  key={preset.layout}
-                  onClick={() => setStarter(preset)}
-                  type="button"
-                >
-                  <TemplatePreview
-                    className="h-32 sm:h-36"
-                    dark={resolvedTheme === "dark"}
-                    preset={preset}
-                  />
-                  {selected ? (
-                    <Check
-                      aria-hidden="true"
-                      className="absolute top-3 right-3 size-5 rounded-full bg-foreground p-1 text-background"
-                    />
-                  ) : null}
-                  <span className="block px-2 pt-2 font-medium text-sm">
-                    {preset.name}
-                  </span>
-                  <span className="block min-h-12 px-2 pt-1 pb-2 text-muted-foreground text-xs leading-relaxed">
-                    {STARTER_DESCRIPTIONS[preset.layout]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
+function WalletStatus({ connecting }: { connecting: boolean }) {
+  const connected = useSyncExternalStore(
+    onWalletChange,
+    isWalletConnected,
+    () => false
+  );
+  let label = "Wallet disconnected";
+  let color = "bg-muted-foreground";
+  if (connecting) {
+    label = "Connecting to wallet";
+    color = "bg-amber-500 motion-safe:animate-pulse";
+  } else if (connected) {
+    label = "Wallet connected";
+    color = "bg-emerald-500";
+  }
+  return (
+    <span
+      aria-label={label}
+      className="absolute top-4 right-4 flex size-6 items-center justify-center"
+      role="status"
+      title={label}
+    >
+      <span aria-hidden="true" className={`size-2 rounded-full ${color}`} />
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
 
-        {error ? (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
+function SharedStarter({
+  title,
+  setTitle,
+  updateTitle,
+  onAdvanced,
+  walletMode,
+  connectingWallet,
+  walletError,
+  onUseLink,
+}: {
+  title: string;
+  setTitle: (title: string) => void;
+  updateTitle: (event: ChangeEvent<HTMLInputElement>) => void;
+  onAdvanced: () => void;
+  walletMode: boolean;
+  connectingWallet: boolean;
+  walletError: string;
+  onUseLink: () => void;
+}) {
+  const router = useRouter();
+  const { resolvedTheme } = useTheme();
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string>();
+  const [starter, setStarter] = useState(PLAN_APPEARANCES[0]);
+  const [step, setStep] = useState<"name" | "style">(
+    walletMode && title.trim() ? "style" : "name"
+  );
+  const finalAction = `Start with ${title.trim() || "Master Plan"}`;
+  const actionLabel = step === "name" ? "Continue" : finalAction;
+  const createSharedDraft = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (creating || !title.trim()) {
+        return;
+      }
+      if (step === "name") {
+        setStep("style");
+        return;
+      }
+      if (walletMode && connectingWallet) {
+        return;
+      }
+      setCreating(true);
+      setError(undefined);
+      try {
+        const wallet = walletMode
+          ? await connectBrowserWalletClient()
+          : undefined;
+        const viewer = await createInstantDraft(
+          { layout: starter.layout, title },
+          fetch,
+          wallet
+        );
+        router.push(viewer);
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "The shared draft could not be created. Try again."
+        );
+        setCreating(false);
+      }
+    },
+    [
+      creating,
+      router,
+      starter.layout,
+      step,
+      title,
+      walletMode,
+      connectingWallet,
+    ]
+  );
 
-        <div className="space-y-3">
-          <Button className="w-full sm:w-auto" disabled={creating} size="lg">
-            {creating ? <Spinner data-icon="inline-start" /> : null}
-            {creating ? "Creating encrypted draft..." : "Create shared draft"}
-          </Button>
-          <p className="flex max-w-xl items-start gap-2 text-muted-foreground text-xs leading-relaxed">
-            <LockKeyhole
-              aria-hidden="true"
-              className="mt-0.5 size-3.5 shrink-0"
-            />
-            This disposable working draft belongs to its private link, not a
-            wallet. Anyone with the full link can read and edit it, so share it
-            with people you trust. Use a wallet when you are ready to publish a
-            separate permanent version.
-          </p>
-        </div>
-      </form>
-
-      <details
-        className="border-t pt-6"
-        onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-        open={advancedOpen}
+  return (
+    <>
+      <TemplatePreview
+        className="h-[calc(100dvh-3.5rem)] rounded-none blur-sm"
+        dark={resolvedTheme === "dark"}
+        fullSize
+        preset={starter}
+      />
+      <Dialog
+        onOpenChange={(open) => {
+          if (!(open || creating)) {
+            router.push("/");
+          }
+        }}
+        open
       >
-        <summary className="cursor-pointer text-muted-foreground text-sm">
-          Publish permanently with a wallet
-        </summary>
-        <form className="mt-6 space-y-6" onSubmit={review}>
-          <p className="text-muted-foreground text-sm">
-            Compose a text plan for encrypted on-chain publishing through a
-            BRC-100 wallet.
-          </p>
-          <div className="space-y-2">
-            <Label htmlFor="plan-title">Title</Label>
-            <Input
-              id="plan-title"
-              maxLength={160}
-              onChange={updateTitle}
-              placeholder="Ship the account recovery flow"
-              value={title}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plan-repository">Repository URL (optional)</Label>
-            <Input
-              id="plan-repository"
-              inputMode="url"
-              onChange={updateRepository}
-              placeholder="https://github.com/owner/repository"
-              type="url"
-              value={repository}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plan-body">Plan</Label>
-            <Textarea
-              className="min-h-72 resize-y"
-              id="plan-body"
-              maxLength={50_000}
-              onChange={updateBody}
-              placeholder={PLAN_PLACEHOLDER}
-              value={body}
-            />
-          </div>
-          {error ? (
-            <p className="text-destructive text-sm" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <div className="flex justify-end">
-            <Button type="submit">Review plan</Button>
-          </div>
-        </form>
-      </details>
-    </section>
+        <DialogContent
+          className="data-open:zoom-in-100 data-closed:zoom-out-100 inset-0 flex h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col items-center overflow-y-auto rounded-none bg-transparent p-4 ring-0 motion-reduce:animate-none sm:max-w-none sm:p-8"
+          data-step={step}
+          fullScreenOnMobile={false}
+          onEscapeKeyDown={(event) => {
+            if (creating) {
+              event.preventDefault();
+            }
+          }}
+          onInteractOutside={(event) => event.preventDefault()}
+          showCloseButton={false}
+        >
+          <button
+            aria-label="Skip naming this plan"
+            className="absolute inset-0 -z-10 cursor-default"
+            disabled={step !== "name" || creating}
+            onClick={() => {
+              setTitle(title.trim() || "Master Plan");
+              setStep("style");
+            }}
+            tabIndex={-1}
+            type="button"
+          />
+          <StarterAccess
+            connecting={connectingWallet}
+            disabled={creating}
+            onConnect={onAdvanced}
+            onUseLink={onUseLink}
+            walletMode={walletMode}
+          />
+          <form
+            aria-busy={creating}
+            className="relative my-auto w-full max-w-lg shrink-0 space-y-6 rounded-xl bg-background/95 p-6 ring-1 ring-foreground/10 data-[step=style]:max-w-2xl sm:p-10"
+            data-step={step}
+            key={step}
+            onSubmit={createSharedDraft}
+          >
+            <StarterHeading step={step} />
+            {step === "name" ? (
+              <>
+                <Label className="sr-only" htmlFor="shared-draft-title">
+                  Document name
+                </Label>
+                <Input
+                  autoComplete="off"
+                  autoFocus
+                  className="motion-safe:fade-in motion-safe:slide-in-from-bottom-2 h-14 rounded-none border-0 border-b bg-transparent px-0 text-xl shadow-none transition-colors duration-200 focus-visible:border-foreground focus-visible:ring-0 motion-safe:animate-in motion-safe:fill-mode-both motion-safe:duration-300 motion-reduce:transition-none md:text-2xl dark:bg-transparent motion-safe:[animation-delay:80ms]"
+                  disabled={creating}
+                  id="shared-draft-title"
+                  maxLength={160}
+                  onChange={updateTitle}
+                  placeholder="Plan name"
+                  required
+                  value={title}
+                />
+              </>
+            ) : (
+              <fieldset
+                className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
+                disabled={creating}
+              >
+                <legend className="sr-only">Template</legend>
+                {PLAN_APPEARANCES.map((preset, index) => (
+                  <label className="min-w-0 cursor-pointer" key={preset.layout}>
+                    <input
+                      autoFocus={index === 0}
+                      checked={starter.layout === preset.layout}
+                      className="peer sr-only"
+                      name="template"
+                      onChange={() => setStarter(preset)}
+                      type="radio"
+                      value={preset.layout}
+                    />
+                    <span className="block rounded-sm border-transparent border-b pb-2 peer-checked:border-foreground peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-focus-visible:outline-offset-4 motion-safe:transition-colors">
+                      <TemplatePreview
+                        className="h-36 rounded-sm border border-foreground/10 sm:h-56"
+                        dark={resolvedTheme === "dark"}
+                        preset={preset}
+                      />
+                      <span className="flex items-center justify-between pt-3 font-heading text-lg sm:text-xl">
+                        {preset.name}
+                        {starter.layout === preset.layout ? (
+                          <span
+                            aria-hidden="true"
+                            className="font-sans text-xs"
+                          >
+                            ✓
+                          </span>
+                        ) : null}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            )}
+            {error || walletError ? (
+              <p className="text-destructive text-sm" role="alert">
+                {error || walletError}
+              </p>
+            ) : null}
+            {step === "style" ? (
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                {walletMode
+                  ? "Wallet-encrypted. Off chain."
+                  : "Anyone with the link can join. Keep it private."}
+              </p>
+            ) : null}
+            <div className="motion-safe:fade-in motion-safe:slide-in-from-bottom-2 flex items-center gap-2 motion-safe:animate-in motion-safe:fill-mode-both motion-safe:duration-300 motion-safe:[animation-delay:160ms]">
+              <Button
+                disabled={creating}
+                onClick={() => router.push("/")}
+                type="button"
+                variant="ghost"
+              >
+                Cancel
+              </Button>
+              {step === "name" ? (
+                <Button
+                  onClick={() => {
+                    setTitle("Master Plan");
+                    setStep("style");
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  Skip
+                </Button>
+              ) : null}
+              {step === "style" ? (
+                <Button
+                  disabled={creating}
+                  onClick={() => {
+                    setStep("name");
+                    setError(undefined);
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  Back
+                </Button>
+              ) : null}
+              <Button
+                className="group ml-auto min-w-0 shrink motion-safe:transition-transform motion-safe:active:scale-[0.98]"
+                disabled={creating || connectingWallet || !title.trim()}
+                size="lg"
+                type="submit"
+              >
+                {creating ? (
+                  <Spinner className="motion-reduce:animate-none" />
+                ) : (
+                  <ArrowRight className="motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5" />
+                )}
+                <span
+                  className="max-w-[40vw] truncate sm:max-w-xs"
+                  title={actionLabel}
+                >
+                  {creating ? "Opening your draft…" : actionLabel}
+                </span>
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function StarterAccess({
+  walletMode,
+  connecting,
+  disabled,
+  onConnect,
+  onUseLink,
+}: {
+  walletMode: boolean;
+  connecting: boolean;
+  disabled: boolean;
+  onConnect: () => void;
+  onUseLink: () => void;
+}) {
+  const [dismissed, setDismissed] = useState(false);
+  const connected = useSyncExternalStore(
+    onWalletChange,
+    isWalletConnected,
+    () => false
+  );
+  if (dismissed || (connected && walletMode)) {
+    return null;
+  }
+  return (
+    <aside className="relative mb-6 w-full max-w-lg shrink-0 rounded-xl bg-background/90 p-5 ring-1 ring-foreground/10 lg:absolute lg:top-6 lg:right-6 lg:mb-0 lg:w-64">
+      <Button
+        aria-label="Dismiss wallet notice"
+        className="absolute top-2 right-2"
+        onClick={() => setDismissed(true)}
+        size="icon-sm"
+        type="button"
+        variant="ghost"
+      >
+        <X className="size-3" />
+      </Button>
+      <p className="font-medium">Off-chain draft</p>
+      <p className="mt-1 text-muted-foreground text-xs leading-relaxed">
+        {walletMode
+          ? "Wallet encryption is selected. Nothing is published until you approve."
+          : "Use wallet encryption instead of a shared link."}
+      </p>
+      <Button
+        className="mt-4 w-full"
+        disabled={disabled || connecting}
+        onClick={walletMode ? onUseLink : onConnect}
+        size="lg"
+        type="button"
+        variant={walletMode ? "outline" : "default"}
+      >
+        {walletMode ? "Use link instead" : "Connect wallet"}
+      </Button>
+    </aside>
+  );
+}
+
+function StarterHeading({ step }: { step: "name" | "style" }) {
+  const naming = step === "name";
+  return (
+    <div className="motion-safe:fade-in motion-safe:slide-in-from-bottom-2 space-y-3 motion-safe:animate-in motion-safe:duration-300">
+      <DialogTitle className="font-heading text-3xl leading-tight sm:text-4xl">
+        {naming ? "Name your plan." : "Choose a template."}
+      </DialogTitle>
+      <DialogDescription className={naming ? "sr-only" : undefined}>
+        {naming
+          ? "Choose a name or skip. You can rename it later."
+          : "You can change it later."}
+      </DialogDescription>
+    </div>
   );
 }
