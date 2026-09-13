@@ -20,6 +20,7 @@ This website stores ciphertext for hosted drafts and fetches on-chain ciphertext
 - Docs: ${SITE_URL}/docs
 - Envelope: ${SITE_URL}/docs/envelope
 - How it works: ${SITE_URL}/docs/how-it-works
+- Sharing and access: ${SITE_URL}/docs/sharing
 - Source: ${GITHUB_URL}
 `,
   "/about": `# About · BitPlan
@@ -44,6 +45,7 @@ After a hosted upload, the CLI tries to sync an encrypted catalog. The sync is b
 
 - How it works: ${SITE_URL}/docs/how-it-works
 - CLI setup: ${SITE_URL}/docs/cli-setup
+- Sharing and access: ${SITE_URL}/docs/sharing
 - Agents and wallets: ${SITE_URL}/docs/agents
 - Commands: ${SITE_URL}/docs/commands
 - Envelope: ${SITE_URL}/docs/envelope
@@ -120,6 +122,54 @@ Private plans use BRC-100 wallet encryption with [2, "bitplan"], a public keyID,
 
 See ${SITE_URL}/docs/how-it-works
 `,
+  "/docs/sharing": `# Sharing and access · BitPlan
+
+A hosted draft is already encrypted. Wallet recipients do not require on-chain publication.
+
+## Two encrypted layers
+
+Document: wallet or reader-link identity → unwrap document key → open this version.
+Live room: separate invitation → decrypt live edits, annotations, and presence.
+
+| URL part | Access |
+| --- | --- |
+| /d/h_ID | Locates ciphertext; cannot decrypt it. |
+| #k=… | Throwaway reader private key, not a funding key or raw AES document key. |
+| room=…&collab=… (fragment) | Live room identifier and separate secret invitation. |
+
+Ephemeral does not mean expiring. Anyone with the reader secret can read versions encrypted for that identity. Fragments are not sent in ordinary HTTP requests, but page scripts can read them and copied links can leak them. Keep complete invitations private. A reader-only link omits room access.
+
+## Invite by wallet identity
+
+Verify the recipient's public identity key with them. Never request private keys.
+
+    bunx bitplan contact set alice <public-identity-key>
+    bunx bitplan team add project alice
+    bunx bitplan upload ./plan.html --hosted --draft <draft-id> --share-with project
+
+Contacts and teams are local address-book entries. Adding a member does not change existing ciphertext; upload a new version. Self means the publishing wallet, not every wallet on a device. Recipient public keys are visible in envelope headers; team names stay local. Confirm the recipient can decrypt with their own wallet before sharing the plain document URL.
+
+## Remove link access from future document versions
+
+Review the latest document AND live annotations first; CLI fetch alone does not include the room. On the CLI installation holding the draft's update secret, make two hosted versions:
+
+    bunx bitplan upload ./plan.html --hosted --draft <draft-id> --private
+    bunx bitplan upload ./plan.html --hosted --draft <draft-id> --share-with project
+
+Review each confirmation. --private removes all additional readers; it cannot be combined with --share-with. Omitting --link preserves inherited readers. Removing #k from a URL does not revoke access. Old links can still decrypt old versions.
+
+## Current limits
+
+Connecting a wallet does not re-encrypt a guest document or its room. Browser starters do not retain the hosted update secret: preserve reviewed content in a new wallet-managed draft; automatic in-place ownership conversion is unavailable.
+
+Live rooms still require secret invitations. Wallet-only room membership, invitation rotation, and verified participant identities are not implemented. A character or displayed public key is not identity proof. Opening a document without its room invitation may create a different room.
+
+Documents use AES-256-GCM with separately wrapped keys per recipient. Rooms derive separate encryption and authorization keys using HKDF-SHA-256 and encrypt values with AES-GCM. Convex sees authorization proofs, ciphertext, routing metadata, sizes, and timing.
+
+Reading does not grant publishing rights. Hosted updates require a separate update secret; on-chain revisions require the current ordinal. Live edits do not automatically create inscriptions.
+
+Full guide: ${SITE_URL}/docs/sharing
+`,
   "/new": `# New shared draft · BitPlan
 
 At ${SITE_URL}/new, the base page appears behind a blurred two-step dialog. Enter a document name and continue, then choose Brief, Terminal, Decision, or Blank from the previews. Back preserves your choices. Start with {plan name} creates it without a funding wallet and joins realtime collaboration automatically. Page styles can also change after opening the document. Keep the complete invitation private: its holder can read and contribute. This disposable link-owned draft has no retained hosted-update secret; room edits are not published document versions. Use the wallet/CLI flow for controlled recipients and permanent publication.
@@ -186,6 +236,7 @@ After a hosted upload, the CLI tries to sync an encrypted catalog; the sync is b
 - Docs: ${SITE_URL}/docs
 - How it works: ${SITE_URL}/docs/how-it-works
 - Envelope: ${SITE_URL}/docs/envelope
+- Sharing and access: ${SITE_URL}/docs/sharing
 - CLI setup: ${SITE_URL}/docs/cli-setup
 - Agents and wallets: ${SITE_URL}/docs/agents
 - Source: ${GITHUB_URL}

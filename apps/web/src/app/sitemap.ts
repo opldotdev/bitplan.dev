@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   "/",
   "/docs",
   "/docs/how-it-works",
+  "/docs/sharing",
   "/docs/cli-setup",
   "/docs/agents",
   "/docs/commands",

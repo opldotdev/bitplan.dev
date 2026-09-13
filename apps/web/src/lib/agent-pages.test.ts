@@ -43,6 +43,24 @@ describe("agent pages", () => {
     expect(markdownForPath("/nope")).toBeNull();
   });
 
+  test("sharing guide distinguishes document, room, and update authority", async () => {
+    const markdown = markdownForPath("/docs/sharing");
+    expect(markdown).toContain("Connecting a wallet does not re-encrypt");
+    expect(markdown).toContain("Old links can still decrypt old versions");
+    expect(markdown).toContain("Omitting --link preserves inherited readers");
+    expect(markdown).toContain(
+      "Browser starters do not retain the hosted update secret"
+    );
+    expect(markdown).toContain("Wallet-only room membership");
+    const page = await readFile(
+      new URL("../app/docs/sharing/page.tsx", import.meta.url),
+      "utf8"
+    );
+    expect(page).toContain("Two encrypted layers");
+    expect(page).toContain("--private");
+    expect(page).toContain("--share-with project");
+  });
+
   test("llms.txt names the CLI and when to use BitPlan", () => {
     expect(LLMS_TXT).toContain("When to use this");
     expect(LLMS_TXT).toContain("npx bitplan");

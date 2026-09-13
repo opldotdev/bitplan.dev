@@ -184,7 +184,8 @@ export default function HowItWorksPage() {
         <p>
           A hosted draft uses the same envelope as an on-chain draft.
           bitplan.dev stores that ciphertext instead of writing it to the chain.
-          You still need a wallet for the keys, but you do not need BSV.{" "}
+          CLI uploads use a wallet; browser guest starters use a throwaway
+          reader identity. Neither needs BSV for hosting.{" "}
           <code>bitplan inscribe</code> puts the draft on chain, and the hosted
           link redirects to that origin forever. Stored draft objects contain
           only ciphertext and the public envelope header.
@@ -200,6 +201,11 @@ export default function HowItWorksPage() {
       </section>
       <section id="reader-links">
         <h2>Reader links</h2>
+        <p>
+          See <Link href="/docs/sharing">sharing and access</Link> for guest
+          links, team invitations, and the current limits of moving to
+          wallet-only access.
+        </p>
         <p>
           A reader link contains a separate random 256-bit private key. Its
           public half is a normal reader slot. Its private half sits after the

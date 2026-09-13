@@ -12,6 +12,7 @@ export interface DocsNavItem {
 export const DOCS_NAV: DocsNavItem[] = [
   { href: "/docs", label: "Introduction" },
   { href: "/docs/how-it-works", label: "How it works" },
+  { href: "/docs/sharing", label: "Sharing and access" },
   { href: "/docs/cli-setup", label: "CLI setup" },
   { href: "/docs/agents", label: "Agents and wallets" },
   { href: "/docs/commands", label: "Commands" },

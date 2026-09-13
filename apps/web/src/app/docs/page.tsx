@@ -17,12 +17,17 @@ export default function DocsIntroPage() {
       <h1>BitPlan</h1>
       <p>
         BitPlan turns one self-contained HTML file into an encrypted plan. Your
-        BRC-100 wallet holds the keys. While the plan is changing, bitplan.dev
-        can host its ciphertext at a private reader link. When it should be
-        permanent, publish the same encrypted plan as a 1Sat Ordinal. The
-        package on npm is <code>bitplan</code>.
+        BRC-100 wallet or a secret reader link grants access. While the plan is
+        changing, bitplan.dev can host its ciphertext at a private reader link.
+        When it should be permanent, publish the same encrypted plan as a 1Sat
+        Ordinal. The package on npm is <code>bitplan</code>.
       </p>
       <h2>Start with a hosted draft</h2>
+      <p>
+        <Link href="/new">New Plan</Link> starts a guest draft without a wallet.
+        Read <Link href="/docs/sharing">sharing and access</Link> to choose
+        between secret invitations and named wallet recipients.
+      </p>
       <p>
         This costs no BSV. The server stores encrypted bytes and cannot read the
         plan. Anyone who gets the complete reader link can read it, so treat the
