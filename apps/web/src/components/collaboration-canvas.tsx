@@ -197,7 +197,7 @@ export function CollaborationCanvas({
   ].includes(publishSection);
   useEffect(() => {
     if (settingsOpen) {
-      setPublishSection("Interaction");
+      setPublishSection("Review changes");
     }
   }, [settingsOpen]);
   useEffect(() => {
