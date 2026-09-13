@@ -36,10 +36,14 @@ export function annotationReplies(root: Annotation, annotations: Annotation[]) {
         item.content.type === "text" &&
         sameDocumentTarget(item.target, root.target)
     )
-    .sort(
-      (a, b) =>
-        a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
-    );
+    .sort(contributionOrder);
+}
+
+export function contributionOrder(a: Annotation, b: Annotation) {
+  return (
+    Date.parse(a.createdAt) - Date.parse(b.createdAt) ||
+    a.id.localeCompare(b.id)
+  );
 }
 
 /** Handles identify room profiles, not verified wallets or global accounts. */

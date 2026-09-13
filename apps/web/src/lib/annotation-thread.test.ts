@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   annotationReplies,
+  contributionOrder,
   mentionParts,
   roomHandles,
 } from "./annotation-thread";
@@ -35,6 +36,10 @@ test("replies stay with the exact document target and sort deterministically", (
     id: "other",
     target: { ...root.target, version: 2 },
   };
+  const laterReply = { ...reply, createdAt: "2026-09-12T00:01:00Z" };
+  expect(
+    [laterReply, root].sort(contributionOrder).map((item) => item.id)
+  ).toEqual(["root", "reply"]);
   expect(
     annotationReplies(root, [nextVersion, reply, root]).map((item) => item.id)
   ).toEqual(["reply"]);

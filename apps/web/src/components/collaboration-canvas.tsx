@@ -42,7 +42,7 @@ import { annotationInputAction } from "@/lib/annotation-input";
 import { annotationLink } from "@/lib/annotation-link";
 import { annotationCardOffset } from "@/lib/annotation-position";
 import { annotationShortcut } from "@/lib/annotation-shortcut";
-import { annotationReplies } from "@/lib/annotation-thread";
+import { annotationReplies, contributionOrder } from "@/lib/annotation-thread";
 import {
   type Annotation,
   type AnnotationAnchor,
@@ -75,19 +75,6 @@ import { planPassages, planSections } from "@/lib/plan-sections";
 import { printPlan } from "@/lib/print-plan";
 import { withRenderPolicy } from "@/lib/render-policy";
 import type { CollaborationState } from "@/lib/use-collaboration";
-
-function annotationLabel(content: AnnotationContent) {
-  if (content.type === "text") {
-    return content.text.slice(0, 65);
-  }
-  if (content.type === "html") {
-    return "HTML design";
-  }
-  if (content.type === "image") {
-    return content.alt || "Image";
-  }
-  return "Drawing";
-}
 
 const center: AnnotationAnchor = { point: { x: 0.5, y: 0.1 } };
 const menuItem =
@@ -2242,10 +2229,10 @@ export function CollaborationCanvas({
                   (item) =>
                     sameDocumentTarget(item.target, room.activeTarget) &&
                     item.status === "open" &&
-                    (isPublisher
-                      ? !item.replyTo
-                      : item.participantId === room.connection?.participantId)
+                    (isPublisher ||
+                      item.participantId === room.connection?.participantId)
                 )
+                .sort(contributionOrder)
                 .map((item) => (
                   <article
                     className="flex items-start gap-3 border-border/50 border-b py-5 text-sm"
@@ -2270,45 +2257,27 @@ export function CollaborationCanvas({
                         <span className="sr-only">Consider in revision</span>
                       </label>
                     ) : null}
-                    <details className="min-w-0 flex-1">
-                      <summary className="cursor-pointer list-none rounded-lg outline-offset-4 focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
                         <ReviewAuthor
-                          detail={`${item.content.type} contribution · edit ${item.revision}`}
+                          detail={`${item.replyTo ? "Reply" : item.content.type} · edit ${item.revision}`}
                           profile={room.profiles[item.participantId]}
                         />
-                        <span className="mt-3 block rounded-xl bg-muted/45 px-4 py-3 leading-relaxed">
-                          <span className="line-clamp-2">
-                            {item.content.type === "text"
-                              ? item.content.text
-                              : annotationLabel(item.content)}
-                          </span>
-                        </span>
-                        <span className="mt-2 block text-muted-foreground text-xs">
-                          View contribution ↗
-                        </span>
-                      </summary>
-                      <div className="plan-scroll scroll-fade mt-3 max-h-64 space-y-3 overflow-auto [--scroll-fade-size:12px]">
-                        <Button
-                          onClick={() => {
-                            if (
-                              sameDocumentTarget(item.target, room.activeTarget)
-                            ) {
-                              setHighlight(item.anchor);
-                              setPanel(false);
-                            }
-                          }}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          Show element
-                        </Button>
-                        <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
-                          <span>
-                            {room.profiles[item.participantId]?.name ??
-                              "Collaborator"}
-                          </span>
-                          <span>{item.status}</span>
-                        </div>
+                        {item.participantId ===
+                        room.connection?.participantId ? (
+                          <Button
+                            aria-label="Remove my annotation"
+                            className="shrink-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => void resolve(item)}
+                            size="icon-sm"
+                            title="Remove contribution; history is retained"
+                            variant="ghost"
+                          >
+                            <Trash2 />
+                          </Button>
+                        ) : null}
+                      </div>
+                      <div className="mt-3 rounded-xl bg-muted/45 px-4 py-3 leading-relaxed">
                         <AnnotationAttachmentStatus
                           item={item}
                           position={positions[item.id]}
@@ -2335,30 +2304,17 @@ export function CollaborationCanvas({
                                 item.anchor,
                                 undefined,
                                 undefined,
-                                item.id
+                                item.replyTo ?? item.id
                               )
                             }
-                            onResolve={resolve}
                             profiles={room.profiles}
-                            replies={annotationReplies(item, room.annotations)}
+                            replies={[]}
                           />
                         ) : (
                           <AnnotationBody content={item.content} />
                         )}
-                        {item.participantId ===
-                        room.connection?.participantId ? (
-                          <Button
-                            aria-label="Remove my annotation"
-                            onClick={() => void resolve(item)}
-                            size="icon-sm"
-                            title="Resolve this annotation; its history is retained"
-                            variant="ghost"
-                          >
-                            <Trash2 />
-                          </Button>
-                        ) : null}
                       </div>
-                    </details>
+                    </div>
                   </article>
                 ))}
             </div>
