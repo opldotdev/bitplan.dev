@@ -4,11 +4,22 @@ import {
   isUiSoundName,
   playUiSound,
   resetUiSoundForTests,
+  soundPreference,
   UI_SOUND_FILES,
   UI_SOUND_HOVER_THROTTLE_MS,
 } from "./ui-sound";
 
 describe("ui sound catalog", () => {
+  test("sound preference bounds volume and keeps mute explicit", () => {
+    expect(soundPreference(null)).toEqual({ muted: false, volume: 1 });
+    expect(soundPreference({ muted: true, volume: 0.4 })).toEqual({
+      muted: true,
+      volume: 0.4,
+    });
+    expect(soundPreference({ volume: -10 }).volume).toBe(0);
+    expect(soundPreference({ volume: 10 }).volume).toBe(1);
+    expect(soundPreference({ volume: Number.NaN }).volume).toBe(1);
+  });
   test("every mapped file is a public audio path", () => {
     for (const [name, src] of Object.entries(UI_SOUND_FILES)) {
       expect(isUiSoundName(name)).toBe(true);

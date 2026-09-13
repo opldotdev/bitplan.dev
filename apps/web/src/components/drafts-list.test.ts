@@ -7,11 +7,20 @@ import {
   classifyChainFailure,
   LoadedDrafts,
   loadChainDetails,
+  matchesPlanQuery,
   walletIdentityKey,
 } from "@/components/drafts-list";
 import type { CatalogEntry } from "@/lib/catalog-client";
 import { mergeCatalogPlans } from "@/lib/drafts";
 import { EnvelopeAccessError, EnvelopeError } from "@/lib/envelope";
+
+test("plan switcher searches visible titles and repositories, not loading status", () => {
+  const row = { plan: { origin: "h_test", title: "Brand New Plan", repoOrg: "opl", repoName: "bitplan", description: null }, detail: { status: "loading" } } as Parameters<typeof matchesPlanQuery>[0];
+  expect(matchesPlanQuery(row, " brand NEW ")).toBe(true);
+  expect(matchesPlanQuery(row, "opl bitplan")).toBe(true);
+  expect(matchesPlanQuery(row, "loading")).toBe(false);
+  expect(matchesPlanQuery(row, "")).toBe(true);
+});
 
 describe("wallet identity", () => {
   test("returns the connected wallet's normalized public identity", async () => {

@@ -36,9 +36,11 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 export function ThemeToggle({
+  showLabel = false,
   templates = false,
   onTemplateRequest,
 }: {
+  showLabel?: boolean;
   templates?: boolean;
   onTemplateRequest?: (preset: PlanAppearance) => Promise<unknown>;
 }) {
@@ -110,12 +112,14 @@ export function ThemeToggle({
           <Button
             aria-label="Themes"
             className="relative"
-            size="icon"
+            size={showLabel ? "sm" : "icon"}
             type="button"
             variant="ghost"
           >
             <Palette className="size-5" />
-            <span className="sr-only">Themes</span>
+            <span className={showLabel ? "hidden lg:inline" : "sr-only"}>
+              Themes
+            </span>
           </Button>
         </PopoverTrigger>
         <PopoverContent

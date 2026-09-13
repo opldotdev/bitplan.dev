@@ -54,73 +54,77 @@ export function DocumentEditSummary({
         </p>
       )}
       {blocks.map((block) => (
-        <details
-          className="rounded-lg border p-3 text-sm"
+        <div
+          className="flex items-start gap-3 border-b py-3 text-sm"
           key={`${block.roomId}:${block.participantId}:${block.path}`}
         >
-          <summary className="cursor-pointer">
-            {block.deleted ? "Removed text" : "Changed text"}:{" "}
-            {block.original.slice(0, 70)}
-            {block.original.length > 70 ? "…" : ""}
-          </summary>
-          <div className="mt-3 space-y-2 whitespace-pre-wrap break-words">
-            <div className="flex items-center justify-between gap-2">
-              {onToggle ? (
-                <label className="flex items-center gap-2 text-xs">
-                  <input
-                    checked={
-                      !excluded.has(
-                        JSON.stringify([block.participantId, block.path])
-                      )
-                    }
-                    onChange={() =>
-                      onToggle(
-                        JSON.stringify([block.participantId, block.path])
-                      )
-                    }
-                    type="checkbox"
-                  />
-                  Consider in revision
-                </label>
-              ) : null}
-              {onRevert &&
-              block.participantId === currentParticipantId &&
-              !blocks.some(
-                (other) =>
-                  other.path === block.path && other.revision > block.revision
-              ) ? (
-                <Button
-                  aria-label="Restore original passage"
-                  onClick={() => onRevert(block)}
-                  size="icon-sm"
-                  title="Restore original passage; keeps edit history"
-                  variant="ghost"
-                >
-                  <Undo2 />
-                </Button>
-              ) : null}
-            </div>
-            <p className="text-muted-foreground text-xs">
-              Edited by {profiles[block.participantId]?.name ?? "Collaborator"}
-              {blocks.some(
-                (other) =>
-                  other.path === block.path && other.revision > block.revision
-              )
-                ? " · Superseded by a later edit"
-                : " · Applied"}
-            </p>
-            <p className="text-muted-foreground">
-              <span className="block text-xs">Before</span>
-              {block.original}
-            </p>
-            <p>
-              <span className="block text-muted-foreground text-xs">
-                Author’s edit
-              </span>
-              {block.deleted ? "Removed from the shared document" : block.text}
-            </p>
+          <div className="flex shrink-0 items-center gap-1">
+            {onToggle ? (
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  checked={
+                    !excluded.has(
+                      JSON.stringify([block.participantId, block.path])
+                    )
+                  }
+                  onChange={() =>
+                    onToggle(JSON.stringify([block.participantId, block.path]))
+                  }
+                  type="checkbox"
+                />
+                <span className="sr-only">Consider in revision</span>
+              </label>
+            ) : null}
+            {onRevert &&
+            block.participantId === currentParticipantId &&
+            !blocks.some(
+              (other) =>
+                other.path === block.path && other.revision > block.revision
+            ) ? (
+              <Button
+                aria-label="Restore original passage"
+                onClick={() => onRevert(block)}
+                size="icon-sm"
+                title="Restore original passage; keeps edit history"
+                variant="ghost"
+              >
+                <Undo2 />
+              </Button>
+            ) : null}
           </div>
-        </details>
+
+          <details className="min-w-0 flex-1">
+            <summary className="cursor-pointer truncate">
+              {block.deleted ? "Removed text" : "Changed text"}:{" "}
+              {block.original.slice(0, 70)}
+              {block.original.length > 70 ? "…" : ""}
+            </summary>
+            <div className="mt-3 space-y-2 whitespace-pre-wrap break-words">
+              <p className="text-muted-foreground text-xs">
+                Edited by{" "}
+                {profiles[block.participantId]?.name ?? "Collaborator"}
+                {blocks.some(
+                  (other) =>
+                    other.path === block.path && other.revision > block.revision
+                )
+                  ? " · Superseded by a later edit"
+                  : " · Applied"}
+              </p>
+              <p className="text-muted-foreground">
+                <span className="block text-xs">Before</span>
+                {block.original}
+              </p>
+              <p>
+                <span className="block text-muted-foreground text-xs">
+                  Author’s edit
+                </span>
+                {block.deleted
+                  ? "Removed from the shared document"
+                  : block.text}
+              </p>
+            </div>
+          </details>
+        </div>
       ))}
     </section>
   );

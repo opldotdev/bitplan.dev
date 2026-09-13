@@ -37,6 +37,45 @@ export const UI_SOUND_HOVER_THROTTLE_MS = 150;
 let unlocked = false;
 let lastHoverAt = 0;
 let lastHoverTarget: EventTarget | null = null;
+const activeSounds = new Set<HTMLAudioElement>();
+let sessionPreference = { muted: false, volume: 1 };
+export const UI_SOUND_PREFERENCE = "bitplan.ui-sound";
+export function soundPreference(value: unknown): {
+  muted: boolean;
+  volume: number;
+} {
+  const input = value as { muted?: unknown; volume?: unknown } | null;
+  return {
+    muted: input?.muted === true,
+    volume:
+      typeof input?.volume === "number" && Number.isFinite(input.volume)
+        ? Math.max(0, Math.min(1, input.volume))
+        : 1,
+  };
+}
+export function getSoundPreference() {
+  try {
+    return soundPreference(
+      JSON.parse(localStorage.getItem(UI_SOUND_PREFERENCE) ?? "null")
+    );
+  } catch {
+    return sessionPreference;
+  }
+}
+export function setSoundPreference(value: { muted: boolean; volume: number }) {
+  const next = soundPreference(value);
+  sessionPreference = next;
+  try {
+    localStorage.setItem(UI_SOUND_PREFERENCE, JSON.stringify(next));
+  } catch {
+    /* Optional device persistence. */
+  }
+  for (const shot of activeSounds) {
+    shot.pause();
+  }
+  activeSounds.clear();
+  return next;
+}
 
 function canUseDom(): boolean {
   return typeof window !== "undefined" && typeof document !== "undefined";
@@ -74,14 +113,26 @@ export function playUiSound(
   name: UiSoundName,
   options?: { volume?: number }
 ): void {
-  if (!canUseDom() || prefersReducedMotion()) {
+  const preference = getSoundPreference();
+  if (
+    !canUseDom() ||
+    prefersReducedMotion() ||
+    preference.muted ||
+    preference.volume === 0 ||
+    !isUiSoundName(name)
+  ) {
     return;
   }
   unlocked = true;
   try {
     const shot = new Audio(UI_SOUND_FILES[name]);
-    shot.volume = options?.volume ?? UI_SOUND_VOLUME;
-    shot.play().catch(() => undefined);
+    shot.volume = Math.max(
+      0,
+      Math.min(1, (options?.volume ?? UI_SOUND_VOLUME) * preference.volume)
+    );
+    activeSounds.add(shot);
+    shot.onended = () => activeSounds.delete(shot);
+    shot.play().catch(() => activeSounds.delete(shot));
   } catch {
     // Audio must never block the interaction it accompanies.
   }

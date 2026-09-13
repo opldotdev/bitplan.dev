@@ -203,6 +203,14 @@ test("click selects, second click edits, Escape clears, and deletion survives re
   expect(instance.removed).toBe(true);
   const edit = instance.messages.find((message) => message.type === "edit");
   expect(edit?.payload.deleted).toBe(true);
+  instance.send("saved", { ...edit?.payload, revision: 1 });
+  instance.event("keydown", { key: "z", metaKey: true });
+  expect(instance.removed).toBe(false);
+  expect(instance.element.textContent).toBe("Original");
+  expect(
+    instance.messages.filter((message) => message.type === "edit").at(-1)
+      ?.payload.deleted
+  ).toBe(false);
   const reader = bridge();
   reader.send("blocks", [{ ...edit?.payload, revision: 1 }]);
   expect(reader.removed).toBe(true);

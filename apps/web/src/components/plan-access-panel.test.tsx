@@ -7,19 +7,21 @@ import {
 } from "./revision-sharing";
 
 test("contributors see actual access but cannot configure next-revision recipients", () => {
-  const render = (publisher: boolean) =>
+  const render = (publisher: boolean, view: "access" | "pdf" = "access") =>
     renderToStaticMarkup(
       <RevisionSharingProvider
         currentAccess={{ link: true, recipients: [] }}
         origin="h_test"
       >
-        <PlanAccessPanel origin="h_test" publisher={publisher} />
+        <PlanAccessPanel origin="h_test" publisher={publisher} view={view} />
       </RevisionSharingProvider>
     );
   const contributor = render(false);
   expect(contributor).toContain("Anyone with the full link");
   expect(contributor).toContain("Copy plan link");
-  expect(contributor).toContain("PDF</button>");
+  expect(contributor).not.toContain("Save as PDF");
+  expect(render(false, "pdf")).toContain("Save as PDF");
+  expect(render(false, "pdf")).not.toContain("revision-access");
   expect(contributor).not.toContain("revision-access");
   expect(contributor).not.toContain("Private copy");
   expect(render(true)).toContain("revision-access");

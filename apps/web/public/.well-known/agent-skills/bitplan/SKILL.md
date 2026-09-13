@@ -21,6 +21,22 @@ wallet interface, not the inscription format.
 Use `bunx bitplan` or `npx bitplan`. Never install the CLI globally. Run it
 from the repository the plan belongs to so BitPlan records Git metadata.
 
+## Complete the requested workflow
+
+| User intent | Action | Completion evidence |
+| --- | --- | --- |
+| Read or contribute live | Discover WebMCP; read the document and layers, then make only authorized edits | Re-read the saved item and cursor; this is not a new version |
+| Save the next hosted version | Follow the Publish prompt's inclusion and access selections; append with `--hosted --draft <id>` | Decrypt/read back the new version, return and open its viewer URL |
+| Change next-version recipients | Verify the selected team fingerprint; use `--private --share-with` on the same hosted ID | Exact selected recipients plus publisher, no inherited reader-link slot |
+| Make a separate copy | Use `--new --hosted` only when explicitly requested | New ID at v1; source unchanged |
+| Record on chain | Review content, recipients, assets, fee and checkpoint support; obtain spending approval | Actual published outpoint, never just a prepared transaction |
+
+An authorized hosted save should finish in BitPlan, not at a local HTML preview
+or an extra review request. If access, authority, team membership, or concurrent
+changes prevent saving, identify that exact blocker and say no version was saved.
+Never substitute a new v1 copy for a blocked same-ID update. Contributors own
+their layers; their annotation prompt does not authorize replacing the document.
+
 ## Choose the wallet honestly
 
 Prefer a compatible BRC-100 wallet the user already has. Check it with
@@ -61,7 +77,7 @@ or localhost versus production does not inherit it. An already authorized wallet
 reconnects automatically, but wallet connection alone does not transfer ownership.
 Older starters that discarded the capability cannot be upgraded using a reader
 link; request an explicitly authorized new owned copy instead.
-The creator's Publish sidebar offers Save current document: this saves all
+The creator's Publish modal offers Save current document: this saves all
 currently saved live document edits as a new hosted version, preserves envelope
 recipients, and rejects stale base versions. Notes remain on their original
 version; this action does not checkpoint annotation layers or spend BSV.
@@ -161,7 +177,7 @@ with the selected identities plus the publishing wallet. Verify CLI support
 first: older releases reject this combination. Without `--share-with`, `--private`
 means wallet-only. Old versions keep their original access.
 
-The Publish sidebar's Selected people setting updates the same plan; it does
+The Publish modal's Selected people setting updates the same plan; it does
 not request a fork. Use `--hosted --draft <id>` for the next hosted version.
 Only use `--new` when the user explicitly requests a separate copy. Hosted
 versions increment without a blockchain transaction. New versions start with
@@ -572,10 +588,26 @@ anchors are pinned to the exact document target and must not be silently
 reused against replacement content. The image
 icon opens Photos, Stickers, Draw, and Generate. Raster uploads up to 20 MB are resized
 locally to fit the 170 KB image budget; SVG/GIF must already fit that budget.
-The gear enables the native browser menu on subsequent right-clicks; restore
-the annotation toolbar with the checkbox in Edit & annotate. Browsers cannot be told to open their
-native menu programmatically. If a browser intercepts right-click before the
-page receives it, use Edit & annotate instead; do not weaken the iframe sandbox
+The annotation toolbar gear and navbar Settings button open the same centered
+Settings dialog. Interaction contains Plan right-click tools (off uses the
+native browser menu), the shortcut legend, comparison and editing controls.
+The menu preference persists on this device; opening Settings does not change it.
+Sound controls UI mute and overall volume for the existing sound theme. Audio never
+changes save, signature, or transaction status.
+Select your own drawing, image, HTML widget, or note and press Delete to remove it.
+Command/Ctrl+Z undoes a removal in the current session; concurrent changes reject
+stale restores. These actions retain annotation history and do not delete other
+authors' layers. Native typing undo remains separate.
+Publish uses the same modal design, with Review changes, Access, and Export PDF.
+Review rows start collapsed; expand only the changes you need. Access selections
+and team fingerprints are shared with the generated revision prompt. Contributor
+access is read-only; only the publisher changes next-version readers.
+Appearance offers Light/Dark/System. Publishing links to Publish and retains
+document metadata; recipients and per-version spending intent stay in Publish.
+The centered document title opens a searchable wallet draft list; rename the
+current plan inside that dialog. Navbar labels collapse to icons on mobile.
+Browsers cannot be told to open their native menu programmatically. If a browser
+intercepts right-click before the page receives it, use Settings instead; do not weaken the iframe sandbox
 or native event validation. This is also the mobile entry point.
 The toolbar offers a freehand pen, Shapes (rectangle, ellipse, line, arrow,
 thought cloud), and a shared drawing color. Drag directly over the document;

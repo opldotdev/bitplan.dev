@@ -81,11 +81,12 @@ export function PlanPublishing({
       aria-expanded={isMobile ? openMobile : open}
       aria-label="Publish"
       onClick={toggleSidebar}
-      size="icon-sm"
+      size="sm"
       title={access ? `Publish · ${access.role}` : "Publish"}
-      variant="ghost"
+      variant="default"
     >
       <Upload aria-hidden="true" />
+      <span className="hidden lg:inline">Publish</span>
     </Button>
   );
 }

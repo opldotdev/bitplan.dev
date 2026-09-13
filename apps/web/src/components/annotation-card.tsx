@@ -96,7 +96,8 @@ export function AnnotationCard({
     });
   }
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: passive anchor highlighting augments child controls; it never replaces their keyboard behavior
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: the spatial widget supports selection while retaining its child controls
+    // biome-ignore lint/a11y/useSemanticElements: group names a spatial annotation, not a form fieldset
     <article
       aria-busy={saving}
       aria-label={label}
@@ -110,6 +111,11 @@ export function AnnotationCard({
       onPointerDown={(event) => {
         onSelect?.();
         const target = event.target as HTMLElement;
+        if (
+          !target.closest("button,a,input,textarea,select,[contenteditable]")
+        ) {
+          event.currentTarget.focus({ preventScroll: true });
+        }
         const handle = target.closest("[data-move-annotation]");
         const image =
           item.content.type === "image" &&
@@ -135,9 +141,12 @@ export function AnnotationCard({
         const next = moved(event.clientX, event.clientY);
         moving.current = null;
         setPlacement(next);
-        void move(next);
+        if (next.dx !== position.dx || next.dy !== position.dy) {
+          void move(next);
+        }
       }}
       ref={card}
+      role="group"
       style={{
         ...style,
         height: size?.height ?? (item.content.type === "html" ? 96 : undefined),
@@ -146,6 +155,8 @@ export function AnnotationCard({
         translate: `${position.dx}px ${position.dy}px`,
         width: size?.width ?? 224,
       }}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: focus selects the spatial widget for keyboard deletion
+      tabIndex={0}
     >
       <div
         className={`min-h-0 flex-1 ${widget ? "overflow-hidden" : "overflow-auto"}`}

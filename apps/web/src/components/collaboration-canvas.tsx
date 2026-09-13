@@ -10,12 +10,11 @@ import {
   Shapes,
   Trash2,
   Type,
-  X,
 } from "lucide-react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { ContextMenu } from "radix-ui";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AnnotationCard } from "@/components/annotation-card";
 import { AnnotationDrawLayer } from "@/components/annotation-draw-layer";
@@ -24,6 +23,7 @@ import { AnnotationOnboarding } from "@/components/annotation-onboarding";
 import { AnnotationThread } from "@/components/annotation-thread";
 import { DocumentEditSummary } from "@/components/document-edit-summary";
 import { PlanAccessPanel } from "@/components/plan-access-panel";
+import { PlanSettings } from "@/components/plan-settings";
 import { useRevisionSharing } from "@/components/revision-sharing";
 import { usePlanAppearance } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
@@ -33,13 +33,14 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Sidebar, useSidebar } from "@/components/ui/sidebar";
+import { useSidebar } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import { registerWebMcpTool } from "@/components/webmcp-tools";
 import { withAnnotationBridge } from "@/lib/annotation-bridge";
 import { annotationInputAction } from "@/lib/annotation-input";
 import { annotationLink } from "@/lib/annotation-link";
 import { annotationCardOffset } from "@/lib/annotation-position";
+import { annotationShortcut } from "@/lib/annotation-shortcut";
 import { annotationReplies } from "@/lib/annotation-thread";
 import {
   type Annotation,
@@ -73,6 +74,19 @@ import { planPassages, planSections } from "@/lib/plan-sections";
 import { printPlan } from "@/lib/print-plan";
 import { withRenderPolicy } from "@/lib/render-policy";
 import type { CollaborationState } from "@/lib/use-collaboration";
+
+function annotationLabel(content: AnnotationContent) {
+  if (content.type === "text") {
+    return content.text.slice(0, 65);
+  }
+  if (content.type === "html") {
+    return "HTML design";
+  }
+  if (content.type === "image") {
+    return content.alt || "Image";
+  }
+  return "Drawing";
+}
 
 const center: AnnotationAnchor = { point: { x: 0.5, y: 0.1 } };
 const menuItem =
@@ -129,7 +143,13 @@ export function CollaborationCanvas({
   room,
   isPublisher = false,
   onSaveHosted,
+  settingsOpen,
+  onSettingsOpenChange,
+  settingsDetails,
 }: {
+  settingsOpen: boolean;
+  onSettingsOpenChange: (open: boolean) => void;
+  settingsDetails: ReactNode;
   html: string;
   title: string;
   target: DocumentTarget;
@@ -168,6 +188,25 @@ export function CollaborationCanvas({
   const panel = isMobile ? openMobile : sidebarOpen;
   const setPanel = isMobile ? setOpenMobile : setOpen;
   const [browserMenu, setBrowserMenu] = useState(false);
+  const selectedAnnotation = useRef<string | null>(null);
+  const removedAnnotations = useRef<Annotation[]>([]);
+  const annotationActionBusy = useRef(false);
+  const [publishSection, setPublishSection] = useState("Review changes");
+  useEffect(() => {
+    try {
+      setBrowserMenu(localStorage.getItem("bitplan.browser-menu") === "true");
+    } catch {
+      /* Device storage may be unavailable. */
+    }
+  }, []);
+  function changeBrowserMenu(enabled: boolean) {
+    setBrowserMenu(enabled);
+    try {
+      localStorage.setItem("bitplan.browser-menu", String(enabled));
+    } catch {
+      /* Still applies in this session. */
+    }
+  }
   const [showEdits, setShowEdits] = useState(true);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [revisionNotes, setRevisionNotes] = useState("");
@@ -578,6 +617,9 @@ export function CollaborationCanvas({
           );
         }
       } else if (event.data.type === "pointer" || event.data.type === "click") {
+        if (event.data.type === "click") {
+          selectedAnnotation.current = null;
+        }
         const hovered = parseAnchor(event.data.payload?.anchor);
         lastHover.current = hovered;
         if (event.data.payload?.selecting === true) {
@@ -642,6 +684,7 @@ export function CollaborationCanvas({
       return;
     }
     if (key === "Escape" || key === "v") {
+      selectedAnnotation.current = null;
       stopPicking();
       setDrawing(null);
       textPort.current?.postMessage({ type: "clear-selection" });
@@ -676,6 +719,7 @@ export function CollaborationCanvas({
       locate();
     }
     window.addEventListener("message", acceptGeometryPort);
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: shared keyboard entry keeps trusted-input and ownership guards explicit
     function keyboardTools(event: KeyboardEvent) {
       if (!showEditsRef.current) {
         return;
@@ -683,6 +727,34 @@ export function CollaborationCanvas({
       if (event.isTrusted && event.key === "Escape" && !event.isComposing) {
         keyboardAction("Escape");
         return;
+      }
+      const shortcut = annotationShortcut(
+        event,
+        event.target instanceof Element &&
+          !!event.target.closest(
+            "input,textarea,select,[contenteditable],[role=dialog]"
+          )
+      );
+      if (shortcut) {
+        if (shortcut === "undo" && removedAnnotations.current.length) {
+          event.preventDefault();
+          void undoAnnotationRemoval();
+          return;
+        }
+        if (shortcut === "remove" && selectedAnnotation.current) {
+          const item = roomRef.current.annotations.find(
+            (a) => a.id === selectedAnnotation.current
+          );
+          if (
+            item &&
+            sameDocumentTarget(item.target, roomRef.current.activeTarget) &&
+            item.participantId === roomRef.current.connection?.participantId
+          ) {
+            event.preventDefault();
+            void resolve(item);
+            return;
+          }
+        }
       }
       if (
         !event.isTrusted ||
@@ -981,17 +1053,73 @@ export function CollaborationCanvas({
   }, [room.connection]);
 
   async function resolve(item: Annotation) {
+    const { current } = roomRef;
+    if (
+      // biome-ignore lint/suspicious/noUnnecessaryConditions: asynchronous input can arrive during the pending save
+      annotationActionBusy.current ||
+      item.participantId !== current.connection?.participantId ||
+      !sameDocumentTarget(item.target, current.activeTarget)
+    ) {
+      return;
+    }
+    annotationActionBusy.current = true;
     try {
-      await room.saveAnnotation(item.content, item.anchor, {
+      await current.saveAnnotation(item.content, item.anchor, {
         ...item,
         status: item.status === "open" ? "resolved" : "open",
       });
+      if (item.status === "open") {
+        removedAnnotations.current.push({
+          ...item,
+          revision: item.revision + 1,
+          status: "resolved",
+        });
+        if (removedAnnotations.current.length > 50) {
+          removedAnnotations.current.shift();
+        }
+        selectedAnnotation.current = null;
+        toast.success("Annotation removed", {
+          action: {
+            label: "Undo",
+            onClick: () => void undoAnnotationRemoval(),
+          },
+        });
+      }
     } catch (failure) {
       toast.error(
         failure instanceof Error
           ? failure.message
           : "Could not update annotation."
       );
+    } finally {
+      annotationActionBusy.current = false;
+    }
+  }
+  async function undoAnnotationRemoval() {
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: repeated key events can arrive while a restore is pending
+    if (annotationActionBusy.current) {
+      return;
+    }
+    const item = removedAnnotations.current.at(-1);
+    const { current } = roomRef;
+    if (
+      !(item && sameDocumentTarget(item.target, current.activeTarget)) ||
+      item.participantId !== current.connection?.participantId
+    ) {
+      return;
+    }
+    annotationActionBusy.current = true;
+    try {
+      await current.saveAnnotation(item.content, item.anchor, {
+        ...item,
+        status: "open",
+      });
+      removedAnnotations.current.pop();
+      toast.success("Annotation restored");
+    } catch {
+      toast.error("This annotation changed. Review it before restoring.");
+    } finally {
+      annotationActionBusy.current = false;
     }
   }
   async function saveInline() {
@@ -1327,7 +1455,13 @@ export function CollaborationCanvas({
                     item={item}
                     key={item.id}
                     label={`Annotation ${index + 1}`}
-                    onSelect={() => setHighlight(item.anchor)}
+                    onSelect={() => {
+                      selectedAnnotation.current = item.id;
+                      setHighlight(item.anchor);
+                      textPort.current?.postMessage({
+                        type: "clear-selection",
+                      });
+                    }}
                     save={(changes) =>
                       room.saveAnnotation(item.content, item.anchor, {
                         ...item,
@@ -1570,16 +1704,10 @@ export function CollaborationCanvas({
             }}
           >
             <ContextMenu.Item
-              aria-label="Use browser right-click menu"
+              aria-label="Settings"
               className={menuItem}
-              onSelect={() => {
-                setBrowserMenu(true);
-                toast.info(
-                  "Right-click again for the browser menu. Restore annotation tools in New version.",
-                  { position: "top-center" }
-                );
-              }}
-              title="Use browser menu on your next right-click"
+              onSelect={() => onSettingsOpenChange(true)}
+              title="Settings"
             >
               <Settings />
             </ContextMenu.Item>
@@ -1695,482 +1823,562 @@ export function CollaborationCanvas({
           </ContextMenu.Content>
         </ContextMenu.Portal>
       </ContextMenu.Root>
-      {room.connection ? (
-        <Sidebar
-          aria-label="Live annotations"
-          className="top-[49px] h-[calc(100svh-49px)] bg-background"
-          data-bitplan-collaboration="live"
-          id="bitplan-annotations"
-          side="right"
-        >
-          <div className="flex items-center justify-between border-b p-3">
-            <div>
-              <h2 className="font-serif text-2xl">
-                {draftingRevision ? "Publish" : "Your contributions"}
-              </h2>
-              <p className="text-muted-foreground text-xs" role="status">
-                {room.online ? "Live · encrypted" : "Reconnecting…"} · change{" "}
-                {room.sequence}
-              </p>
-            </div>
-            <Button
-              aria-label="Close annotations"
-              onClick={() => setPanel(false)}
-              size="icon-sm"
-              variant="ghost"
-            >
-              <X />
-            </Button>
-          </div>
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-            <details
-              className="space-y-3 border-b pb-3"
-              id="view-editing-tools"
-            >
-              <summary className="cursor-pointer text-muted-foreground text-sm">
-                View & editing tools
-              </summary>
-              <fieldset className="space-y-2 pb-3">
-                <legend className="mb-2 font-medium text-sm">Your view</legend>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    checked={showEdits}
-                    onChange={(event) => {
-                      if (
-                        textRecovery.current.size ||
-                        inline ||
-                        editor ||
-                        drawing
-                      ) {
-                        toast.info(
-                          "Finish your current edit before comparing."
-                        );
-                        return;
-                      }
-                      stopPicking();
-                      setShowEdits(event.target.checked);
-                    }}
-                    type="checkbox"
-                  />
-                  Show live changes
-                </label>
-                <p className="text-muted-foreground text-xs">
-                  {showEdits
-                    ? "Only changes your view. Nothing is removed."
-                    : "Original version · read-only. Live changes are still saved."}
-                </p>
-              </fieldset>
-              <Button
-                disabled={!showEdits}
-                onClick={() => startPicking()}
-                size="sm"
-                variant="outline"
-              >
-                Annotate an element
-              </Button>
+      <PlanSettings
+        browserMenu={browserMenu}
+        details={settingsDetails}
+        interaction={
+          <>
+            <fieldset className="space-y-2 pb-3">
+              <legend className="mb-2 font-medium text-sm">Your view</legend>
               <label className="flex items-center gap-2 text-sm">
                 <input
-                  checked={browserMenu}
-                  onChange={(event) => setBrowserMenu(event.target.checked)}
-                  type="checkbox"
-                />
-                Use browser right-click menu
-              </label>
-              {isHostedId(target.origin) ? (
-                <>
-                  <Button
-                    disabled={!showEdits}
-                    onClick={() => {
-                      setInlineEditing((value) => !value);
-                      setPanel(false);
-                    }}
-                    size="sm"
-                    variant="outline"
-                  >
-                    {inlineEditing
-                      ? "Finish editing text"
-                      : "Edit text in place"}
-                  </Button>
-                  <Button
-                    disabled={!showEdits}
-                    onClick={editDocument}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Edit HTML
-                  </Button>
-                </>
-              ) : null}
-            </details>
-            <PlanAccessPanel origin={target.origin} publisher={isPublisher} />
-            <DocumentEditSummary
-              blocks={reviewEdits.filter(
-                (block) =>
-                  sameDocumentTarget(block.base, room.activeTarget) &&
-                  (isPublisher ||
-                    block.participantId === room.connection?.participantId)
-              )}
-              currentParticipantId={room.connection?.participantId}
-              excluded={excluded}
-              htmlRevision={
-                room.documentDraft?.html === undefined
-                  ? undefined
-                  : room.documentDraft.revision
-              }
-              onConsiderAll={
-                isPublisher
-                  ? (include) =>
-                      setExcluded((previous) => {
-                        const next = new Set(previous);
-                        for (const block of reviewEdits.filter((entry) =>
-                          sameDocumentTarget(entry.base, room.activeTarget)
-                        )) {
-                          const key = JSON.stringify([
-                            block.participantId,
-                            block.path,
-                          ]);
-                          if (include) {
-                            next.delete(key);
-                          } else {
-                            next.add(key);
-                          }
-                        }
-                        return next;
-                      })
-                  : undefined
-              }
-              onRevert={async (block) => {
-                const latest = room.textBlocks.find(
-                  (item) =>
-                    item.path === block.path &&
-                    sameDocumentTarget(item.base, block.base)
-                );
-                if (
-                  !latest ||
-                  latest.revision !== block.revision ||
-                  latest.participantId !== room.connection?.participantId
-                ) {
-                  toast.error(
-                    "This passage changed. Review the latest edit first."
-                  );
-                  return;
-                }
-                try {
-                  await room.saveTextBlock(
-                    { ...block, deleted: false, text: block.original },
-                    block.revision
-                  );
-                  toast.success("Original text restored. History is retained.");
-                } catch {
-                  toast.error(
-                    "Could not restore text. Refresh and review the latest edit."
-                  );
-                }
-              }}
-              onToggle={
-                isPublisher
-                  ? (id) =>
-                      setExcluded((previous) => {
-                        const next = new Set(previous);
-                        if (!next.delete(id)) {
-                          next.add(id);
-                        }
-                        return next;
-                      })
-                  : undefined
-              }
-              profiles={room.profiles}
-            />
-            {room.annotations.some(
-              (item) =>
-                item.status === "open" &&
-                (isPublisher ||
-                  item.participantId === room.connection?.participantId)
-            ) ||
-            reviewEdits.some(
-              (item) =>
-                sameDocumentTarget(item.base, room.activeTarget) &&
-                (isPublisher ||
-                  item.participantId === room.connection?.participantId)
-            ) ? null : (
-              <div className="py-10 text-center">
-                <p className="font-serif text-xl">
-                  {isPublisher
-                    ? "Room for the next idea."
-                    : "Make your first mark."}
-                </p>
-                <p className="mx-auto mt-2 max-w-60 text-muted-foreground text-sm">
-                  Add a note, edit a passage, or drop an image onto the plan.
-                  Your changes appear here.
-                </p>
-                <Button
-                  className="mt-4"
-                  onClick={() => startPicking()}
-                  size="sm"
-                  variant="outline"
-                >
-                  Add a note
-                </Button>
-              </div>
-            )}
-            {room.annotations
-              .filter(
-                (item) =>
-                  item.status === "open" &&
-                  (isPublisher
-                    ? !item.replyTo
-                    : item.participantId === room.connection?.participantId)
-              )
-              .map((item) => (
-                <article
-                  className="space-y-2 rounded-lg border p-3 text-sm"
-                  data-annotation-id={item.id}
-                  key={item.id}
-                >
-                  {isPublisher ? (
-                    <label className="flex items-center gap-2 text-xs">
-                      <input
-                        checked={!excluded.has(item.id)}
-                        onChange={() =>
-                          setExcluded((previous) => {
-                            const next = new Set(previous);
-                            if (!next.delete(item.id)) {
-                              next.add(item.id);
-                            }
-                            return next;
-                          })
-                        }
-                        type="checkbox"
-                      />
-                      Consider in revision
-                    </label>
-                  ) : null}
-                  <Button
-                    onClick={() => {
-                      if (sameDocumentTarget(item.target, room.activeTarget)) {
-                        setHighlight(item.anchor);
-                      }
-                    }}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Show element
-                  </Button>
-                  <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
-                    <span>
-                      {room.profiles[item.participantId]?.name ??
-                        "Collaborator"}
-                    </span>
-                    <span>{item.status}</span>
-                  </div>
-                  <AnnotationAttachmentStatus
-                    item={item}
-                    position={positions[item.id]}
-                    target={room.activeTarget}
-                  />
-                  {item.content.type === "text" ? (
-                    <AnnotationThread
-                      currentParticipantId={room.connection?.participantId}
-                      disabled={
-                        !(
-                          room.online &&
-                          sameDocumentTarget(item.target, room.activeTarget)
-                        )
-                      }
-                      item={item}
-                      onReply={(replyText) =>
-                        room.saveAnnotation(
-                          { text: replyText, type: "text" },
-                          item.anchor,
-                          undefined,
-                          undefined,
-                          item.id
-                        )
-                      }
-                      onResolve={resolve}
-                      profiles={room.profiles}
-                      replies={annotationReplies(item, room.annotations)}
-                    />
-                  ) : (
-                    <AnnotationBody content={item.content} />
-                  )}
-                  {item.participantId === room.connection?.participantId ? (
-                    <Button
-                      aria-label="Remove my annotation"
-                      onClick={() => void resolve(item)}
-                      size="icon-sm"
-                      title="Resolve this annotation; its history is retained"
-                      variant="ghost"
-                    >
-                      <Trash2 />
-                    </Button>
-                  ) : null}
-                </article>
-              ))}
-          </div>
-          <div className="shrink-0 space-y-3 border-t bg-background p-4">
-            {onSaveHosted &&
-            !publishOnChain &&
-            sharing?.value.mode === "preserve" ? (
-              <div className="space-y-2">
-                <Button
-                  className="w-full"
-                  disabled={savingHosted || !room.online}
-                  onClick={async () => {
+                  checked={showEdits}
+                  onChange={(event) => {
                     if (
                       textRecovery.current.size ||
                       inline ||
                       editor ||
                       drawing
                     ) {
-                      toast.info(
-                        "Finish your current edit before saving a version."
+                      toast.info("Finish your current edit before comparing.");
+                      return;
+                    }
+                    stopPicking();
+                    setShowEdits(event.target.checked);
+                  }}
+                  type="checkbox"
+                />
+                Show live changes
+              </label>
+              <p className="text-muted-foreground text-xs">
+                {showEdits
+                  ? "Only changes your view. Nothing is removed."
+                  : "Original version · read-only. Live changes are still saved."}
+              </p>
+            </fieldset>
+            <Button
+              disabled={!showEdits}
+              onClick={() => {
+                onSettingsOpenChange(false);
+                startPicking();
+              }}
+              size="sm"
+              variant="outline"
+            >
+              Annotate an element
+            </Button>
+            {isHostedId(target.origin) ? (
+              <>
+                <Button
+                  disabled={!showEdits}
+                  onClick={() => {
+                    setInlineEditing((value) => !value);
+                    onSettingsOpenChange(false);
+                    setPanel(false);
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  {inlineEditing ? "Finish editing text" : "Edit text in place"}
+                </Button>
+                <Button
+                  disabled={!showEdits}
+                  onClick={() => {
+                    onSettingsOpenChange(false);
+                    editDocument();
+                  }}
+                  size="sm"
+                  variant="ghost"
+                >
+                  Edit HTML
+                </Button>
+              </>
+            ) : null}
+          </>
+        }
+        onBrowserMenuChange={changeBrowserMenu}
+        onOpenChange={onSettingsOpenChange}
+        onPublish={() => setPanel(true)}
+        open={settingsOpen}
+      />
+      {room.connection ? (
+        <Dialog onOpenChange={setPanel} open={panel}>
+          <DialogContent
+            aria-label="Publish plan"
+            className="h-[min(850px,90dvh)] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden rounded-[18px] bg-background p-0 shadow-2xl sm:w-[calc(100vw-4rem)] sm:max-w-[1100px] md:grid-cols-[minmax(230px,1fr)_minmax(0,1.6fr)] md:grid-rows-1"
+            fullScreenOnMobile={false}
+            id="bitplan-annotations"
+          >
+            <div className="flex flex-col border-b p-5 md:border-r md:border-b-0 md:p-12">
+              <DialogTitle className="font-normal font-serif text-4xl tracking-tight md:text-6xl">
+                {draftingRevision ? "Publish" : "Your contributions"}
+              </DialogTitle>
+              <DialogDescription className="sr-only">
+                Review contributions, choose access, and prepare the next
+                version.
+              </DialogDescription>
+              <nav
+                aria-label="Publish sections"
+                className="mt-4 flex gap-2 md:mt-14 md:flex-col md:gap-7"
+              >
+                {["Review changes", "Access", "Export PDF"].map((section) => (
+                  <button
+                    aria-current={
+                      publishSection === section ? "page" : undefined
+                    }
+                    className="relative whitespace-nowrap rounded-sm py-1 pl-3 text-left font-serif text-muted-foreground text-sm transition-colors hover:text-foreground aria-[current=page]:text-foreground md:pl-4 md:text-2xl"
+                    key={section}
+                    onClick={() => setPublishSection(section)}
+                    type="button"
+                  >
+                    {publishSection === section ? (
+                      <span className="absolute inset-y-1 left-0 w-[3px] rounded-full bg-primary" />
+                    ) : null}
+                    {section}
+                  </button>
+                ))}
+              </nav>
+              <p className="mt-auto hidden border-t pt-5 font-serif text-muted-foreground md:block">
+                {title} · v{target.version}
+              </p>
+            </div>
+            <div className="flex min-h-0 flex-col overflow-hidden px-6 pt-6 md:px-12 md:pt-12">
+              <h2 className="font-serif text-3xl md:text-4xl">
+                {publishSection}
+              </h2>
+              <p className="mt-2 mb-6 text-muted-foreground text-sm">
+                {draftingRevision
+                  ? `Next version · v${target.version + 1}`
+                  : "Your annotation layer"}
+              </p>
+              {publishSection === "Review changes" ? null : (
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <PlanAccessPanel
+                    origin={target.origin}
+                    publisher={isPublisher}
+                    view={publishSection === "Access" ? "access" : "pdf"}
+                  />
+                </div>
+              )}
+              <div
+                className="min-h-0 flex-1 space-y-3 overflow-y-auto"
+                hidden={publishSection !== "Review changes"}
+              >
+                <DocumentEditSummary
+                  blocks={reviewEdits.filter(
+                    (block) =>
+                      sameDocumentTarget(block.base, room.activeTarget) &&
+                      (isPublisher ||
+                        block.participantId === room.connection?.participantId)
+                  )}
+                  currentParticipantId={room.connection?.participantId}
+                  excluded={excluded}
+                  htmlRevision={
+                    room.documentDraft?.html === undefined
+                      ? undefined
+                      : room.documentDraft.revision
+                  }
+                  onConsiderAll={
+                    isPublisher
+                      ? (include) =>
+                          setExcluded((previous) => {
+                            const next = new Set(previous);
+                            for (const block of reviewEdits.filter((entry) =>
+                              sameDocumentTarget(entry.base, room.activeTarget)
+                            )) {
+                              const key = JSON.stringify([
+                                block.participantId,
+                                block.path,
+                              ]);
+                              if (include) {
+                                next.delete(key);
+                              } else {
+                                next.add(key);
+                              }
+                            }
+                            return next;
+                          })
+                      : undefined
+                  }
+                  onRevert={async (block) => {
+                    const latest = room.textBlocks.find(
+                      (item) =>
+                        item.path === block.path &&
+                        sameDocumentTarget(item.base, block.base)
+                    );
+                    if (
+                      !latest ||
+                      latest.revision !== block.revision ||
+                      latest.participantId !== room.connection?.participantId
+                    ) {
+                      toast.error(
+                        "This passage changed. Review the latest edit first."
                       );
                       return;
                     }
-                    const { sequence } = room;
-                    const snapshot = materializeTextBlocks(
-                      currentHtml,
-                      room.textBlocks,
-                      room.activeTarget
-                    );
-                    setSavingHosted(true);
                     try {
-                      await onSaveHosted(snapshot, () => {
-                        if (
-                          !roomRef.current.online ||
-                          roomRef.current.sequence !== sequence
-                        ) {
-                          throw new Error(
-                            "The live plan changed. Review it before saving."
-                          );
-                        }
-                      });
-                      toast.success("New hosted version saved");
-                    } catch (error) {
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Could not save this version"
+                      await room.saveTextBlock(
+                        { ...block, deleted: false, text: block.original },
+                        block.revision
                       );
-                    } finally {
-                      setSavingHosted(false);
+                      toast.success(
+                        "Original text restored. History is retained."
+                      );
+                    } catch {
+                      toast.error(
+                        "Could not restore text. Refresh and review the latest edit."
+                      );
                     }
                   }}
-                >
-                  {savingHosted ? "Saving…" : "Save current document"}
-                </Button>
-                <p className="text-muted-foreground text-xs">
-                  Saves all live document edits with current access. Notes stay
-                  on their original version.
-                </p>
-              </div>
-            ) : null}
-            <details
-              className="group max-h-[35dvh] space-y-3 overflow-y-auto"
-              open={onSaveHosted ? undefined : true}
-            >
-              <summary className="cursor-pointer py-1 text-sm">
-                {draftingRevision
-                  ? "Revise with your agent"
-                  : "Review with your agent"}
-              </summary>
-              <div className="flex items-center justify-between gap-3">
-                <label className="text-sm" htmlFor="revision-on-chain">
-                  Publish on chain
-                </label>
-                <Switch
-                  checked={publishOnChain}
-                  id="revision-on-chain"
-                  onCheckedChange={setPublishOnChain}
+                  onToggle={
+                    isPublisher
+                      ? (id) =>
+                          setExcluded((previous) => {
+                            const next = new Set(previous);
+                            if (!next.delete(id)) {
+                              next.add(id);
+                            }
+                            return next;
+                          })
+                      : undefined
+                  }
+                  profiles={room.profiles}
                 />
-              </div>
-              <textarea
-                aria-label="Instructions for the next version"
-                className="min-h-20 w-full resize-y rounded-lg border bg-background p-3 text-sm"
-                maxLength={4000}
-                onChange={(event) => setRevisionNotes(event.target.value)}
-                placeholder="Anything else for your agent?"
-                value={revisionNotes}
-              />
-              <p className="text-muted-foreground text-xs">
-                {draftingRevision
-                  ? "Your agent uses these selections. Original layers stay intact."
-                  : "Your notes and replies stay yours. Copying a prompt does not publish them."}
-              </p>
-            </details>
-            {draftingRevision ? (
-              <p className="text-muted-foreground text-xs">
-                {publishOnChain
-                  ? "Agent prepares publication; you approve before signing."
-                  : "Agent saves the next version here with your access selections and returns its link."}
-              </p>
-            ) : null}
-            <Button
-              className="w-full"
-              disabled={
-                isPublisher &&
-                sharing?.value.mode === "private" &&
-                !sharing.value.recipients.length
-              }
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(
-                    draftingRevision
-                      ? revisionSelectionPrompt(target.origin, {
-                          annotations: room.annotations
-                            .filter(
-                              (item) =>
-                                !item.replyTo &&
-                                item.status === "open" &&
+                {room.annotations.some(
+                  (item) =>
+                    sameDocumentTarget(item.target, room.activeTarget) &&
+                    item.status === "open" &&
+                    (isPublisher ||
+                      item.participantId === room.connection?.participantId)
+                ) ||
+                reviewEdits.some(
+                  (item) =>
+                    sameDocumentTarget(item.base, room.activeTarget) &&
+                    (isPublisher ||
+                      item.participantId === room.connection?.participantId)
+                ) ? null : (
+                  <div className="py-10 text-center">
+                    <p className="font-serif text-xl">
+                      {isPublisher
+                        ? "Room for the next idea."
+                        : "Make your first mark."}
+                    </p>
+                    <p className="mx-auto mt-2 max-w-60 text-muted-foreground text-sm">
+                      Add a note, edit a passage, or drop an image onto the
+                      plan. Your changes appear here.
+                    </p>
+                    <Button
+                      className="mt-4"
+                      onClick={() => startPicking()}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Add a note
+                    </Button>
+                  </div>
+                )}
+                {room.annotations
+                  .filter(
+                    (item) =>
+                      sameDocumentTarget(item.target, room.activeTarget) &&
+                      item.status === "open" &&
+                      (isPublisher
+                        ? !item.replyTo
+                        : item.participantId === room.connection?.participantId)
+                  )
+                  .map((item) => (
+                    <article
+                      className="flex items-start gap-3 border-b py-3 text-sm"
+                      data-annotation-id={item.id}
+                      key={item.id}
+                    >
+                      {isPublisher ? (
+                        <label className="flex items-center gap-2 text-xs">
+                          <input
+                            checked={!excluded.has(item.id)}
+                            onChange={() =>
+                              setExcluded((previous) => {
+                                const next = new Set(previous);
+                                if (!next.delete(item.id)) {
+                                  next.add(item.id);
+                                }
+                                return next;
+                              })
+                            }
+                            type="checkbox"
+                          />
+                          <span className="sr-only">Consider in revision</span>
+                        </label>
+                      ) : null}
+                      <details className="min-w-0 flex-1">
+                        <summary className="cursor-pointer truncate">
+                          {annotationLabel(item.content)}
+                          <span className="ml-2 text-muted-foreground text-xs">
+                            ·{" "}
+                            {room.profiles[item.participantId]?.name ??
+                              "Collaborator"}
+                          </span>
+                        </summary>
+                        <div className="mt-3 max-h-64 space-y-3 overflow-auto">
+                          <Button
+                            onClick={() => {
+                              if (
                                 sameDocumentTarget(
                                   item.target,
                                   room.activeTarget
                                 )
-                            )
-                            .map((item) => ({
-                              id: item.id,
-                              include: !excluded.has(item.id),
-                              revision: item.revision,
-                            })),
-                          cursor: room.sequence,
-                          documentRevision: room.documentRevision,
-                          notes: revisionNotes,
-                          publishOnChain,
-                          sharing: sharing?.value,
-                          target: room.activeTarget,
-                          textEdits: reviewEdits
-                            .filter((item) =>
-                              sameDocumentTarget(item.base, room.activeTarget)
-                            )
-                            .map((item) => ({
-                              include: !excluded.has(
-                                JSON.stringify([item.participantId, item.path])
-                              ),
-                              participantId: item.participantId,
-                              path: item.path,
-                              revision: item.revision,
-                            })),
-                        })
-                      : annotationPublicationPrompt(target.origin, {
-                          cursor: room.sequence,
-                          notes: revisionNotes,
-                          participantId: room.connection?.participantId ?? "",
-                          publishOnChain,
-                          sharingMode: "preserve",
-                          target: room.activeTarget,
-                        })
-                  );
-                  toast.success("Prompt copied — send it to your agent");
-                } catch {
-                  toast.error("Could not copy the prompt");
-                }
-              }}
-            >
-              <Copy /> Copy prompt
-            </Button>
-          </div>
-        </Sidebar>
+                              ) {
+                                setHighlight(item.anchor);
+                                setPanel(false);
+                              }
+                            }}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            Show element
+                          </Button>
+                          <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
+                            <span>
+                              {room.profiles[item.participantId]?.name ??
+                                "Collaborator"}
+                            </span>
+                            <span>{item.status}</span>
+                          </div>
+                          <AnnotationAttachmentStatus
+                            item={item}
+                            position={positions[item.id]}
+                            target={room.activeTarget}
+                          />
+                          {item.content.type === "text" ? (
+                            <AnnotationThread
+                              currentParticipantId={
+                                room.connection?.participantId
+                              }
+                              disabled={
+                                !(
+                                  room.online &&
+                                  sameDocumentTarget(
+                                    item.target,
+                                    room.activeTarget
+                                  )
+                                )
+                              }
+                              item={item}
+                              onReply={(replyText) =>
+                                room.saveAnnotation(
+                                  { text: replyText, type: "text" },
+                                  item.anchor,
+                                  undefined,
+                                  undefined,
+                                  item.id
+                                )
+                              }
+                              onResolve={resolve}
+                              profiles={room.profiles}
+                              replies={annotationReplies(
+                                item,
+                                room.annotations
+                              )}
+                            />
+                          ) : (
+                            <AnnotationBody content={item.content} />
+                          )}
+                          {item.participantId ===
+                          room.connection?.participantId ? (
+                            <Button
+                              aria-label="Remove my annotation"
+                              onClick={() => void resolve(item)}
+                              size="icon-sm"
+                              title="Resolve this annotation; its history is retained"
+                              variant="ghost"
+                            >
+                              <Trash2 />
+                            </Button>
+                          ) : null}
+                        </div>
+                      </details>
+                    </article>
+                  ))}
+              </div>
+              <div className="shrink-0 space-y-3 border-t bg-background py-5">
+                <div
+                  className="space-y-4"
+                  hidden={publishSection !== "Review changes"}
+                >
+                  <button
+                    className="flex w-full items-center justify-between py-2 text-left text-sm"
+                    onClick={() => setPublishSection("Access")}
+                    type="button"
+                  >
+                    <span>
+                      {sharing?.value.mode === "link" ||
+                      (sharing?.value.mode === "preserve" &&
+                        sharing.currentAccess.link)
+                        ? "Anyone with the link"
+                        : `Private · ${sharing?.value.teams?.map((t) => t.name).join(", ") || "Selected people"} · ${sharing?.value.mode === "preserve" ? sharing.currentAccess.recipients.length : (sharing?.value.recipients.length ?? 0)} people`}
+                    </span>
+                    <span aria-hidden="true">›</span>
+                  </button>
+                  {onSaveHosted &&
+                  !publishOnChain &&
+                  sharing?.value.mode === "preserve" ? (
+                    <div className="space-y-2">
+                      <Button
+                        className="w-full"
+                        disabled={savingHosted || !room.online}
+                        onClick={async () => {
+                          if (
+                            textRecovery.current.size ||
+                            inline ||
+                            editor ||
+                            drawing
+                          ) {
+                            toast.info(
+                              "Finish your current edit before saving a version."
+                            );
+                            return;
+                          }
+                          const { sequence } = room;
+                          const snapshot = materializeTextBlocks(
+                            currentHtml,
+                            room.textBlocks,
+                            room.activeTarget
+                          );
+                          setSavingHosted(true);
+                          try {
+                            await onSaveHosted(snapshot, () => {
+                              if (
+                                !roomRef.current.online ||
+                                roomRef.current.sequence !== sequence
+                              ) {
+                                throw new Error(
+                                  "The live plan changed. Review it before saving."
+                                );
+                              }
+                            });
+                            toast.success("New hosted version saved");
+                          } catch (error) {
+                            toast.error(
+                              error instanceof Error
+                                ? error.message
+                                : "Could not save this version"
+                            );
+                          } finally {
+                            setSavingHosted(false);
+                          }
+                        }}
+                      >
+                        {savingHosted ? "Saving…" : "Save current document"}
+                      </Button>
+                      <p className="text-muted-foreground text-xs">
+                        Saves all live document edits with current access. Notes
+                        stay on their original version.
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-sm" htmlFor="revision-on-chain">
+                        Publish on chain
+                      </label>
+                      <Switch
+                        checked={publishOnChain}
+                        id="revision-on-chain"
+                        onCheckedChange={setPublishOnChain}
+                      />
+                    </div>
+                    <textarea
+                      aria-label="Instructions for the next version"
+                      className="min-h-20 w-full resize-y rounded-lg border bg-background p-3 text-sm"
+                      maxLength={4000}
+                      onChange={(event) => setRevisionNotes(event.target.value)}
+                      placeholder="Direction for your agent…"
+                      value={revisionNotes}
+                    />
+                  </div>
+                </div>
+                <Button
+                  className="h-11 w-full text-base"
+                  disabled={
+                    isPublisher &&
+                    sharing?.value.mode === "private" &&
+                    !sharing.value.recipients.length
+                  }
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        draftingRevision
+                          ? revisionSelectionPrompt(target.origin, {
+                              annotations: room.annotations
+                                .filter(
+                                  (item) =>
+                                    !item.replyTo &&
+                                    item.status === "open" &&
+                                    sameDocumentTarget(
+                                      item.target,
+                                      room.activeTarget
+                                    )
+                                )
+                                .map((item) => ({
+                                  id: item.id,
+                                  include: !excluded.has(item.id),
+                                  revision: item.revision,
+                                })),
+                              cursor: room.sequence,
+                              documentRevision: room.documentRevision,
+                              notes: revisionNotes,
+                              publishOnChain,
+                              sharing: sharing?.value,
+                              target: room.activeTarget,
+                              textEdits: reviewEdits
+                                .filter((item) =>
+                                  sameDocumentTarget(
+                                    item.base,
+                                    room.activeTarget
+                                  )
+                                )
+                                .map((item) => ({
+                                  include: !excluded.has(
+                                    JSON.stringify([
+                                      item.participantId,
+                                      item.path,
+                                    ])
+                                  ),
+                                  participantId: item.participantId,
+                                  path: item.path,
+                                  revision: item.revision,
+                                })),
+                            })
+                          : annotationPublicationPrompt(target.origin, {
+                              cursor: room.sequence,
+                              notes: revisionNotes,
+                              participantId:
+                                room.connection?.participantId ?? "",
+                              publishOnChain,
+                              sharingMode: "preserve",
+                              target: room.activeTarget,
+                            })
+                      );
+                      toast.success("Prompt copied — send it to your agent");
+                    } catch {
+                      toast.error("Could not copy the prompt");
+                    }
+                  }}
+                >
+                  <Copy /> Copy agent prompt
+                </Button>
+                <p className="text-muted-foreground text-xs">
+                  {publishOnChain && "You approve before signing."}
+                  {!publishOnChain &&
+                    draftingRevision &&
+                    "Your agent saves the next version."}
+                  {!(publishOnChain || draftingRevision) &&
+                    "Your agent prepares your annotation layer."}
+                </p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       ) : null}
       <Dialog
         onOpenChange={(open) => {

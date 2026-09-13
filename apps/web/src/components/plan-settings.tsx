@@ -1,0 +1,250 @@
+"use client";
+
+import { useTheme } from "next-themes";
+import { type ReactNode, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import {
+  getSoundPreference,
+  playUiSound,
+  setSoundPreference,
+} from "@/lib/ui-sound";
+
+const sections = ["Interaction", "Appearance", "Sound", "Publishing"] as const;
+const shortcuts = [
+  ["Select text", "V"],
+  ["Add note", "T"],
+  ["Add image", "I"],
+  ["Show tools", "Shift"],
+  ["Clear selection", "Esc"],
+  ["Save note", "Enter"],
+  ["New line", "Shift + Enter"],
+  ["Remove selection", "Delete"],
+  ["Undo removal", "⌘ / Ctrl + Z"],
+];
+
+export function PlanSettings({
+  open,
+  onOpenChange,
+  browserMenu,
+  onBrowserMenuChange,
+  interaction,
+  details,
+  onPublish,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  browserMenu: boolean;
+  onBrowserMenuChange: (enabled: boolean) => void;
+  interaction: ReactNode;
+  details: ReactNode;
+  onPublish: () => void;
+}) {
+  const [section, setSection] =
+    useState<(typeof sections)[number]>("Interaction");
+  const { theme, setTheme } = useTheme();
+  const [sound, setSound] = useState({ muted: false, volume: 1 });
+  useEffect(() => {
+    if (open) {
+      setSound(getSoundPreference());
+    }
+  }, [open]);
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent
+        className="max-h-[90dvh] gap-0 overflow-y-auto rounded-[18px] bg-background p-0 shadow-2xl sm:w-[calc(100vw-4rem)] sm:max-w-[1152px] md:h-[650px] md:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] md:overflow-hidden"
+        fullScreenOnMobile={false}
+      >
+        <div className="flex flex-col p-7 sm:p-12 md:min-h-0 md:p-16">
+          <DialogTitle className="font-normal font-serif text-4xl tracking-tight sm:text-6xl">
+            Settings
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Personal preferences and document information.
+          </DialogDescription>
+          <nav
+            aria-label="Settings sections"
+            className="mt-8 flex flex-wrap gap-2 md:mt-14 md:flex-col md:items-start md:gap-7"
+          >
+            {sections.map((name) => (
+              <button
+                aria-current={section === name ? "page" : undefined}
+                className="relative rounded-sm px-4 py-1 text-left font-serif text-muted-foreground text-xl transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring aria-[current=page]:text-foreground md:text-3xl"
+                key={name}
+                onClick={() => setSection(name)}
+                type="button"
+              >
+                {section === name ? (
+                  <span className="absolute inset-y-1 left-0 w-[3px] rounded-full bg-primary" />
+                ) : null}
+                {name}
+              </button>
+            ))}
+          </nav>
+          <span className="mt-auto hidden pt-12 font-serif text-muted-foreground text-xl md:block">
+            BitPlan
+          </span>
+        </div>
+        <section
+          aria-label={`${section} settings`}
+          className="min-h-0 min-w-0 border-t p-7 sm:p-10 md:overflow-y-auto md:border-t-0 md:border-l"
+        >
+          <h2 className="mb-9 font-normal font-serif text-3xl">{section}</h2>
+          {section === "Interaction" ? (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-base" htmlFor="plan-context-tools">
+                  Plan right-click tools
+                </label>
+                <Switch
+                  checked={!browserMenu}
+                  id="plan-context-tools"
+                  onCheckedChange={(enabled) => onBrowserMenuChange(!enabled)}
+                />
+              </div>
+              <p className="mt-1 text-muted-foreground text-sm">
+                Off uses your browser menu.
+              </p>
+              <section
+                aria-label="Keyboard shortcuts"
+                className="mt-8 border-t pt-7"
+              >
+                <h3 className="mb-4 font-serif text-xl">Keyboard shortcuts</h3>
+                <dl>
+                  {shortcuts.map(([action, key]) => (
+                    <div
+                      className="flex items-center justify-between gap-3 border-border/50 border-b py-3 text-sm"
+                      key={action}
+                    >
+                      <dt>{action}</dt>
+                      <dd>
+                        <kbd className="whitespace-nowrap rounded-md border bg-muted px-2.5 py-1 font-mono text-xs shadow-sm">
+                          {key}
+                        </kbd>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+              <details className="mt-7">
+                <summary className="cursor-pointer text-muted-foreground text-sm">
+                  View & editing tools
+                </summary>
+                <div className="mt-4 space-y-4">{interaction}</div>
+              </details>
+              <p className="mt-8 text-muted-foreground text-xs">
+                Menu preference saves automatically on this device.
+              </p>
+            </>
+          ) : null}
+          {section === "Appearance" ? (
+            <>
+              <fieldset className="space-y-3">
+                <legend className="mb-4 text-muted-foreground text-sm">
+                  Color mode
+                </legend>
+                {["light", "dark", "system"].map((mode) => (
+                  <label
+                    className="flex cursor-pointer items-center justify-between border-b py-3 capitalize"
+                    key={mode}
+                  >
+                    <span>{mode}</span>
+                    <input
+                      checked={theme === mode}
+                      className="accent-primary"
+                      name="settings-theme"
+                      onChange={() => setTheme(mode)}
+                      type="radio"
+                      value={mode}
+                    />
+                  </label>
+                ))}
+              </fieldset>
+              <p className="mt-7 text-muted-foreground text-sm">
+                Choose page styles from Themes in the toolbar.
+              </p>
+            </>
+          ) : null}
+          {section === "Sound" ? (
+            <div className="space-y-8">
+              <div className="flex items-center justify-between">
+                <label htmlFor="ui-sound-enabled">UI sounds</label>
+                <Switch
+                  checked={!sound.muted}
+                  id="ui-sound-enabled"
+                  onCheckedChange={(enabled) =>
+                    setSound(setSoundPreference({ ...sound, muted: !enabled }))
+                  }
+                />
+              </div>
+              <div className="space-y-4">
+                <label
+                  className="flex justify-between text-sm"
+                  htmlFor="ui-sound-volume"
+                >
+                  Volume{" "}
+                  <span className="text-muted-foreground">
+                    {Math.round(sound.volume * 100)}%
+                  </span>
+                </label>
+                <input
+                  aria-label="UI sound volume"
+                  className="w-full accent-primary"
+                  id="ui-sound-volume"
+                  max="100"
+                  min="0"
+                  onChange={(event) =>
+                    setSound(
+                      setSoundPreference({
+                        ...sound,
+                        volume: Number(event.target.value) / 100,
+                      })
+                    )
+                  }
+                  type="range"
+                  value={Math.round(sound.volume * 100)}
+                />
+              </div>
+              <Button
+                disabled={sound.muted || sound.volume === 0}
+                onClick={() => playUiSound("notification-success")}
+                variant="outline"
+              >
+                Test sound
+              </Button>
+            </div>
+          ) : null}
+          {section === "Publishing" ? (
+            <>
+              <p className="text-muted-foreground text-sm">
+                Choose readers and prepare your next version in Publish. Hosted
+                saves do not spend BSV.
+              </p>
+              <Button
+                className="mt-5"
+                onClick={() => {
+                  onOpenChange(false);
+                  onPublish();
+                }}
+              >
+                Open Publish
+              </Button>
+              <details className="mt-9 border-t pt-5">
+                <summary className="cursor-pointer font-serif text-xl">
+                  Document details
+                </summary>
+                <div className="mt-5">{details}</div>
+              </details>
+            </>
+          ) : null}
+        </section>
+      </DialogContent>
+    </Dialog>
+  );
+}

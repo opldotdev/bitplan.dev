@@ -25,9 +25,11 @@ import { parseIdentityKeys } from "@/lib/sharing";
 export function PlanAccessPanel({
   origin,
   publisher,
+  view = "access",
 }: {
   origin: string;
   publisher: boolean;
+  view?: "access" | "pdf";
 }) {
   const sharing = useRevisionSharing();
   const [annotations, setAnnotations] = useState(false);
@@ -38,6 +40,44 @@ export function PlanAccessPanel({
   const defaults = currentAccess.link ? [] : currentAccess.recipients;
   const selectedRecipients =
     value.mode === "preserve" ? defaults : value.recipients;
+  if (view === "pdf") {
+    return (
+      <section aria-label="Export PDF" className="space-y-5">
+        {" "}
+        <label
+          className="flex items-center justify-between gap-2 text-xs"
+          htmlFor="pdf-annotations"
+        >
+          Include annotations
+          <Switch
+            checked={annotations}
+            id="pdf-annotations"
+            onCheckedChange={setAnnotations}
+          />
+        </label>
+        <p className="text-muted-foreground text-xs">
+          Readable export, not encrypted. Notes are appended with attribution.
+        </p>
+        <Button
+          onClick={async () => {
+            try {
+              if (!sharing.print.current) {
+                throw new Error("Wait for the document to open.");
+              }
+              await sharing.print.current(annotations);
+            } catch {
+              toast.error("Could not open print preview");
+            }
+          }}
+          size="sm"
+          variant="outline"
+        >
+          <FileText />
+          Save as PDF
+        </Button>
+      </section>
+    );
+  }
   return (
     <section aria-label="Plan access" className="space-y-3 border-b pb-4">
       <div className="flex items-center justify-between">
@@ -94,48 +134,6 @@ export function PlanAccessPanel({
           <Copy />
           Copy plan link
         </Button>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button className="flex-1" size="sm" variant="outline">
-              <FileText />
-              PDF
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="space-y-3 p-4">
-            <label
-              className="flex items-center justify-between gap-2 text-xs"
-              htmlFor="pdf-annotations"
-            >
-              Include annotations
-              <Switch
-                checked={annotations}
-                id="pdf-annotations"
-                onCheckedChange={setAnnotations}
-              />
-            </label>
-            <p className="text-muted-foreground text-xs">
-              Readable export, not encrypted. Notes are appended with
-              attribution.
-            </p>
-            <Button
-              onClick={async () => {
-                try {
-                  if (!sharing.print.current) {
-                    throw new Error("Wait for the document to open.");
-                  }
-                  await sharing.print.current(annotations);
-                } catch {
-                  toast.error("Could not open print preview");
-                }
-              }}
-              size="sm"
-              variant="outline"
-            >
-              <FileText />
-              Save as PDF
-            </Button>
-          </PopoverContent>
-        </Popover>
       </div>
       {publisher ? (
         <div className="space-y-3">

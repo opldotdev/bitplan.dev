@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Cloud, Copy, Info, Lock } from "lucide-react";
+import { Check, Cloud, Copy, Lock, Settings } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import { CharacterChooser } from "@/components/character-chooser";
 import { CollaborationCanvas } from "@/components/collaboration-canvas";
 import { InlinePlanTitle } from "@/components/inline-plan-title";
 import { PlanPublishing } from "@/components/plan-publishing";
+import { PlanSwitcher } from "@/components/plan-switcher";
 import {
   RevisionSharingProvider,
   useRevisionSharing,
@@ -21,14 +22,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -424,7 +417,7 @@ function VersionSelect({
             ? `Version ${currentVersion}, latest`
             : `Version ${currentVersion} of ${latestVersion}`
         }
-        className="shrink-0"
+        className="h-7 shrink-0 gap-1 border-0 bg-transparent px-1 text-muted-foreground text-xs shadow-none"
         size="sm"
       >
         v{currentVersion}
@@ -844,6 +837,7 @@ function DecryptedView({
   origin: string;
   outpoint: string | null;
 }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const baseTitle = plaintext.meta.title;
   const sharing = useRevisionSharing();
   const [isPublisher, setIsPublisher] = useState(false);
@@ -907,104 +901,111 @@ function DecryptedView({
 
   return (
     <div className="flex h-dvh min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-border border-b px-2 py-2 sm:gap-3 sm:px-4">
-        <Wordmark />
-        {isHostedId(origin) ? <HostedLabel /> : null}
-        <VersionSelect
-          currentVersion={currentVersion}
-          latestVersion={latestVersion}
-          onVersion={onVersion}
-        />
-        <div className="flex min-w-0 flex-1 items-center text-muted-foreground text-sm">
-          <InlinePlanTitle
-            key={`${origin}:${currentVersion}`}
-            onSave={
-              isHostedId(origin) && collaboration.online
-                ? (nextTitle) =>
-                    collaboration.saveDocument(
-                      undefined,
-                      collaboration.documentRevision,
-                      nextTitle
-                    )
-                : undefined
-            }
-            title={title}
+      <header className="relative grid h-[49px] shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b px-2 sm:px-5">
+        <div className="flex items-center gap-3">
+          <Wordmark />
+          <VersionSelect
+            currentVersion={currentVersion}
+            latestVersion={latestVersion}
+            onVersion={onVersion}
           />
-          {collaboration.contributorCount > 1 ? (
-            <span
-              className="ml-2 text-xs"
-              title="Multiple people have contributed to this plan"
-            >
-              · Collaborative
-            </span>
-          ) : null}
         </div>
+        <PlanSwitcher title={title}>
+          <div className="min-w-0 text-sm">
+            <InlinePlanTitle
+              key={`${origin}:${currentVersion}`}
+              onSave={
+                isHostedId(origin) && collaboration.online
+                  ? (nextTitle) =>
+                      collaboration.saveDocument(
+                        undefined,
+                        collaboration.documentRevision,
+                        nextTitle
+                      )
+                  : undefined
+              }
+              title={title}
+            />
+          </div>
+        </PlanSwitcher>
         <div className="ml-auto flex items-center gap-1">
-          <MetaInfo
-            meta={plaintext.meta}
-            openedWithLink={openedWithLink}
-            origin={origin}
-          />
-          <CharacterChooser onChange={setProfile}>
-            <div className="border-t pt-2">
-              {collaboration.connection ? (
-                <p className="text-muted-foreground text-xs" role="status">
-                  {collaboration.online
-                    ? "Connected · invitation-encrypted collaboration"
-                    : "Reconnecting..."}
-                </p>
-              ) : null}
-              {!collaboration.connection && collaboration.connecting ? (
-                <p className="text-muted-foreground text-xs" role="status">
-                  Connecting…
-                </p>
-              ) : null}
-              {collaboration.connection ? (
-                <p className="mt-2 text-muted-foreground text-xs">
-                  Notes are attributed to this browser profile, not a verified
-                  wallet identity. Connecting a wallet does not change who can
-                  read this room.
-                </p>
-              ) : null}
-              {collaboration.error ? (
-                <p className="mt-2 text-destructive text-xs" role="alert">
-                  {collaboration.error}
-                </p>
-              ) : null}
-              {collaboration.error && !collaboration.connection ? (
-                <Button
-                  className="mt-2 w-full"
-                  disabled={collaboration.connecting}
-                  onClick={() => void collaboration.start()}
-                  size="sm"
-                  variant="outline"
-                >
-                  Retry connection
-                </Button>
-              ) : null}
-            </div>
-          </CharacterChooser>
-          <ThemeToggle
-            onTemplateRequest={
-              collaboration.online
-                ? (preset) =>
-                    collaboration.saveAnnotation(
-                      {
-                        text: `Template change request: ${preset.name}. Use https://bitplan.dev/templates/${preset.layout}.html as the content and design starting point, not just a global CSS change. Read this plan and its annotations before revising. ${preset.layout === "blank" ? "I want a clear page; confirm before replacing existing content." : "Preserve the plan's useful content and decisions while adapting its composition."} Keep existing annotation records attached to their original version. Do not publish on chain without approval.`,
-                        type: "text",
-                      },
-                      { point: { x: 0.5, y: 0.1 } }
-                    )
-                : undefined
-            }
-            templates
-          />
-          <PlanPublishing
-            latestOutpoint={latestOutpoint}
-            onPublisherChange={setIsPublisher}
-            origin={origin}
-            senderIdentityKey={senderIdentityKey}
-          />
+          <Button
+            aria-label="Settings"
+            className="order-2"
+            onClick={() => setSettingsOpen(true)}
+            size="sm"
+            variant="ghost"
+          >
+            <Settings />
+            <span className="hidden lg:inline">Settings</span>
+          </Button>
+          <div className="order-4">
+            <CharacterChooser onChange={setProfile}>
+              <div className="border-t pt-2">
+                {collaboration.connection ? (
+                  <p className="text-muted-foreground text-xs" role="status">
+                    {collaboration.online
+                      ? "Connected · invitation-encrypted collaboration"
+                      : "Reconnecting..."}
+                  </p>
+                ) : null}
+                {!collaboration.connection && collaboration.connecting ? (
+                  <p className="text-muted-foreground text-xs" role="status">
+                    Connecting…
+                  </p>
+                ) : null}
+                {collaboration.connection ? (
+                  <p className="mt-2 text-muted-foreground text-xs">
+                    Notes are attributed to this browser profile, not a verified
+                    wallet identity. Connecting a wallet does not change who can
+                    read this room.
+                  </p>
+                ) : null}
+                {collaboration.error ? (
+                  <p className="mt-2 text-destructive text-xs" role="alert">
+                    {collaboration.error}
+                  </p>
+                ) : null}
+                {collaboration.error && !collaboration.connection ? (
+                  <Button
+                    className="mt-2 w-full"
+                    disabled={collaboration.connecting}
+                    onClick={() => void collaboration.start()}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Retry connection
+                  </Button>
+                ) : null}
+              </div>
+            </CharacterChooser>
+          </div>
+          <div className="order-1">
+            <ThemeToggle
+              onTemplateRequest={
+                collaboration.online
+                  ? (preset) =>
+                      collaboration.saveAnnotation(
+                        {
+                          text: `Template change request: ${preset.name}. Use https://bitplan.dev/templates/${preset.layout}.html as the content and design starting point, not just a global CSS change. Read this plan and its annotations before revising. ${preset.layout === "blank" ? "I want a clear page; confirm before replacing existing content." : "Preserve the plan's useful content and decisions while adapting its composition."} Keep existing annotation records attached to their original version. Do not publish on chain without approval.`,
+                          type: "text",
+                        },
+                        { point: { x: 0.5, y: 0.1 } }
+                      )
+                  : undefined
+              }
+              showLabel
+              templates
+            />
+          </div>
+          <div className="order-3">
+            <PlanPublishing
+              latestOutpoint={latestOutpoint}
+              onPublisherChange={setIsPublisher}
+              origin={origin}
+              senderIdentityKey={senderIdentityKey}
+            />
+          </div>
         </div>
       </header>
       <CollaborationCanvas
@@ -1045,7 +1046,16 @@ function DecryptedView({
               }
             : undefined
         }
+        onSettingsOpenChange={setSettingsOpen}
         room={collaboration}
+        settingsDetails={
+          <MetaInfo
+            meta={plaintext.meta}
+            openedWithLink={openedWithLink}
+            origin={origin}
+          />
+        }
+        settingsOpen={settingsOpen}
         target={target}
         title={title ?? "Draft"}
       />
@@ -1109,70 +1119,16 @@ function MetaInfo({
   }
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          aria-label="Draft info"
-          size="icon"
-          title={`${openedWith} · ${storage}`}
-          type="button"
-          variant="ghost"
-        >
-          <Info />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="w-[min(28rem,calc(100vw-2rem))] gap-5 p-5"
-      >
-        <PopoverHeader>
-          <PopoverTitle className="font-serif text-2xl">
-            Your workspace
-          </PopoverTitle>
-          <PopoverDescription>
-            How you opened this version, not its complete reader list.
-            Connecting a wallet does not revoke links or change recipients.
-          </PopoverDescription>
-        </PopoverHeader>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-          {rows.map((row) => (
-            <div className="contents" key={row.label}>
-              <dt className="text-muted-foreground">{row.label}</dt>
-              <dd className="min-w-0 break-words">{row.value}</dd>
-            </div>
-          ))}
-        </dl>
-        <section aria-label="Keyboard shortcuts" className="border-t pt-4">
-          <h3 className="mb-3 font-medium text-sm">Make your mark</h3>
-          <dl className="grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 text-sm">
-            {[
-              ["Select text", "V"],
-              ["Add a note", "T"],
-              ["Add an image", "I"],
-              ["Tools at your pointer", "Shift"],
-              ["Clear selection", "Esc"],
-              ["Remove selected text", "Delete"],
-              ["Save a note", "Enter"],
-              ["New line", "Shift + Enter"],
-            ].map(([action, key]) => (
-              <div className="contents" key={action}>
-                <dt className="text-muted-foreground">{action}</dt>
-                <dd>
-                  <kbd className="rounded-md border bg-muted px-2 py-1 font-mono text-xs shadow-sm">
-                    {key}
-                  </kbd>
-                </dd>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-4 text-muted-foreground text-xs">
-            Click text to select. Click again or double-click to edit. New
-            version gathers feedback for your agent; it does not publish
-            automatically.
-          </p>
-        </section>
-      </PopoverContent>
-    </Popover>
+    <dl className="space-y-4 text-sm">
+      {rows.map((row) => (
+        <div key={row.label}>
+          <dt className="text-muted-foreground">{row.label}</dt>
+          <dd className="mt-1 break-words [overflow-wrap:anywhere]">
+            {row.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

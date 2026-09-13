@@ -30,6 +30,7 @@ export function installInlineTextBridge() {
   let enabled = false;
   let selected: Block | null = null;
   let editing: Block | null = null;
+  const removals: Array<{ path: string; text: string; revision: number }> = [];
   const byElement = new Map<EventTarget, Block>();
   // biome-ignore lint/performance/useTopLevelRegex: this function is serialized into the isolated document and cannot capture module constants
   const editorColor = /^hsl\([0-9.]+ 70% 65%\)$/;
@@ -155,6 +156,17 @@ export function installInlineTextBridge() {
     for (const [path, block] of blocks) {
       if (block !== selected) {
         continue;
+      }
+      if (block.pending || block.deleted || block.conflict) {
+        return;
+      }
+      removals.push({
+        path,
+        revision: block.revision + 1,
+        text: block.element.textContent ?? block.text,
+      });
+      if (removals.length > 50) {
+        removals.shift();
       }
       render(block, "", true);
       reportDraft(path, block);
@@ -383,12 +395,45 @@ export function installInlineTextBridge() {
   );
   document.addEventListener(
     "keydown",
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: serialized keyboard boundary retains native editing, trust, and concurrent undo guards
     (event) => {
       if (!enabled || trusted?.call(event) !== true || event.isComposing) {
         return;
       }
       if (event.key === "Escape") {
         clearSelection();
+        return;
+      }
+      if (
+        !(editing || event.repeat || event.shiftKey || event.altKey) &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "z" &&
+        !(
+          event.target instanceof Element &&
+          event.target.closest("input,textarea,select,[contenteditable]")
+        )
+      ) {
+        const last = removals.at(-1);
+        if (!last) {
+          return;
+        }
+        event.preventDefault();
+        const block = blocks.get(last.path);
+        if (!block || block.pending) {
+          return;
+        }
+        if (
+          block.revision !== last.revision ||
+          !block.deleted ||
+          block.conflict
+        ) {
+          send("error", "This passage changed. Review it before undoing.");
+          return;
+        }
+        removals.pop();
+        render(block, last.text, false);
+        reportDraft(last.path, block);
+        save(last.path, block);
         return;
       }
       if (

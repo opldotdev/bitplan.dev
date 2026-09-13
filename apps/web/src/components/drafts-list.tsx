@@ -162,6 +162,12 @@ function rowDateLabel(row: ViewRow): string {
   return formatPlanDate(row.plan.updatedAt) ?? "Date unavailable";
 }
 
+export function matchesPlanQuery(row: ViewRow, query: string): boolean {
+  const meta = row.detail?.status === "ok" ? row.detail.meta : row.plan;
+  return [row.plan.origin, meta.title, meta.description, meta.repoOrg, meta.repoName]
+    .filter(Boolean).join(" ").toLowerCase().includes(query.trim().toLowerCase());
+}
+
 export function buildRows(
   plans: MergedPlan[],
   details: Record<string, ChainDetail>
@@ -294,7 +300,7 @@ export async function loadChainDetails(
   return details;
 }
 
-export function DraftsList() {
+export function DraftsList({ query = "" }: { query?: string }) {
   const [state, setState] = useState<ListState>({ phase: "checking" });
   const generation = useRef(0);
 
@@ -494,6 +500,7 @@ export function DraftsList() {
         hosted={state.hosted}
         onRetryCatalog={retryCatalog}
         onRetryRow={retryRow}
+        query={query}
         reloadingRows={state.reloadingRows}
         wallet={state.wallet}
       />
@@ -518,6 +525,7 @@ export async function walletIdentityKey(
 
 /** Exported for behavioral tests; the list wires the live callbacks. */
 export function LoadedDrafts({
+  query = "",
   catalog,
   coins,
   details,
@@ -527,6 +535,7 @@ export function LoadedDrafts({
   reloadingRows,
   wallet,
 }: {
+  query?: string;
   catalog: CatalogPhase;
   coins: DraftCoin[];
   details: Record<string, ChainDetail>;
@@ -562,6 +571,8 @@ export function LoadedDrafts({
   const visible = buildRows(
     applyPlanFilter(plans, options ? filter : "all"),
     details
+  ).filter((row) =>
+    matchesPlanQuery(row, query)
   );
 
   return (
