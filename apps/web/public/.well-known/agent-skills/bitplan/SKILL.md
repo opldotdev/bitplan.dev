@@ -32,15 +32,16 @@ currently serves authenticated wallet storage; it is not a drop-in endpoint
 for BitPlan's BRC-100 `HTTPWalletJSON` client. Do not point BitPlan at it or
 claim the fallback works until the 1Sat headless-wallet acceptance test passes.
 
-The browser's Get started flow can create a link-owned hosted starter without
+The browser's New Plan flow can create a link-owned hosted starter without
 a funding wallet. Its throwaway reader key is generated inside the browser;
 it is not a CLI wallet fallback or permission to handle private keys in model
 context. CLI publishing and contact-based encryption still require a compatible
 BRC-100 wallet. Never substitute a funding key into a reader link.
-Get started shows the Brief base page behind a blurred naming dialog. Enter a
-document name and choose View shared draft, or press Enter. It creates the draft
-and opens its encrypted collaboration room automatically. Page styles remain
-available in the viewer. Save the full invitation privately.
+New Plan shows the base page behind a blurred two-step dialog. Enter a document
+name and continue, then choose Brief, Terminal, or Blank from the previews.
+Back preserves your choices. View shared draft creates the draft and opens its
+encrypted collaboration room automatically. Page styles remain available in
+the viewer. Save the full invitation privately.
 This disposable draft has no retained hosted-update secret or wallet ownership;
 live room edits do not create base-document versions. Use the wallet/CLI path
 when the user needs controlled recipients, version publishing, or inscription.
