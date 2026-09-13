@@ -349,6 +349,8 @@ test("click anchors round-trip over a private port, including blank space", asyn
   element.textContent = "Changed paragraph";
   await locate({ point: { x: 0.5, y: 0.5 }, quote: { exact: "A paragraph" } });
   expect(messages.at(-1)?.payload[0].position).toBeNull();
+  // Embedded browsers can omit the modifier on wheel while Shift remains held.
+  handlers.get("keydown")?.(trustedEvent({ key: "Shift" }));
   handlers.get("wheel")?.(
     trustedEvent({
       clientX: 200,
@@ -359,7 +361,7 @@ test("click anchors round-trip over a private port, including blank space", asyn
       preventDefault() {
         /* Native event stub. */
       },
-      shiftKey: true,
+      shiftKey: false,
       stopImmediatePropagation() {
         /* Native event stub. */
       },
@@ -371,6 +373,15 @@ test("click anchors round-trip over a private port, including blank space", asyn
   )?.payload;
   expect(camera.scale).toBeGreaterThan(1);
   expect((200 - camera.x) / camera.scale).toBeCloseTo(200);
+  handlers.get("keyup")?.(trustedEvent({ key: "Shift" }));
+  const cameraCount = messages.filter(
+    (message) => message.type === "camera"
+  ).length;
+  handlers.get("wheel")?.(trustedEvent({ shiftKey: false }));
+  await flushMessages();
+  expect(messages.filter((message) => message.type === "camera")).toHaveLength(
+    cameraCount
+  );
   port.postMessage({ payload: { kind: "reset" }, type: "navigate" });
   await flushMessages();
   await flushMessages();

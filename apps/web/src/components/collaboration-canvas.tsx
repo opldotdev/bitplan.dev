@@ -168,6 +168,7 @@ export function CollaborationCanvas({
   const geometryPort = useRef<MessagePort | null>(null);
   const [viewScale, setViewScale] = useState(1);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const shiftHeld = useRef(false);
   const viewportPan = useRef<{ x: number; y: number } | null>(null);
   const textPort = useRef<MessagePort | null>(null);
   const textRecovery = useRef(
@@ -583,7 +584,12 @@ export function CollaborationCanvas({
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the private-port receiver validates each supported message shape before updating UI state
   function received(event: MessageEvent) {
     try {
-      if (event.data.type === "camera") {
+      if (
+        event.data.type === "shift-held" &&
+        typeof event.data.payload === "boolean"
+      ) {
+        shiftHeld.current = event.data.payload;
+      } else if (event.data.type === "camera") {
         const scale = event.data.payload?.scale;
         if (typeof scale === "number" && scale >= 0.25 && scale <= 4) {
           setViewScale(scale);
@@ -800,6 +806,7 @@ export function CollaborationCanvas({
         return;
       }
       if (event.key === "Shift") {
+        shiftHeld.current = true;
         geometryPort.current?.postMessage({ type: "open-tools" });
       } else {
         keyboardAction(event.key.toLowerCase());
@@ -811,7 +818,7 @@ export function CollaborationCanvas({
       if (
         !(
           event.isTrusted &&
-          event.shiftKey &&
+          (event.shiftKey || shiftHeld.current) &&
           element &&
           (trigger.current?.contains(element) ||
             element.closest("[data-plan-tools]"))
@@ -841,11 +848,22 @@ export function CollaborationCanvas({
       capture: true,
       passive: false,
     });
+    function releaseShift(event: KeyboardEvent | Event) {
+      if (event instanceof KeyboardEvent && event.key !== "Shift") {
+        return;
+      }
+      shiftHeld.current = false;
+      geometryPort.current?.postMessage({ type: "release-shift" });
+    }
+    window.addEventListener("keyup", releaseShift, true);
+    window.addEventListener("blur", releaseShift);
     setBridgeHostReady(true);
     return () => {
       window.removeEventListener("message", acceptGeometryPort);
       window.removeEventListener("keydown", keyboardTools);
       window.removeEventListener("wheel", zoomOverOverlay, true);
+      window.removeEventListener("keyup", releaseShift, true);
+      window.removeEventListener("blur", releaseShift);
       geometryPort.current?.close();
       geometryPort.current = null;
       connectedFrame.current = null;
@@ -1345,7 +1363,11 @@ export function CollaborationCanvas({
           </div>
         </div>
       ) : null}
-      <ContextMenu.Root onOpenChange={setToolsOpen} open={toolsOpen}>
+      <ContextMenu.Root
+        modal={false}
+        onOpenChange={setToolsOpen}
+        open={toolsOpen}
+      >
         <ContextMenu.Trigger
           asChild
           disabled={!room.connection || browserMenu || !showEdits}

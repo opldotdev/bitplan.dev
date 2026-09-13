@@ -144,6 +144,20 @@ function installGeometryBridge(
   const trustedActivity = (event: Event) =>
     readEventTrusted?.call(event) === true;
   let camera = { scale: 1, x: 0, y: 0 };
+  let shiftHeld = false;
+  document.addEventListener(
+    "keyup",
+    (event) => {
+      if (trustedActivity(event) && event.key === "Shift") {
+        shiftHeld = false;
+        send("shift-held", false);
+      }
+    },
+    true
+  );
+  window.addEventListener("blur", () => {
+    shiftHeld = false;
+  });
   let pageSize: { width: number; height: number } | null = null;
   let cameraStyle: HTMLStyleElement | null = null;
   let pan: { x: number; y: number; pointerId: number } | null = null;
@@ -268,7 +282,7 @@ function installGeometryBridge(
   document.addEventListener(
     "wheel",
     (event) => {
-      if (!(event.shiftKey && trustedActivity(event))) {
+      if (!((event.shiftKey || shiftHeld) && trustedActivity(event))) {
         return;
       }
       event.preventDefault();
@@ -465,6 +479,10 @@ function installGeometryBridge(
     if (!(data && typeof data === "object" && "type" in data)) {
       return;
     }
+    if (data.type === "release-shift") {
+      shiftHeld = false;
+      return;
+    }
     if (data.type === "navigate") {
       navigate("payload" in data ? data.payload : null);
       return;
@@ -616,6 +634,10 @@ function installGeometryBridge(
     );
   }
   document.addEventListener("keydown", (event) => {
+    if (trustedActivity(event) && event.key === "Shift") {
+      shiftHeld = true;
+      send("shift-held", true);
+    }
     if (
       trustedActivity(event) &&
       !event.isComposing &&
