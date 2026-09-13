@@ -2095,10 +2095,19 @@ export function CollaborationCanvas({
               />
               <p className="text-muted-foreground text-xs">
                 {draftingRevision
-                  ? "Selection is just for this draft. Nothing is deleted or published."
+                  ? "Your agent uses these selections. Original layers stay intact."
                   : "Your notes and replies stay yours. Copying a prompt does not publish them."}
               </p>
             </details>
+            {draftingRevision ? (
+              <p className="text-muted-foreground text-xs">
+                {publishOnChain
+                  ? "Agent prepares publication; you approve before signing."
+                  : sharing?.value.mode === "private"
+                    ? "Agent saves a new private copy at v1. This plan stays unchanged."
+                    : "Agent saves the next version here and returns its link."}
+              </p>
+            ) : null}
             <Button
               className="w-full"
               disabled={
@@ -2148,7 +2157,7 @@ export function CollaborationCanvas({
                           target: room.activeTarget,
                         })
                   );
-                  toast.success("Revision prompt copied");
+                  toast.success("Prompt copied — send it to your agent");
                 } catch {
                   toast.error("Could not copy the prompt");
                 }
