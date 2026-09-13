@@ -42,7 +42,8 @@ decrypted plan starts a room automatically once a character is selected or loade
 An existing invitation joins its room; a document-only link starts a separate
 room and cannot reveal annotations from another room. Share the full invitation
 to collaborate together. Failed connections offer Retry in the character menu.
-Right-click the document → **Add Annotation** → type at the anchor → **Save**.
+Right-click or hold Shift over the document to open its tool bar. Choose **+ T**,
+click an element to anchor the note, type, and press Enter to save.
 Saved notes stream through Convex to connected clients and survive reloads.
 Text/element-relative anchors follow scrolling and responsive layout; a small
 pin preserves the exact target when an edge forces the note card to flip.

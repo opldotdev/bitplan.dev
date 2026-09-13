@@ -11,8 +11,10 @@ import {
   frameEnvelope,
   MAGIC,
   openEnvelope,
+  openPayloadEnvelope,
   parseEnvelope,
   sealEnvelope,
+  sealPayloadEnvelope,
   sharedWith,
 } from "./envelope";
 
@@ -33,6 +35,36 @@ const UNSUPPORTED_0X01 =
 
 const SENDER_IDENTITY =
   "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+
+test("application records reuse authenticated v2 framing without becoming HTML plans", async () => {
+  const sender = new ProtoWallet(new PrivateKey(1));
+  const reader = new ProtoWallet(new PrivateKey(2));
+  const outsider = new ProtoWallet(new PrivateKey(3));
+  const readerKey = (await reader.getPublicKey({ identityKey: true }))
+    .publicKey;
+  const payload = {
+    entries: ["a note", "an embedded asset"],
+    schema: "test-record/1",
+  };
+  const sealed = await sealPayloadEnvelope(sender, payload, "record-test", [
+    readerKey,
+  ]);
+  expect(parseEnvelope(sealed).header.v).toBe(2);
+  expect((await openPayloadEnvelope(reader, sealed)).payload).toEqual(payload);
+  expect((await openPayloadEnvelope(sender, sealed)).payload).toEqual(payload);
+  await expect(openEnvelope(reader, sealed)).rejects.toThrow(
+    "no html document"
+  );
+  await expect(openPayloadEnvelope(outsider, sealed)).rejects.toThrow(
+    "not authorized"
+  );
+  const parsed = parseEnvelope(sealed);
+  const changed = structuredClone(parsed.header);
+  changed.key.keyID = "different-key";
+  await expect(
+    openPayloadEnvelope(reader, frameEnvelope(changed, parsed.ciphertext))
+  ).rejects.toThrow();
+});
 
 const PAD = Uint8Array.from(
   Array.from({ length: 32 }, (_, i) => ((i * 37 + 11) % 251) + 1)

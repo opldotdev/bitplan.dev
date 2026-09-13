@@ -147,9 +147,24 @@ function concatenate(
  * Seal a draft as a bitplan envelope. Recipients are extra reader slots;
  * the publisher's self slot is always present.
  */
-export async function sealEnvelope(
+export function sealEnvelope(
   wallet: EncryptingEnvelopeWallet,
   plaintext: DraftPlaintext,
+  keyID: string,
+  recipientIdentityKeys: readonly string[] = []
+): Promise<Uint8Array> {
+  return sealPayloadEnvelope(
+    wallet,
+    { ...plaintext },
+    keyID,
+    recipientIdentityKeys
+  );
+}
+
+/** Same authenticated BPLN v2 framing, for separately validated application records. */
+export async function sealPayloadEnvelope(
+  wallet: EncryptingEnvelopeWallet,
+  plaintext: Record<string, unknown>,
   keyID: string,
   recipientIdentityKeys: readonly string[] = []
 ): Promise<Uint8Array> {
@@ -196,7 +211,7 @@ export async function sealEnvelope(
     })
   );
 
-  const boundPlaintext: DraftPlaintext = {
+  const boundPlaintext: Record<string, unknown> = {
     ...plaintext,
     headerSha256: HEADER_SHA256_PLACEHOLDER,
   };
@@ -536,7 +551,7 @@ function assertPlaintext(value: unknown): DraftPlaintext {
 
 function assertHeaderBinding(
   header: EnvelopeHeader,
-  plaintext: DraftPlaintext
+  plaintext: Record<string, unknown>
 ): void {
   if (plaintext.headerSha256 !== headerSha256(header)) {
     throw new EnvelopeError(
@@ -555,6 +570,15 @@ export async function openEnvelope(
   wallet: EnvelopeWallet,
   bytes: Uint8Array
 ): Promise<{ header: EnvelopeHeader; plaintext: DraftPlaintext }> {
+  const { header, payload } = await openPayloadEnvelope(wallet, bytes);
+  return { header, plaintext: assertPlaintext(payload) };
+}
+
+/** Authenticate first; callers must validate the decrypted application schema. */
+export async function openPayloadEnvelope(
+  wallet: EnvelopeWallet,
+  bytes: Uint8Array
+): Promise<{ header: EnvelopeHeader; payload: Record<string, unknown> }> {
   const { ciphertext: body, header } = parseEnvelope(bytes);
   const level = assertProtocolLevel(header.key.protocolID[0]);
   let identityKey: string;
@@ -631,8 +655,11 @@ export async function openEnvelope(
     );
   }
 
-  const plaintext = assertPlaintext(parsed);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new EnvelopeError("Decrypted payload must be an application record.");
+  }
+  const plaintext = parsed as Record<string, unknown>;
   assertHeaderBinding(header, plaintext);
   const { headerSha256: _headerSha256, ...document } = plaintext;
-  return { header, plaintext: document };
+  return { header, payload: document };
 }
