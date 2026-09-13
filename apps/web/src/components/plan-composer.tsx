@@ -501,19 +501,21 @@ function SharedStarter({
                 {error || walletError}
               </p>
             ) : null}
-            <div className="motion-safe:fade-in motion-safe:slide-in-from-bottom-2 flex flex-wrap items-center gap-3 motion-safe:animate-in motion-safe:fill-mode-both motion-safe:duration-300 motion-safe:[animation-delay:160ms]">
+            {step === "style" ? (
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                {walletMode
+                  ? "Wallet-encrypted. Off chain."
+                  : "Anyone with the link can join. Keep it private."}
+              </p>
+            ) : null}
+            <div className="motion-safe:fade-in motion-safe:slide-in-from-bottom-2 flex items-center gap-2 motion-safe:animate-in motion-safe:fill-mode-both motion-safe:duration-300 motion-safe:[animation-delay:160ms]">
               <Button
-                className="group motion-safe:transition-transform motion-safe:active:scale-[0.98]"
-                disabled={creating || connectingWallet || !title.trim()}
-                size="lg"
-                type="submit"
+                disabled={creating}
+                onClick={() => router.push("/")}
+                type="button"
+                variant="ghost"
               >
-                {creating ? (
-                  <Spinner className="motion-reduce:animate-none" />
-                ) : (
-                  <ArrowRight className="motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5" />
-                )}
-                {creating ? "Opening your draft…" : actionLabel}
+                Cancel
               </Button>
               {step === "name" ? (
                 <Button
@@ -540,23 +542,18 @@ function SharedStarter({
                   Back
                 </Button>
               ) : null}
-            </div>
-            {step === "style" ? (
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                {walletMode
-                  ? "Encrypted to your wallet. Nothing goes on chain."
-                  : "Anyone with the full link can read and contribute. Keep it private."}
-              </p>
-            ) : null}
-            <div className="flex justify-end">
               <Button
-                disabled={creating}
-                onClick={() => router.push("/")}
-                size="sm"
-                type="button"
-                variant="ghost"
+                className="group ml-auto motion-safe:transition-transform motion-safe:active:scale-[0.98]"
+                disabled={creating || connectingWallet || !title.trim()}
+                size="lg"
+                type="submit"
               >
-                Cancel
+                {creating ? (
+                  <Spinner className="motion-reduce:animate-none" />
+                ) : (
+                  <ArrowRight className="motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5" />
+                )}
+                {creating ? "Opening your draft…" : actionLabel}
               </Button>
             </div>
           </form>
