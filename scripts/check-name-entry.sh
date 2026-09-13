@@ -17,7 +17,7 @@ agent-browser --session "$session" wait --fn 'document.querySelector("#shared-dr
 agent-browser --session "$session" press Enter
 agent-browser --session "$session" wait --fn 'document.querySelector("input[value=terminal]")?.checked === true'
 agent-browser --session "$session" set offline on
-agent-browser --session "$session" find role button click --name 'View shared draft'
+agent-browser --session "$session" find role button click --name 'Start with Naming flow check'
 agent-browser --session "$session" wait '[role="alert"]'
 agent-browser --session "$session" wait --fn 'document.querySelector("input[value=terminal]")?.checked === true && document.querySelector("button[type=submit]")?.disabled === false'
 agent-browser --session "$session" set offline off

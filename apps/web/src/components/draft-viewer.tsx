@@ -867,7 +867,7 @@ function DecryptedView({
               isHostedId(origin) && collaboration.online
                 ? (nextTitle) =>
                     collaboration.saveDocument(
-                      liveDraft?.html,
+                      undefined,
                       collaboration.documentRevision,
                       nextTitle
                     )

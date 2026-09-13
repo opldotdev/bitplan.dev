@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
+import { prepareStarterDraft } from "./instant-draft";
 import {
   PLAN_APPEARANCES,
   parsePlanAppearance,
@@ -51,4 +52,50 @@ test("blank is an empty theme-aware starter and does not hide existing content",
       "utf8"
     )
   ).toBe(html);
+});
+
+test("every selectable template is a real starter with a private project handoff", async () => {
+  await Promise.all(
+    PLAN_APPEARANCES.map(async (preset) => {
+      const html = await readFile(
+        new URL(
+          `../../../../docs/templates/${preset.layout}.html`,
+          import.meta.url
+        ),
+        "utf8"
+      );
+      expect(
+        await readFile(
+          new URL(
+            `../../public/templates/${preset.layout}.html`,
+            import.meta.url
+          ),
+          "utf8"
+        )
+      ).toBe(html);
+      const draft = await prepareStarterDraft(
+        { layout: preset.layout, title: "Project" },
+        (() =>
+          Promise.resolve(
+            new Response(html, { headers: { "content-type": "text/html" } })
+          )) as typeof fetch
+      );
+      expect(draft.html).toBe(html);
+      if (preset.layout === "blank") {
+        return;
+      }
+      expect(html).toContain('id="copy-agent-prompt"');
+      expect(html).toContain("data-bitplan-id");
+      expect(html).toContain("not live annotations");
+      expect(html).not.toContain("location.href");
+      expect(html).not.toContain("location.hash");
+      expect(html).not.toContain('prompt.style.cssText = "display:block');
+      expect(html).not.toContain("Example note");
+      expect(html).not.toContain('type="radio" checked');
+      expect(html).toContain(">Unsure<");
+      expect(html.indexOf('id="connect-agent"')).toBeLessThan(
+        html.indexOf('id="decisions"')
+      );
+    })
+  );
 });

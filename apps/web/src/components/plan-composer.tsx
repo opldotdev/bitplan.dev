@@ -338,7 +338,7 @@ function SharedStarter({
   const [step, setStep] = useState<"name" | "style">(
     walletMode && title.trim() ? "style" : "name"
   );
-  const finalAction = walletMode ? "Open plan" : "View shared draft";
+  const finalAction = `Start with ${title.trim() || "Master Plan"}`;
   const actionLabel = step === "name" ? "Continue" : finalAction;
   const createSharedDraft = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -459,7 +459,7 @@ function SharedStarter({
               </>
             ) : (
               <fieldset
-                className="grid grid-cols-3 gap-3 sm:gap-5"
+                className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
                 disabled={creating}
               >
                 <legend className="sr-only">Template</legend>
@@ -543,7 +543,7 @@ function SharedStarter({
                 </Button>
               ) : null}
               <Button
-                className="group ml-auto motion-safe:transition-transform motion-safe:active:scale-[0.98]"
+                className="group ml-auto min-w-0 shrink motion-safe:transition-transform motion-safe:active:scale-[0.98]"
                 disabled={creating || connectingWallet || !title.trim()}
                 size="lg"
                 type="submit"
@@ -553,7 +553,12 @@ function SharedStarter({
                 ) : (
                   <ArrowRight className="motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5" />
                 )}
-                {creating ? "Opening your draft…" : actionLabel}
+                <span
+                  className="max-w-[40vw] truncate sm:max-w-xs"
+                  title={actionLabel}
+                >
+                  {creating ? "Opening your draft…" : actionLabel}
+                </span>
               </Button>
             </div>
           </form>

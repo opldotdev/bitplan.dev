@@ -4,6 +4,7 @@ import { ConvexClient } from "convex/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { replyParent } from "./annotation-thread";
 import {
   type Annotation,
   type AnnotationAnchor,
@@ -31,6 +32,7 @@ import {
   loadProfile,
   parseProfile,
 } from "./collaborator";
+import { parseTextBlock, type TextBlock, textBlockKey } from "./inline-text";
 import {
   parseSharedDocument,
   type SharedDocument,
@@ -65,6 +67,9 @@ const message = (error: unknown) =>
 export function useCollaboration(target: DocumentTarget) {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [textBlocks, setTextBlocks] = useState<
+    (TextBlock & { key: string; revision: number })[]
+  >([]);
   const [documentDraft, setDocumentDraft] = useState<
     (SharedDocument & { revision: number }) | null
   >(null);
@@ -194,6 +199,7 @@ export function useCollaboration(target: DocumentTarget) {
   }, [connect]);
 
   useEffect(() => {
+    setTextBlocks([]);
     if (!connection) {
       return;
     }
@@ -216,13 +222,27 @@ export function useCollaboration(target: DocumentTarget) {
       let readEpoch = 0;
       stopChanges = c.client.onUpdate(
         api.collaboration.changesSince,
-        { ...access, after },
+        { ...access, after, includeTextBlocks: true },
         // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ordered document and annotation reconciliation shares one subscription boundary
         async (rows) => {
           readEpoch += 1;
           const reading = readEpoch;
           try {
+            // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: independent encrypted item kinds validate their own schema before reconciliation
             const page = await settleChangePage(rows, async (row) => {
+              if (row.kind === "text-block") {
+                const block = parseTextBlock(
+                  await decryptRoomValue(
+                    c.secret,
+                    `${c.roomId}:${row.key}:${row.revision}:${row.participantId}`,
+                    row.ciphertext
+                  )
+                );
+                if ((await textBlockKey(block)) !== row.key) {
+                  throw new Error("Inline text address mismatch.");
+                }
+                return { ...block, key: row.key, revision: row.revision };
+              }
               if (row.kind === "document") {
                 const draft = await parseSharedDocument(
                   await decryptRoomValue(
@@ -265,7 +285,19 @@ export function useCollaboration(target: DocumentTarget) {
               );
             }
             for (const item of page.values) {
-              if ("schema" in item) {
+              if ("schema" in item && item.schema === "bitplan-text/1") {
+                setTextBlocks((previous) => {
+                  const existing = previous.find(
+                    (block) => block.key === item.key
+                  );
+                  return existing && existing.revision >= item.revision
+                    ? previous
+                    : [
+                        ...previous.filter((block) => block.key !== item.key),
+                        item,
+                      ];
+                });
+              } else if ("schema" in item) {
                 setDocumentDraft((previous) =>
                   !previous || previous.revision < item.revision
                     ? item
@@ -459,16 +491,24 @@ export function useCollaboration(target: DocumentTarget) {
     content: AnnotationContent,
     anchor: AnnotationAnchor,
     existing?: Annotation,
-    size?: Annotation["size"]
+    size?: Annotation["size"],
+    replyTo?: string
   ) {
     const c = connectionRef.current;
     // biome-ignore lint/suspicious/noUnnecessaryConditions: actions can race the asynchronous disconnect cleanup
     if (!c) {
       throw new Error("Open a collaboration invitation first.");
     }
+    const parentId = existing?.replyTo ?? replyTo;
+    const parent = replyParent(
+      parentId,
+      annotations,
+      content,
+      existing?.target ?? activeTargetRef.current
+    );
     const now = new Date().toISOString();
     const annotation = parseAnnotation({
-      anchor,
+      anchor: parent?.anchor ?? anchor,
       content,
       id: existing?.id ?? crypto.randomUUID(),
       participantId: c.participantId,
@@ -476,7 +516,8 @@ export function useCollaboration(target: DocumentTarget) {
       revision: (existing?.revision ?? 0) + 1,
       sessionId: c.sessionId,
       status: existing?.status ?? "open",
-      target: existing?.target ?? activeTargetRef.current,
+      target: parent?.target ?? existing?.target ?? activeTargetRef.current,
+      ...(parentId ? { replyTo: parentId } : {}),
       ...(existing?.size || size ? { size: existing?.size ?? size } : {}),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -537,12 +578,24 @@ export function useCollaboration(target: DocumentTarget) {
   async function saveDocument(
     html: string | undefined,
     expectedRevision: number,
-    title?: string
+    title?: string,
+    expectedSequence?: number
   ) {
     const c = connectionRef.current;
     // biome-ignore lint/suspicious/noUnnecessaryConditions: actions can race the asynchronous disconnect cleanup
     if (!c) {
       throw new Error("Open a collaboration invitation first.");
+    }
+    if (
+      html !== undefined &&
+      textBlocks.some((block) =>
+        sameDocumentTarget(block.base, activeTargetRef.current)
+      ) &&
+      expectedSequence === undefined
+    ) {
+      throw new Error(
+        "Read the latest live text and provide its change cursor before replacing the document."
+      );
     }
     const previousTitle =
       documentDraft && sameDocumentTarget(documentDraft.base, targetRef.current)
@@ -550,7 +603,11 @@ export function useCollaboration(target: DocumentTarget) {
         : undefined;
     const draft = await sharedDocument(
       targetRef.current,
-      html,
+      html ??
+        (documentDraft &&
+        sameDocumentTarget(documentDraft.base, targetRef.current)
+          ? documentDraft.html
+          : undefined),
       title ?? previousTitle
     );
     const ciphertext = await encryptRoomValue(
@@ -561,8 +618,40 @@ export function useCollaboration(target: DocumentTarget) {
     return c.client.mutation(api.collaboration.write, {
       ciphertext,
       expectedRevision,
+      expectedSequence: html === undefined ? sequence : expectedSequence,
       key: "document",
       kind: "document",
+      operationId: crypto.randomUUID(),
+      proof: c.proof,
+      roomId: c.roomId,
+      sessionProof: c.sessionProof,
+    });
+  }
+  async function saveTextBlock(value: unknown, expectedRevision: number) {
+    const c = connectionRef.current;
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: private bridge callbacks can outlive an asynchronous disconnect
+    if (!c) {
+      throw new Error("Connect to collaboration first.");
+    }
+    const block = parseTextBlock(value);
+    const expectedDocumentRevision = documentRevision;
+    if (!sameDocumentTarget(block.base, activeTargetRef.current)) {
+      throw new Error(
+        "The document changed. Copy your text before reopening it."
+      );
+    }
+    const key = await textBlockKey(block);
+    const ciphertext = await encryptRoomValue(
+      c.secret,
+      `${c.roomId}:${key}:${expectedRevision + 1}:${c.participantId}`,
+      block
+    );
+    return c.client.mutation(api.collaboration.write, {
+      ciphertext,
+      expectedDocumentRevision,
+      expectedRevision,
+      key,
+      kind: "text-block",
       operationId: crypto.randomUUID(),
       proof: c.proof,
       roomId: c.roomId,
@@ -624,8 +713,10 @@ export function useCollaboration(target: DocumentTarget) {
     profiles,
     saveAnnotation,
     saveDocument,
+    saveTextBlock,
     sequence,
     start,
+    textBlocks,
     updateProfile,
   };
 }

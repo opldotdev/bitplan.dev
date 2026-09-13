@@ -12,7 +12,7 @@ agent-browser --session "$session" wait --fn '!Array.from(document.querySelector
 agent-browser --session "$session" find role button click --name 'Continue' --exact
 agent-browser --session "$session" check 'input[name="template"][value="terminal"]'
 agent-browser --session "$session" wait --fn '!document.querySelector("#plan-body") && !document.querySelector("#plan-repository")'
-agent-browser --session "$session" find role button click --name 'Open plan' --exact
+agent-browser --session "$session" find role button click --name 'Start with Wallet flow check' --exact
 agent-browser --session "$session" wait --fn 'location.pathname.startsWith("/d/h_") && !new URLSearchParams(location.hash.slice(1)).has("k")'
 agent-browser --session "$session" wait 'iframe[title="Wallet flow check"]'
 agent-browser --session "$session" wait --fn '!document.querySelector("[role=dialog]")'

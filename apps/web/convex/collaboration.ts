@@ -232,7 +232,11 @@ export const updateProfile = mutation({
   returns: v.number(),
 });
 export const items = query({
-  args: { ...access, paginationOpts: paginationOptsValidator },
+  args: {
+    ...access,
+    includeTextBlocks: v.optional(v.boolean()),
+    paginationOpts: paginationOptsValidator,
+  },
   handler: async (ctx, args) => {
     await authorize(ctx, args);
     if (args.paginationOpts.numItems > 20) {
@@ -241,6 +245,11 @@ export const items = query({
     const page = await ctx.db
       .query("items")
       .withIndex("by_roomId", (q) => q.eq("roomId", args.roomId))
+      .filter((q) =>
+        args.includeTextBlocks
+          ? q.eq(1, 1)
+          : q.neq(q.field("kind"), "text-block")
+      )
       .paginate(args.paginationOpts);
     return {
       ...page,
@@ -268,7 +277,11 @@ export const items = query({
   returns: paginationResultValidator(itemValue),
 });
 export const changesSince = query({
-  args: { ...access, after: v.number() },
+  args: {
+    ...access,
+    after: v.number(),
+    includeTextBlocks: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
     await authorize(ctx, args);
     if (!Number.isSafeInteger(args.after) || args.after < 0) {
@@ -278,6 +291,11 @@ export const changesSince = query({
       .query("changes")
       .withIndex("by_roomId_and_sequence", (q) =>
         q.eq("roomId", args.roomId).gt("sequence", args.after)
+      )
+      .filter((q) =>
+        args.includeTextBlocks
+          ? q.eq(1, 1)
+          : q.neq(q.field("kind"), "text-block")
       )
       .take(20);
     return rows.map(
@@ -306,7 +324,9 @@ export const write = mutation({
   args: {
     ...authenticated,
     ciphertext: v.string(),
+    expectedDocumentRevision: v.optional(v.number()),
     expectedRevision: v.number(),
+    expectedSequence: v.optional(v.number()),
     key: v.string(),
     kind: itemKind,
     operationId: v.string(),
@@ -322,7 +342,9 @@ export const write = mutation({
         Number.isSafeInteger(args.expectedRevision)
       ) ||
       args.expectedRevision < 0 ||
-      (args.kind === "document" && args.key !== "document")
+      (args.kind === "document" && args.key !== "document") ||
+      (args.kind === "text-block" && !args.key.startsWith("text_")) ||
+      (args.kind !== "text-block" && args.key.startsWith("text_"))
     ) {
       throw new ConvexError("Invalid operation.");
     }
@@ -343,6 +365,30 @@ export const write = mutation({
         throw new ConvexError("Operation ID reused with different content.");
       }
       return { revision: previous.revision, sequence: previous.sequence };
+    }
+    if (
+      (args.expectedSequence !== undefined &&
+        args.expectedSequence !== room.sequence) ||
+      (args.kind === "document" &&
+        room.hasTextBlocks &&
+        args.expectedSequence === undefined)
+    ) {
+      throw new ConvexError(
+        "The plan changed. Read the latest document and annotations before replacing it."
+      );
+    }
+    if (args.kind === "text-block") {
+      const document = await ctx.db
+        .query("items")
+        .withIndex("by_roomId_and_key", (q) =>
+          q.eq("roomId", room._id).eq("key", "document")
+        )
+        .unique();
+      if (args.expectedDocumentRevision !== (document?.revision ?? 0)) {
+        throw new ConvexError(
+          "The document changed before this passage could save."
+        );
+      }
     }
     const existing = await ctx.db
       .query("items")
@@ -395,6 +441,7 @@ export const write = mutation({
       });
     }
     await ctx.db.patch("rooms", room._id, {
+      ...(args.kind === "text-block" ? { hasTextBlocks: true } : {}),
       contributorCount:
         room.contributorCount + (participant.contributed ? 0 : 1),
       itemCount: room.itemCount + (existing ? 0 : 1),

@@ -12,7 +12,12 @@ import type { PlanAppearance } from "@/lib/plan-appearance";
 
 const MAX_TEMPLATE_BYTES = 5 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 15_000;
-const STARTER_LAYOUTS = new Set<StarterLayout>(["blank", "brief", "terminal"]);
+const STARTER_LAYOUTS = new Set<StarterLayout>([
+  "blank",
+  "brief",
+  "terminal",
+  "decision",
+]);
 
 export type StarterLayout = PlanAppearance["layout"];
 

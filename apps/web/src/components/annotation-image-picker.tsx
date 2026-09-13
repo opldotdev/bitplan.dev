@@ -12,28 +12,40 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { prepareAnnotationImage } from "@/lib/annotation-image";
+import {
+  GENERATION_PROMPT_LIMIT,
+  pendingSticker,
+  STICKERS,
+} from "@/lib/annotation-stickers";
 
 export function AnnotationImagePicker({
   onLoad,
   initiallyOpen = false,
   onClose,
 }: {
-  onLoad: (dataUrl: string) => void | Promise<void>;
+  onLoad: (dataUrl: string, alt?: string) => void | Promise<void>;
   initiallyOpen?: boolean;
   onClose?: () => void;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
-  const [tab, setTab] = useState<"photos" | "stickers" | "draw">("stickers");
+  const [tab, setTab] = useState<"photos" | "stickers" | "draw" | "generate">(
+    "stickers"
+  );
   const [preview, setPreview] = useState<string | null>(null);
+  const [alt, setAlt] = useState("");
+  const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  async function choose(file: Blob) {
+  async function choose(file: Blob, description = "Uploaded image") {
     setBusy(true);
     setError(null);
     try {
       setPreview(await prepareAnnotationImage(file));
+      setAlt(description);
+      setTab("photos");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not prepare image.");
     } finally {
@@ -61,7 +73,7 @@ export function AnnotationImagePicker({
         </DialogTrigger>
       )}
       <DialogContent
-        className="sm:max-h-[90dvh] sm:max-w-xl sm:overflow-y-auto"
+        className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
         onPaste={(event) => {
           const [file] = event.clipboardData.files;
           if (file && !busy) {
@@ -72,34 +84,55 @@ export function AnnotationImagePicker({
       >
         <DialogTitle>Add an image</DialogTitle>
         <DialogDescription>
-          Choose a photo, drop an image, or make a drawing. Image bytes are
-          encrypted with your annotation.
+          Stickers, photos, and sketches. Encrypted with your annotation.
         </DialogDescription>
         <fieldset className="border-0 p-0">
           <legend className="sr-only">Image sources</legend>
           <div className="flex gap-1 rounded-xl bg-muted p-1">
-            {(["photos", "stickers", "draw"] as const).map((value) => (
-              <Button
-                aria-pressed={tab === value}
-                className="min-h-11 flex-1"
-                key={value}
-                onClick={() => setTab(value)}
-                type="button"
-                variant={tab === value ? "secondary" : "ghost"}
-              >
-                {value[0].toUpperCase() + value.slice(1)}
-              </Button>
-            ))}
+            {(["stickers", "photos", "draw", "generate"] as const).map(
+              (value) => (
+                <Button
+                  aria-pressed={tab === value}
+                  className="min-h-11 flex-1"
+                  key={value}
+                  onClick={() => setTab(value)}
+                  type="button"
+                  variant={tab === value ? "secondary" : "ghost"}
+                >
+                  {value[0].toUpperCase() + value.slice(1)}
+                </Button>
+              )
+            )}
           </div>
         </fieldset>
+        {tab === "generate" ? (
+          <div className="space-y-3">
+            <label className="text-sm" htmlFor="sticker-request">
+              What should your agent create?
+            </label>
+            <Textarea
+              id="sticker-request"
+              maxLength={GENERATION_PROMPT_LIMIT}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="A paper-cut mountain to mark our next milestone…"
+              value={prompt}
+            />
+            <p className="text-muted-foreground text-sm">
+              Places a request here. Your agent can read it with the annotations
+              and create the image on its next pass. No model runs now.
+            </p>
+          </div>
+        ) : null}
         {tab === "draw" ? (
           <AnnotationSketch
             onUse={(value) => {
               setPreview(value);
+              setAlt("Drawing");
               setTab("photos");
             }}
           />
-        ) : (
+        ) : null}
+        {tab === "photos" || tab === "stickers" ? (
           <>
             {tab === "photos" ? (
               <button
@@ -124,34 +157,38 @@ export function AnnotationImagePicker({
               </button>
             ) : (
               <div className="grid grid-cols-3 gap-3">
-                <button
-                  aria-label="Choose planning papers sticker"
-                  className="aspect-square rounded-xl border p-3 hover:bg-muted"
-                  disabled={busy}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      const response = await fetch("/planning-sticker.png");
-                      if (!response.ok) {
-                        throw new Error("Sticker unavailable.");
+                {STICKERS.map((sticker) => (
+                  <button
+                    aria-label={`Choose ${sticker.name} sticker`}
+                    className="flex aspect-square min-w-0 flex-col items-center gap-2 rounded-xl border p-3 hover:bg-muted"
+                    disabled={busy}
+                    key={sticker.src}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        const response = await fetch(sticker.src);
+                        if (!response.ok) {
+                          throw new Error("Sticker unavailable.");
+                        }
+                        await choose(await response.blob(), sticker.name);
+                      } catch {
+                        setError("Could not load sticker. Try again.");
+                      } finally {
+                        setBusy(false);
                       }
-                      await choose(await response.blob());
-                    } catch {
-                      setError("Could not load sticker. Try again.");
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                  type="button"
-                >
-                  <Image
-                    alt=""
-                    className="h-full w-full object-contain"
-                    height={160}
-                    src="/planning-sticker.png"
-                    width={160}
-                  />
-                </button>
+                    }}
+                    type="button"
+                  >
+                    <Image
+                      alt=""
+                      className="min-h-0 w-full flex-1 object-contain"
+                      height={160}
+                      src={sticker.src}
+                      width={160}
+                    />
+                    <span className="text-xs">{sticker.name}</span>
+                  </button>
+                ))}
                 <button
                   className="aspect-square rounded-xl border border-dashed p-3 text-xs"
                   onClick={() => input.current?.click()}
@@ -176,7 +213,7 @@ export function AnnotationImagePicker({
               </div>
             ) : null}
           </>
-        )}
+        ) : null}
         <input
           accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
           aria-label="Choose annotation image file"
@@ -202,16 +239,21 @@ export function AnnotationImagePicker({
           </span>
           <Button
             className="min-h-11"
-            disabled={!preview || busy}
+            disabled={busy || (tab === "generate" ? !prompt.trim() : !preview)}
             onClick={async () => {
-              if (!preview) {
+              if (!preview && tab !== "generate") {
                 return;
               }
               setBusy(true);
               try {
-                await onLoad(preview);
+                const image =
+                  tab === "generate"
+                    ? pendingSticker(prompt)
+                    : { alt, dataUrl: preview as string };
+                await onLoad(image.dataUrl, image.alt);
                 setOpen(false);
                 setPreview(null);
+                setPrompt("");
               } catch (e) {
                 setError(
                   e instanceof Error ? e.message : "Could not add image."
@@ -222,7 +264,7 @@ export function AnnotationImagePicker({
             }}
             type="button"
           >
-            Use image
+            {tab === "generate" ? "Place request" : "Use image"}
           </Button>
         </div>
       </DialogContent>

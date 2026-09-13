@@ -1,8 +1,9 @@
+import { installInlineTextBridge } from "./inline-text-bridge";
 import { withRenderPolicy } from "./render-policy";
 
 const PUBLIC_PLAN_ID = /^(?:h_[a-zA-Z0-9_-]{20}|[0-9a-f]{64}_\d+)$/;
 
-/** Geometry only crosses this boundary. Never inject annotation content or credentials. */
+/** Geometry and bounded plain-text edits use separate private ports; never inject credentials. */
 export function withAnnotationBridge(
   html: string,
   collaboration = true,
@@ -17,6 +18,9 @@ export function withAnnotationBridge(
   return withRenderPolicy(
     html,
     tag +
+      (collaboration
+        ? `<script>;(${installInlineTextBridge.toString().replaceAll("</script", "<\\/script")})();</script>`
+        : "") +
       (appearanceCss
         ? `<style>${appearanceCss.replaceAll("</style", "<\\/style")}</style>`
         : "")
@@ -443,7 +447,7 @@ function installGeometryBridge(
       !event.repeat &&
       !(
         event.target instanceof Element &&
-        event.target.closest("input,textarea,select,[contenteditable=true]")
+        event.target.closest("input,textarea,select,[contenteditable]")
       ) &&
       pointerPoint &&
       !picking &&

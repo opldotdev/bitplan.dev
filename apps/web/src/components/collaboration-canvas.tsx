@@ -21,6 +21,7 @@ import { AnnotationCard } from "@/components/annotation-card";
 import { AnnotationDrawLayer } from "@/components/annotation-draw-layer";
 import { AnnotationImagePicker } from "@/components/annotation-image-picker";
 import { AnnotationOnboarding } from "@/components/annotation-onboarding";
+import { AnnotationThread } from "@/components/annotation-thread";
 import { usePlanAppearance } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,7 @@ import { withAnnotationBridge } from "@/lib/annotation-bridge";
 import { annotationInputAction } from "@/lib/annotation-input";
 import { annotationLink } from "@/lib/annotation-link";
 import { annotationCardOffset } from "@/lib/annotation-position";
+import { annotationReplies } from "@/lib/annotation-thread";
 import {
   type Annotation,
   type AnnotationAnchor,
@@ -47,6 +49,11 @@ import { characterPortrait } from "@/lib/collaborator";
 import { cursorIsActive } from "@/lib/cursor-activity";
 import type { DrawingTool } from "@/lib/drawing-asset";
 import { isHostedId } from "@/lib/hosted-id";
+import {
+  materializeTextBlocks,
+  parseTextBlock,
+  type TextBlock,
+} from "@/lib/inline-text";
 import { planAppearanceCss } from "@/lib/plan-appearance";
 import { withRenderPolicy } from "@/lib/render-policy";
 import type { CollaborationState } from "@/lib/use-collaboration";
@@ -149,6 +156,14 @@ export function CollaborationCanvas({
   const frame = useRef<HTMLIFrameElement>(null);
   const connectedFrame = useRef<HTMLIFrameElement | null>(null);
   const geometryPort = useRef<MessagePort | null>(null);
+  const textPort = useRef<MessagePort | null>(null);
+  const textRecovery = useRef(
+    new Map<string, TextBlock & { revision: number }>()
+  );
+  const [inlineEditing, setInlineEditing] = useState(false);
+  const [inlineEditError, setInlineEditError] = useState<string | null>(null);
+  const inlineEditingRef = useRef(inlineEditing);
+  inlineEditingRef.current = inlineEditing;
   const [bridgeHostReady, setBridgeHostReady] = useState(false);
   const trigger = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState(false);
@@ -168,6 +183,7 @@ export function CollaborationCanvas({
   const [mode, setMode] = useState<AnnotationMode>("text");
   const [text, setText] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [imageAlt, setImageAlt] = useState("");
   const [busy, setBusy] = useState(false);
   const [inline, setInline] = useState<{
     anchor: AnnotationAnchor;
@@ -180,6 +196,7 @@ export function CollaborationCanvas({
   const [editor, setEditor] = useState<{
     html: string;
     revision: number;
+    sequence: number;
   } | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [savingDocument, setSavingDocument] = useState(false);
@@ -212,9 +229,158 @@ export function CollaborationCanvas({
       ),
     [currentHtml, !!room.connection, preset, browserMenu, target.origin]
   );
+  useEffect(() => {
+    textPort.current?.postMessage({ payload: inlineEditing, type: "mode" });
+  }, [inlineEditing]);
+  useEffect(() => {
+    function beforeUnload(event: BeforeUnloadEvent) {
+      if (textRecovery.current.size) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, []);
+  useEffect(() => {
+    textPort.current?.postMessage({
+      payload: room.textBlocks.filter((block) =>
+        sameDocumentTarget(block.base, room.activeTarget)
+      ),
+      type: "blocks",
+    });
+  }, [room.textBlocks, room.activeTarget]);
+  useEffect(() => {
+    function sync() {
+      const { current } = roomRef;
+      textPort.current?.postMessage({
+        payload: inlineEditingRef.current,
+        type: "mode",
+      });
+      textPort.current?.postMessage({
+        payload: current.textBlocks.filter((block) =>
+          sameDocumentTarget(block.base, current.activeTarget)
+        ),
+        type: "blocks",
+      });
+    }
+    function ready(event: MessageEvent) {
+      if (
+        event.source !== frame.current?.contentWindow ||
+        event.data?.type !== "bitplan-text-ready/1" ||
+        !event.ports[0] ||
+        textPort.current
+      ) {
+        return;
+      }
+      const [port] = event.ports;
+      textPort.current = port;
+      const base = roomRef.current.activeTarget;
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: private edit channel validates input and retains rejected local edits
+      port.onmessage = async ({ data }) => {
+        if (data?.type === "ready") {
+          sync();
+          const drafts = [...textRecovery.current.values()].filter((block) =>
+            sameDocumentTarget(block.base, base)
+          );
+          if (drafts.length) {
+            port.postMessage({ payload: drafts, type: "restore" });
+          }
+          if (textRecovery.current.size) {
+            setInlineEditError(
+              "Unsaved text has been kept. Copy it before loading the latest text."
+            );
+          }
+          return;
+        }
+        if (data?.type === "error" && typeof data.payload === "string") {
+          setInlineEditError(data.payload);
+          return;
+        }
+        if (data?.type === "clean" && typeof data.payload?.path === "string") {
+          const key = `${base.sha256}:${data.payload.path}`;
+          if (textRecovery.current.get(key)?.text === data.payload.text) {
+            textRecovery.current.delete(key);
+          }
+          return;
+        }
+        if (data?.type === "draft") {
+          const value = data.payload;
+          try {
+            if (
+              typeof value?.text !== "string" ||
+              value.text.length > 64_000 ||
+              !Number.isSafeInteger(value.revision) ||
+              value.revision < 0
+            ) {
+              return;
+            }
+            const block = parseTextBlock({
+              ...value,
+              base,
+              schema: "bitplan-text/1",
+              text: value.text.slice(0, 16_000),
+            });
+            textRecovery.current.set(`${base.sha256}:${block.path}`, {
+              ...block,
+              revision: value.revision,
+              text: value.text,
+            });
+          } catch {
+            /* Invalid bridge messages cannot change the document. */
+          }
+          return;
+        }
+        if (data?.type !== "edit") {
+          return;
+        }
+        const value = data.payload;
+        try {
+          const block = parseTextBlock({
+            ...value,
+            base,
+            schema: "bitplan-text/1",
+          });
+          if (!Number.isSafeInteger(value.revision) || value.revision < 0) {
+            throw new Error("Invalid text revision.");
+          }
+          const saved = await roomRef.current.saveTextBlock(
+            block,
+            value.revision
+          );
+          const recoveryKey = `${base.sha256}:${block.path}`;
+          if (textRecovery.current.get(recoveryKey)?.text === block.text) {
+            textRecovery.current.delete(recoveryKey);
+          }
+          port.postMessage({
+            payload: {
+              path: block.path,
+              revision: saved.revision,
+              text: block.text,
+            },
+            type: "saved",
+          });
+        } catch {
+          port.postMessage({ payload: value?.path, type: "failed" });
+          setInlineEditError(
+            "This passage changed or could not save. Your text is still on the page. Copy it before loading the latest text."
+          );
+        }
+      };
+      port.start();
+      sync();
+    }
+    window.addEventListener("message", ready);
+    return () => {
+      window.removeEventListener("message", ready);
+      textPort.current?.close();
+      textPort.current = null;
+    };
+  }, [documentHtml]);
   const visible = room.annotations.filter(
     (item) =>
       sameDocumentTarget(item.target, room.activeTarget) &&
+      !item.replyTo &&
       item.status === "open"
   );
   const earlierCursors = room.cursors.filter(
@@ -417,7 +583,7 @@ export function CollaborationCanvas({
         event.key !== "Shift" ||
         event.repeat ||
         (event.target instanceof Element &&
-          event.target.closest("input,textarea,[contenteditable=true]"))
+          event.target.closest("input,textarea,[contenteditable]"))
       ) {
         return;
       }
@@ -447,10 +613,17 @@ export function CollaborationCanvas({
           collaborators: roomRef.current.profiles,
           cursor: roomRef.current.sequence,
           documentRevision: roomRef.current.documentRevision,
-          html: htmlRef.current,
+          html: materializeTextBlocks(
+            htmlRef.current,
+            roomRef.current.textBlocks,
+            roomRef.current.activeTarget
+          ),
           locations: roomRef.current.cursors,
           online: roomRef.current.online,
           target: roomRef.current.activeTarget,
+          textBlocks: roomRef.current.textBlocks.filter((block) =>
+            sameDocumentTarget(block.base, roomRef.current.activeTarget)
+          ),
           title: titleRef.current,
         }),
         inputSchema: {
@@ -502,7 +675,7 @@ export function CollaborationCanvas({
       }),
       registerWebMcpTool({
         description:
-          "Save shared HTML against the documentRevision returned by read_bitplan_collaboration. Conflicts reject stale edits. No wallet action or inscription. Hosted plans only.",
+          "Save shared HTML against the documentRevision and cursor returned by read_bitplan_collaboration. Its HTML includes live text edits; read its annotations before revising. Conflicts reject stale edits. No wallet action or inscription. Hosted plans only.",
         execute: (input: unknown) => {
           if (
             !input ||
@@ -512,22 +685,33 @@ export function CollaborationCanvas({
             !("expectedRevision" in input) ||
             typeof input.expectedRevision !== "number" ||
             !Number.isSafeInteger(input.expectedRevision) ||
-            input.expectedRevision < 0
+            input.expectedRevision < 0 ||
+            !("expectedSequence" in input) ||
+            typeof input.expectedSequence !== "number" ||
+            !Number.isSafeInteger(input.expectedSequence) ||
+            input.expectedSequence < 0
           ) {
             throw new Error("Provide HTML and the observed document revision.");
           }
           return roomRef.current.saveDocument(
             input.html,
-            input.expectedRevision
+            input.expectedRevision,
+            undefined,
+            input.expectedSequence
           );
         },
         inputSchema: {
           additionalProperties: false,
           properties: {
             expectedRevision: { minimum: 0, type: "integer" },
+            expectedSequence: {
+              description: "The cursor from read_bitplan_collaboration.",
+              minimum: 0,
+              type: "integer",
+            },
             html: { type: "string" },
           },
-          required: ["html", "expectedRevision"],
+          required: ["html", "expectedRevision", "expectedSequence"],
           type: "object",
         },
         name: "edit_bitplan_document",
@@ -548,9 +732,13 @@ export function CollaborationCanvas({
     setBusy(true);
     try {
       const content = contentFor(mode, text, image);
+      if (content.type === "image" && imageAlt) {
+        content.alt = imageAlt;
+      }
       await room.saveAnnotation(content, anchor);
       setText("");
       setImage(null);
+      setImageAlt("");
       if (mode === "text") {
         setPanel(false);
       }
@@ -640,7 +828,15 @@ export function CollaborationCanvas({
   }
 
   function editDocument() {
-    setEditor({ html: currentHtml, revision: room.documentRevision });
+    setEditor({
+      html: materializeTextBlocks(
+        currentHtml,
+        room.textBlocks,
+        room.activeTarget
+      ),
+      revision: room.documentRevision,
+      sequence: room.sequence,
+    });
     setEditError(null);
   }
   async function saveDocument() {
@@ -649,7 +845,12 @@ export function CollaborationCanvas({
     }
     setSavingDocument(true);
     try {
-      await room.saveDocument(editor.html, editor.revision);
+      await room.saveDocument(
+        editor.html,
+        editor.revision,
+        undefined,
+        editor.sequence
+      );
       setEditor(null);
       setEditError(null);
     } catch (failure) {
@@ -666,6 +867,61 @@ export function CollaborationCanvas({
   return (
     <>
       {room.connection ? <AnnotationOnboarding /> : null}
+      {inlineEditing || inlineEditError ? (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2 text-sm"
+          role="status"
+        >
+          <span>
+            {inlineEditError ??
+              "Click a text passage to edit. Changes save live; Enter finishes the passage."}
+          </span>
+          <div className="flex gap-2">
+            {inlineEditError ? (
+              <>
+                <Button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        [...textRecovery.current.values()]
+                          .map((block) => block.text)
+                          .join("\n\n")
+                      );
+                      toast.success("Unsaved text copied.");
+                    } catch {
+                      toast.error(
+                        "Could not copy. Select the text on the page to copy it."
+                      );
+                    }
+                  }}
+                  size="sm"
+                  variant="ghost"
+                >
+                  Copy unsaved text
+                </Button>
+                <Button
+                  onClick={() => {
+                    textRecovery.current.clear();
+                    textPort.current?.postMessage({ type: "discard" });
+                    setInlineEditError(null);
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  Load latest text
+                </Button>
+              </>
+            ) : null}
+            <Button
+              onClick={() => setInlineEditing(false)}
+              size="sm"
+              variant="ghost"
+            >
+              Done
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild disabled={!room.connection || browserMenu}>
           <div
@@ -851,7 +1107,26 @@ export function CollaborationCanvas({
                         "Collaborator"}{" "}
                       · {index + 1}
                     </button>
-                    <AnnotationBody content={item.content} />
+                    {item.content.type === "text" ? (
+                      <AnnotationThread
+                        currentParticipantId={room.connection?.participantId}
+                        disabled={!room.online}
+                        item={item}
+                        onReply={(replyText) =>
+                          room.saveAnnotation(
+                            { text: replyText, type: "text" },
+                            item.anchor,
+                            undefined,
+                            undefined,
+                            item.id
+                          )
+                        }
+                        profiles={room.profiles}
+                        replies={annotationReplies(item, room.annotations)}
+                      />
+                    ) : (
+                      <AnnotationBody content={item.content} />
+                    )}
                   </AnnotationCard>
                 );
               })}
@@ -971,7 +1246,7 @@ export function CollaborationCanvas({
               <AnnotationImagePicker
                 initiallyOpen
                 onClose={() => setInline(null)}
-                onLoad={async (dataUrl) => {
+                onLoad={async (dataUrl, alt) => {
                   if (
                     !sameDocumentTarget(
                       inline.target,
@@ -983,7 +1258,7 @@ export function CollaborationCanvas({
                     );
                   }
                   await room.saveAnnotation(
-                    { alt: "Image annotation", dataUrl, type: "image" },
+                    { alt: alt ?? "Image annotation", dataUrl, type: "image" },
                     inline.anchor
                   );
                   setInline(null);
@@ -1100,9 +1375,23 @@ export function CollaborationCanvas({
                     your pointer.
                   </p>
                   {isHostedId(target.origin) ? (
-                    <Button onClick={editDocument} size="sm" variant="outline">
-                      Edit page
-                    </Button>
+                    <>
+                      <Button
+                        onClick={() => {
+                          setInlineEditing((value) => !value);
+                          setPanel(false);
+                        }}
+                        size="sm"
+                        variant="outline"
+                      >
+                        {inlineEditing
+                          ? "Finish editing text"
+                          : "Edit text in place"}
+                      </Button>
+                      <Button onClick={editDocument} size="sm" variant="ghost">
+                        Edit HTML
+                      </Button>
+                    </>
                   ) : null}
                   {room.documentDraft ? (
                     <p className="text-muted-foreground text-xs">
@@ -1139,49 +1428,81 @@ export function CollaborationCanvas({
                       one below.
                     </p>
                   ) : null}
-                  {room.annotations.map((item) => (
-                    <article
-                      className="space-y-2 rounded-lg border p-3 text-sm"
-                      data-annotation-id={item.id}
-                      key={item.id}
-                    >
-                      <Button
-                        onClick={() => {
-                          if (
-                            sameDocumentTarget(item.target, room.activeTarget)
-                          ) {
-                            setHighlight(item.anchor);
-                          }
-                        }}
-                        size="sm"
-                        variant="ghost"
+                  {room.annotations
+                    .filter((item) => !item.replyTo)
+                    .map((item) => (
+                      <article
+                        className="space-y-2 rounded-lg border p-3 text-sm"
+                        data-annotation-id={item.id}
+                        key={item.id}
                       >
-                        Show element
-                      </Button>
-                      <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
-                        <span>
-                          {room.profiles[item.participantId]?.name ??
-                            "Collaborator"}
-                        </span>
-                        <span>{item.status}</span>
-                      </div>
-                      <AnnotationAttachmentStatus
-                        item={item}
-                        position={positions[item.id]}
-                        target={room.activeTarget}
-                      />
-                      <AnnotationBody content={item.content} />
-                      {item.participantId === room.connection?.participantId ? (
                         <Button
-                          onClick={() => void resolve(item)}
+                          onClick={() => {
+                            if (
+                              sameDocumentTarget(item.target, room.activeTarget)
+                            ) {
+                              setHighlight(item.anchor);
+                            }
+                          }}
                           size="sm"
                           variant="ghost"
                         >
-                          {item.status === "open" ? "Resolve" : "Reopen"}
+                          Show element
                         </Button>
-                      ) : null}
-                    </article>
-                  ))}
+                        <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
+                          <span>
+                            {room.profiles[item.participantId]?.name ??
+                              "Collaborator"}
+                          </span>
+                          <span>{item.status}</span>
+                        </div>
+                        <AnnotationAttachmentStatus
+                          item={item}
+                          position={positions[item.id]}
+                          target={room.activeTarget}
+                        />
+                        {item.content.type === "text" ? (
+                          <AnnotationThread
+                            currentParticipantId={
+                              room.connection?.participantId
+                            }
+                            disabled={
+                              !(
+                                room.online &&
+                                sameDocumentTarget(
+                                  item.target,
+                                  room.activeTarget
+                                )
+                              )
+                            }
+                            item={item}
+                            onReply={(replyText) =>
+                              room.saveAnnotation(
+                                { text: replyText, type: "text" },
+                                item.anchor,
+                                undefined,
+                                undefined,
+                                item.id
+                              )
+                            }
+                            profiles={room.profiles}
+                            replies={annotationReplies(item, room.annotations)}
+                          />
+                        ) : (
+                          <AnnotationBody content={item.content} />
+                        )}
+                        {item.participantId ===
+                        room.connection?.participantId ? (
+                          <Button
+                            onClick={() => void resolve(item)}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            {item.status === "open" ? "Resolve" : "Reopen"}
+                          </Button>
+                        ) : null}
+                      </article>
+                    ))}
                 </div>
                 <form
                   className="space-y-2 border-t p-3"
@@ -1194,9 +1515,13 @@ export function CollaborationCanvas({
                     Add annotation
                     <select
                       className="rounded border bg-background p-1"
-                      onChange={(event) =>
-                        setMode(event.target.value as typeof mode)
-                      }
+                      onChange={(event) => {
+                        if (event.target.value === "image") {
+                          startPicking("image");
+                          return;
+                        }
+                        setMode(event.target.value as typeof mode);
+                      }}
                       value={mode}
                     >
                       <option value="text">Comment</option>
@@ -1205,7 +1530,12 @@ export function CollaborationCanvas({
                     </select>
                   </label>
                   {mode === "image" ? (
-                    <AnnotationImagePicker onLoad={setImage} />
+                    <AnnotationImagePicker
+                      onLoad={(dataUrl, alt) => {
+                        setImage(dataUrl);
+                        setImageAlt(alt ?? "");
+                      }}
+                    />
                   ) : null}
                   <textarea
                     aria-label={annotationInputLabel(mode)}

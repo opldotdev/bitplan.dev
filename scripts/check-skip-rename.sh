@@ -8,7 +8,7 @@ agent-browser --session "$session" open "${1:-http://localhost:3000}/new" >/dev/
 agent-browser --session "$session" wait '#shared-draft-title'
 agent-browser --session "$session" find role button click --name 'Skip' --exact
 agent-browser --session "$session" wait 'input[value="brief"]'
-agent-browser --session "$session" find role button click --name 'View shared draft' --exact
+agent-browser --session "$session" find role button click --name 'Start with Master Plan' --exact
 agent-browser --session "$session" wait 'button[aria-label="Rename Master Plan"]'
 invitation=$(agent-browser --session "$session" get url)
 agent-browser --session "$reader" open "$invitation" >/dev/null
