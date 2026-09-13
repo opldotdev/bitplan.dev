@@ -8,7 +8,7 @@ agent-browser --session "$session" open "$origin/new" >/dev/null
 agent-browser --session "$session" wait '#shared-draft-title'
 agent-browser --session "$session" fill '#shared-draft-title' 'Wallet flow check'
 agent-browser --session "$session" find role button click --name 'Connect wallet' --exact
-agent-browser --session "$session" wait --fn '/Wallet connected|Wallet disconnected/.test(document.querySelector("[role=status]")?.textContent ?? "")'
+agent-browser --session "$session" wait --fn '!Array.from(document.querySelectorAll("button")).find(b => b.textContent.trim() === "Continue")?.disabled'
 agent-browser --session "$session" find role button click --name 'Continue' --exact
 agent-browser --session "$session" check 'input[name="template"][value="terminal"]'
 agent-browser --session "$session" wait --fn '!document.querySelector("#plan-body") && !document.querySelector("#plan-repository")'
@@ -16,6 +16,7 @@ agent-browser --session "$session" find role button click --name 'Review plan' -
 agent-browser --session "$session" wait '[role="dialog"] iframe[title="Plan preview"]'
 agent-browser --session "$session" find role button click --name 'Edit' --exact
 agent-browser --session "$session" wait --fn 'document.querySelector("input[name=template][value=terminal]")?.checked === true'
+agent-browser --session "$session" wait --fn '(() => { const b = Array.from(document.querySelectorAll("button")).find(el => el.textContent.trim() === "Back"); if (!b) return false; const r = b.getBoundingClientRect(); return b.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })()'
 agent-browser --session "$session" find role button click --name 'Back' --exact
 agent-browser --session "$session" wait --fn 'document.querySelector("#shared-draft-title")?.value === "Wallet flow check"'
 agent-browser --session "$session" open "$origin" >/dev/null

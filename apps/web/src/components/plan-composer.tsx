@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -548,6 +548,17 @@ function SharedStarter({
           onInteractOutside={(event) => event.preventDefault()}
           showCloseButton={false}
         >
+          <button
+            aria-label="Skip naming this plan"
+            className="absolute inset-0 -z-10 cursor-default"
+            disabled={step !== "name" || creating}
+            onClick={() => {
+              setTitle(title.trim() || "Master Plan");
+              setStep("style");
+            }}
+            tabIndex={-1}
+            type="button"
+          />
           <StarterAccess
             connecting={connectingWallet}
             disabled={creating}
@@ -703,9 +714,27 @@ function StarterAccess({
   onConnect: () => void;
   onUseLink: () => void;
 }) {
+  const [dismissed, setDismissed] = useState(false);
+  const connected = useSyncExternalStore(
+    onWalletChange,
+    isWalletConnected,
+    () => false
+  );
+  if (dismissed || (connected && walletMode)) {
+    return null;
+  }
   return (
     <aside className="relative mb-6 w-full max-w-lg shrink-0 rounded-xl bg-background/90 p-5 ring-1 ring-foreground/10 lg:absolute lg:top-6 lg:right-6 lg:mb-0 lg:w-64">
-      {walletMode ? <WalletStatus connecting={connecting} /> : null}
+      <Button
+        aria-label="Dismiss wallet notice"
+        className="absolute top-2 right-2"
+        onClick={() => setDismissed(true)}
+        size="icon-sm"
+        type="button"
+        variant="ghost"
+      >
+        <X className="size-3" />
+      </Button>
       <p className="font-medium">Off-chain draft</p>
       <p className="mt-1 text-muted-foreground text-xs leading-relaxed">
         {walletMode
