@@ -23,6 +23,7 @@ export function AnnotationCard({
   canResize,
   save,
   children,
+  onSelect,
 }: {
   item: Annotation;
   label: string;
@@ -30,6 +31,7 @@ export function AnnotationCard({
   canResize: boolean;
   save: (size: NonNullable<Annotation["size"]>) => Promise<unknown>;
   children: ReactNode;
+  onSelect?: () => void;
 }) {
   const card = useRef<HTMLElement>(null);
   const drag = useRef<{
@@ -59,11 +61,14 @@ export function AnnotationCard({
     }
   }
   return (
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: passive anchor highlighting augments child controls; it never replaces their keyboard behavior
     <article
       aria-busy={saving}
       aria-label={label}
       className={`pointer-events-auto absolute flex max-w-[90%] flex-col rounded-md border p-2 pb-6 text-sm ${item.content.type === "image" ? "border-transparent bg-transparent focus-within:border-border hover:border-border" : "bg-background shadow-sm"}`}
       data-annotation-anchor={item.id}
+      onFocus={onSelect}
+      onPointerDown={onSelect}
       ref={card}
       style={{ ...style, height: size?.height, width: size?.width ?? 224 }}
     >

@@ -933,7 +933,21 @@ function DecryptedView({
               ) : null}
             </div>
           </CharacterChooser>
-          <ThemeToggle templates />
+          <ThemeToggle
+            onTemplateRequest={
+              collaboration.online
+                ? (preset) =>
+                    collaboration.saveAnnotation(
+                      {
+                        text: `Template change request: ${preset.name}. Use https://bitplan.dev/templates/${preset.layout}.html as the content and design starting point, not just a global CSS change. Read this plan and its annotations before revising. ${preset.layout === "blank" ? "I want a clear page; confirm before replacing existing content." : "Preserve the plan's useful content and decisions while adapting its composition."} Keep existing annotation records attached to their original version. Do not publish on chain without approval.`,
+                        type: "text",
+                      },
+                      { point: { x: 0.5, y: 0.1 } }
+                    )
+                : undefined
+            }
+            templates
+          />
         </div>
       </header>
       <CollaborationCanvas

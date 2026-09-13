@@ -118,8 +118,11 @@ Do not describe a hosted plan as on chain. Do not call a 1Sat Ordinal a
 
 The player offers Brief (editorial paper), Terminal (monochrome dither), and
 Blank (white paper / dark chalkboard) appearance presets, with Light, Dark, and
-System modes. Applying a preset restyles the current document locally; it does
-not replace content, publish a version, or erase annotations. Import presets
+System modes. Choosing a template opens a change dialog: add a shared annotation
+requesting an agent-led revision, explicitly apply colors/typography only, or
+start a new plan. Blank does not silently erase the current plan. Read all
+annotations before fulfilling a template request and confirm destructive replacement.
+Import presets
 are validated JSON palettes, not arbitrary executable templates. Start from
 https://bitplan.dev/templates/brief.html or
 https://bitplan.dev/templates/terminal.html for these self-contained formats.
@@ -479,12 +482,17 @@ Never retry the whole stale document. The visible equivalent is Annotations →
 Edit shared document → Save shared document. Current live saves happen on
 explicit Save, not per keystroke, and do not inscribe a transaction.
 
-Right-click the document for the contextual icon bar: + T adds text; the image
+Right-click or hold Shift over the document for the contextual icon bar.
+Choosing + T or image enters an element picker: hover highlights the target in
+your session color and broadcasts encrypted selection presence. Click to attach
+the annotation at that relative point; Escape cancels. Clicking a saved note
+highlights its element again. Stable IDs are preferred; structural domPath
+anchors are pinned to the exact document target and must not be silently
+reused against replacement content. The image
 icon opens Photos, Stickers, and Draw. Raster uploads up to 20 MB are resized
 locally to fit the 170 KB image budget; SVG/GIF must already fit that budget.
 The gear enables the native browser menu on subsequent right-clicks; restore
-the annotation toolbar with the checkbox in Edit & annotate. Shift-right-click
-temporarily passes through to the browser. Browsers cannot be told to open their
+the annotation toolbar with the checkbox in Edit & annotate. Browsers cannot be told to open their
 native menu programmatically. If a browser intercepts right-click before the
 page receives it, use Edit & annotate instead; do not weaken the iframe sandbox
 or native event validation. This is also the mobile entry point.

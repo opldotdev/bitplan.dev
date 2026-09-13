@@ -7,6 +7,8 @@ export interface DocumentTarget {
 }
 
 export interface AnnotationAnchor {
+  /** Structural fallback for elements without an ID, pinned to the document target. */
+  domPath?: string;
   /** Stable author-supplied DOM id; absent for a document-level annotation. */
   elementId?: string;
   /** Fractions of the anchored element, not viewport pixels. */
@@ -46,6 +48,8 @@ export interface AnnotationLayer {
 }
 
 const ID = /^[a-zA-Z0-9_-]{1,128}$/;
+const DOM_PATH =
+  /^body(?:>[a-z][a-z0-9-]*:nth-child\([1-9][0-9]{0,5}\)){1,64}$/;
 const ORIGIN = /^(?:[0-9a-f]{64}_\d+|h_[a-zA-Z0-9_-]{20})$/;
 const OUTPOINT = /^[0-9a-f]{64}_\d+$/;
 const HASH = /^[0-9a-f]{64}$/;
@@ -126,6 +130,13 @@ export function parseDocumentTarget(value: unknown): DocumentTarget {
 export function parseAnchor(value: unknown): AnnotationAnchor {
   const anchor = record(value);
   const result: AnnotationAnchor = { point: point(anchor.point) };
+  if (anchor.domPath !== undefined) {
+    const path = string(anchor.domPath, 2048);
+    if (!DOM_PATH.test(path)) {
+      throw new Error("Invalid element path.");
+    }
+    result.domPath = path;
+  }
   if (anchor.elementId !== undefined) {
     result.elementId = string(anchor.elementId, 512);
   }

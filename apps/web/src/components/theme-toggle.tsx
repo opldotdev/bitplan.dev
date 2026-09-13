@@ -18,7 +18,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { PLAN_APPEARANCES, parsePlanAppearance } from "@/lib/plan-appearance";
+import {
+  PLAN_APPEARANCES,
+  type PlanAppearance,
+  parsePlanAppearance,
+} from "@/lib/plan-appearance";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -31,11 +35,20 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
 
-export function ThemeToggle({ templates = false }: { templates?: boolean }) {
+export function ThemeToggle({
+  templates = false,
+  onTemplateRequest,
+}: {
+  templates?: boolean;
+  onTemplateRequest?: (preset: PlanAppearance) => Promise<unknown>;
+}) {
   const { resolvedTheme, theme, setTheme } = useTheme();
   const appearance = usePlanAppearance();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [savingRequest, setSavingRequest] = useState(false);
+  const [requestError, setRequestError] = useState("");
   const [draft, setDraft] = useState(PLAN_APPEARANCES[0]);
   const [importError, setImportError] = useState<string | null>(null);
   useEffect(() => {
@@ -138,7 +151,7 @@ export function ThemeToggle({ templates = false }: { templates?: boolean }) {
           {templates ? (
             <>
               <div className="flex items-center justify-between border-t pt-3">
-                <p className="font-medium text-sm">Page style</p>
+                <p className="font-medium text-sm">Template</p>
                 <Button
                   aria-label="Add page style"
                   onClick={() => {
@@ -155,6 +168,7 @@ export function ThemeToggle({ templates = false }: { templates?: boolean }) {
               <div className="grid grid-cols-2 gap-3">
                 {appearance.presets.map((preset) => (
                   <button
+                    aria-label={`Choose ${preset.name} template`}
                     aria-pressed={draft.name === preset.name}
                     className="relative min-w-0 rounded-lg border p-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring aria-pressed:ring-2 aria-pressed:ring-ring"
                     key={preset.name}
@@ -182,12 +196,13 @@ export function ThemeToggle({ templates = false }: { templates?: boolean }) {
               </p>
               <Button
                 onClick={() => {
-                  appearance.select(draft);
                   setOpen(false);
+                  setRequestError("");
+                  setRequesting(true);
                 }}
                 variant="outline"
               >
-                Use page style
+                Choose template
               </Button>
               <Button
                 onClick={() => {
@@ -209,6 +224,74 @@ export function ThemeToggle({ templates = false }: { templates?: boolean }) {
           ) : null}
         </PopoverContent>
       </Popover>
+      <Dialog
+        onOpenChange={(next) => {
+          if (!savingRequest) {
+            setRequesting(next);
+          }
+        }}
+        open={requesting}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle className="font-heading text-2xl">
+            Use {draft.name}?
+          </DialogTitle>
+          <DialogDescription>
+            Keep the current plan and ask your agent to adapt it. The request
+            becomes a shared annotation, not an automatic rewrite.
+          </DialogDescription>
+          <Button
+            disabled={!onTemplateRequest || savingRequest}
+            onClick={async () => {
+              if (!onTemplateRequest) {
+                return;
+              }
+              setSavingRequest(true);
+              try {
+                await onTemplateRequest(draft);
+                setRequesting(false);
+              } catch {
+                setRequestError(
+                  "Could not add the request. Your plan is unchanged."
+                );
+              } finally {
+                setSavingRequest(false);
+              }
+            }}
+          >
+            {savingRequest ? "Adding request…" : "Add change request"}
+          </Button>
+          {onTemplateRequest ? null : (
+            <p className="text-muted-foreground text-xs">
+              Join collaboration to leave a shared request.
+            </p>
+          )}
+          <Button
+            onClick={() => {
+              appearance.select(draft);
+              setRequesting(false);
+            }}
+            variant="outline"
+          >
+            Apply colors and typography only
+          </Button>
+          <a
+            className="text-center text-sm underline underline-offset-4"
+            href="/new"
+          >
+            Start a new plan instead
+          </a>
+          <p className="text-muted-foreground text-xs">
+            To clear this document, ask your agent to replace it with Blank.
+            Existing annotations stay attached to their original version.
+          </p>
+          {requestError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {requestError}
+            </p>
+          ) : null}
+        </DialogContent>
+      </Dialog>
       <Dialog onOpenChange={setAdding} open={adding}>
         <DialogContent>
           <DialogTitle>Add page style</DialogTitle>

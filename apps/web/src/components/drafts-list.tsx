@@ -151,10 +151,7 @@ function repoLabel(meta: DraftMeta | null): string {
 }
 
 function rowDateMillis(row: ViewRow): number | null {
-  if (row.detail?.status === "ok") {
-    const millis = Date.parse(row.detail.meta.createdAt);
-    return Number.isFinite(millis) ? millis : row.plan.updatedAtMillis;
-  }
+  // Discovery order stays fixed while encrypted details resolve.
   return row.plan.updatedAtMillis;
 }
 
@@ -198,10 +195,7 @@ export function buildRows(
 function groupRows(rows: ViewRow[]): [string, ViewRow[]][] {
   const groups = new Map<string, ViewRow[]>();
   for (const row of rows) {
-    const label =
-      row.detail?.status === "ok"
-        ? repoLabel(row.detail.meta)
-        : planRepoLabel(row.plan);
+    const label = planRepoLabel(row.plan);
     const bucket = groups.get(label) ?? [];
     bucket.push(row);
     groups.set(label, bucket);
@@ -658,8 +652,8 @@ function DraftsSkeleton() {
   return (
     <div className="space-y-3">
       <Skeleton className="h-4 w-32" />
-      <Skeleton className="h-16 w-full" />
-      <Skeleton className="h-16 w-full" />
+      <Skeleton className="h-32 w-full" />
+      <Skeleton className="h-32 w-full" />
     </div>
   );
 }
@@ -690,7 +684,7 @@ function Groups({
   rows: ViewRow[];
 }) {
   return (
-    <div className="space-y-8">
+    <div className="draft-list space-y-8">
       {groupRows(rows).map(([label, group]) => (
         <section key={label}>
           <h2 className="mb-3 font-medium text-muted-foreground text-sm">
@@ -736,6 +730,11 @@ function PlanItem({
         <ItemActions>
           <Badge variant="secondary">On chain</Badge>
         </ItemActions>
+        <ItemFooter>
+          <span className="text-muted-foreground text-xs">
+            Opening details…
+          </span>
+        </ItemFooter>
       </Item>
     );
   }
@@ -818,7 +817,7 @@ function ChainItem({ row }: { row: ViewRow }) {
         </ItemActions>
         <ItemFooter>
           <span className="truncate font-mono text-muted-foreground text-xs">
-            {truncateMiddle(plan.origin)}
+            {meta?.repoName ? repoLabel(meta) : truncateMiddle(plan.origin)}
           </span>
           <span className="shrink-0 text-muted-foreground text-xs">
             {rowDateLabel(row)}

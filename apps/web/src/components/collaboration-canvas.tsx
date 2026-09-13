@@ -52,6 +52,13 @@ const menuItem =
   "flex cursor-default items-center gap-1 rounded-sm px-2 py-2 text-sm outline-none data-highlighted:bg-muted data-disabled:opacity-50 [&_svg]:size-4";
 const CONTEXT_LINK = /^(https?:\/\/|mailto:|#)/i;
 type AnnotationMode = "text" | "html" | "image";
+interface AnchorPosition {
+  bounds?: { x: number; y: number; width: number; height: number };
+  x: number;
+  y: number;
+}
+const sessionColor = (id: string) =>
+  `hsl(${[...id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360} 70% 65%)`;
 
 function contentFor(
   mode: AnnotationMode,
@@ -142,6 +149,10 @@ export function CollaborationCanvas({
   const trigger = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState(false);
   const [browserMenu, setBrowserMenu] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [highlight, setHighlight] = useState<AnnotationAnchor | null>(null);
+  const picker = useRef<"text" | "image">("text");
+  const lastHover = useRef<AnnotationAnchor>(center);
   const [anchor, setAnchor] = useState<AnnotationAnchor>(center);
   const [contextLink, setContextLink] = useState<string | null>(null);
   const [contextSelection, setContextSelection] = useState("");
@@ -164,7 +175,7 @@ export function CollaborationCanvas({
   const [editError, setEditError] = useState<string | null>(null);
   const [savingDocument, setSavingDocument] = useState(false);
   const [positions, setPositions] = useState<
-    Record<string, { x: number; y: number } | null>
+    Record<string, AnchorPosition | null>
   >({});
   const [activityTime, setActivityTime] = useState(() => Date.now());
   useEffect(() => {
@@ -200,6 +211,7 @@ export function CollaborationCanvas({
     (cursor) => !sameDocumentTarget(cursor.target, room.activeTarget)
   );
   const targets = [
+    ...(highlight ? [{ anchor: highlight, id: "highlight" }] : []),
     ...visible.map((item) => ({ anchor: item.anchor, id: item.id })),
     ...(inline ? [{ anchor: inline.anchor, id: "composer" }] : []),
     ...room.cursors
@@ -215,6 +227,20 @@ export function CollaborationCanvas({
       payload: JSON.parse(targetsJsonRef.current),
       type: "anchors",
     });
+  }
+  function startPicking(kind: "text" | "image" = "text") {
+    picker.current = kind;
+    setPanel(false);
+    setPicking(true);
+    setHighlight(null);
+    geometryPort.current?.postMessage({ payload: true, type: "pick" });
+    frame.current?.focus();
+  }
+  function stopPicking() {
+    setPicking(false);
+    setHighlight(null);
+    geometryPort.current?.postMessage({ payload: false, type: "pick" });
+    roomRef.current.moveCursor(lastHover.current, false, false, true);
   }
   function cardTransform(
     point: { x: number; y: number },
@@ -237,7 +263,23 @@ export function CollaborationCanvas({
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the private-port receiver validates each supported message shape before updating UI state
   function received(event: MessageEvent) {
     try {
-      if (event.data.type === "context") {
+      if (event.data.type === "hover-end") {
+        setHighlight(null);
+        roomRef.current.moveCursor(lastHover.current, false, false, true);
+      } else if (event.data.type === "picked") {
+        const picked = parseAnchor(event.data.payload?.anchor);
+        stopPicking();
+        roomRef.current.moveCursor(picked, true);
+        setHighlight(picked);
+        setInline({
+          anchor: picked,
+          target: roomRef.current.activeTarget,
+          text: "",
+          ...(picker.current === "image" ? { kind: "image" as const } : {}),
+        });
+      } else if (event.data.type === "pick-cancel") {
+        stopPicking();
+      } else if (event.data.type === "context") {
         const { payload } = event.data;
         if (!(position(payload) && "anchor" in payload)) {
           return;
@@ -275,23 +317,56 @@ export function CollaborationCanvas({
           );
         }
       } else if (event.data.type === "pointer" || event.data.type === "click") {
+        const hovered = parseAnchor(event.data.payload?.anchor);
+        lastHover.current = hovered;
+        if (event.data.payload?.selecting === true) {
+          setHighlight(hovered);
+        }
         roomRef.current.moveCursor(
-          parseAnchor(event.data.payload?.anchor),
-          event.data.type === "click"
+          hovered,
+          event.data.type === "click",
+          event.data.payload?.selecting === true
         );
       } else if (
         event.data.type === "positions" &&
         Array.isArray(event.data.payload) &&
         event.data.payload.length <= 1600
       ) {
-        const next: Record<string, { x: number; y: number } | null> = {};
+        const next: Record<string, AnchorPosition | null> = {};
         for (const row of event.data.payload) {
           if (
             typeof row?.id === "string" &&
             row.id.length <= 160 &&
             (row.position === null || position(row.position))
           ) {
-            next[row.id] = row.position;
+            const bounds = row.position?.bounds;
+            next[row.id] =
+              row.position === null
+                ? null
+                : {
+                    x: row.position.x,
+                    y: row.position.y,
+                    ...(position(bounds) &&
+                    "width" in bounds &&
+                    typeof bounds.width === "number" &&
+                    "height" in bounds &&
+                    typeof bounds.height === "number" &&
+                    Number.isFinite(bounds.width) &&
+                    Number.isFinite(bounds.height) &&
+                    bounds.width >= 0 &&
+                    bounds.height >= 0 &&
+                    bounds.width < 100_000 &&
+                    bounds.height < 100_000
+                      ? {
+                          bounds: {
+                            height: bounds.height,
+                            width: bounds.width,
+                            x: bounds.x,
+                            y: bounds.y,
+                          },
+                        }
+                      : {}),
+                  };
           }
         }
         setPositions(next);
@@ -324,9 +399,23 @@ export function CollaborationCanvas({
       locate();
     }
     window.addEventListener("message", acceptGeometryPort);
+    function keyboardTools(event: KeyboardEvent) {
+      if (
+        !event.isTrusted ||
+        event.key !== "Shift" ||
+        event.repeat ||
+        (event.target instanceof Element &&
+          event.target.closest("input,textarea,[contenteditable=true]"))
+      ) {
+        return;
+      }
+      geometryPort.current?.postMessage({ type: "open-tools" });
+    }
+    window.addEventListener("keydown", keyboardTools);
     setBridgeHostReady(true);
     return () => {
       window.removeEventListener("message", acceptGeometryPort);
+      window.removeEventListener("keydown", keyboardTools);
       geometryPort.current?.close();
       geometryPort.current = null;
       connectedFrame.current = null;
@@ -572,7 +661,7 @@ export function CollaborationCanvas({
             data-bitplan-connected={room.connection ? room.online : undefined}
             data-bitplan-sequence={room.connection ? room.sequence : undefined}
             onContextMenuCapture={(event) => {
-              if (browserMenu || event.shiftKey || !room.connection) {
+              if (browserMenu || !room.connection) {
                 event.stopPropagation();
                 return;
               }
@@ -609,6 +698,46 @@ export function CollaborationCanvas({
               />
             ) : null}
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              {[
+                {
+                  color: sessionColor(room.connection?.sessionId ?? ""),
+                  id: "highlight",
+                },
+                ...room.cursors
+                  .filter(
+                    (cursor) =>
+                      cursor.selecting &&
+                      cursor.sessionId !== room.connection?.sessionId &&
+                      sameDocumentTarget(cursor.target, room.activeTarget) &&
+                      cursorIsActive(
+                        cursor.online,
+                        cursor.updatedAt,
+                        activityTime
+                      )
+                  )
+                  .map((cursor) => ({
+                    color: sessionColor(cursor.sessionId),
+                    id: `cursor-${cursor.sessionId}`,
+                  })),
+              ].map((item) => {
+                const bounds = positions[item.id]?.bounds;
+                return bounds ? (
+                  <div
+                    aria-hidden="true"
+                    className="absolute border-2"
+                    data-element-highlight={item.id}
+                    key={item.id}
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${item.color} 10%, transparent)`,
+                      borderColor: item.color,
+                      height: bounds.height,
+                      left: bounds.x,
+                      top: bounds.y,
+                      width: bounds.width,
+                    }}
+                  />
+                ) : null;
+              })}
               {targets
                 .filter((item) => !item.id.startsWith("cursor-"))
                 .map((item) => {
@@ -635,6 +764,7 @@ export function CollaborationCanvas({
                     item={item}
                     key={item.id}
                     label={`Annotation ${index + 1}`}
+                    onSelect={() => setHighlight(item.anchor)}
                     save={(size) =>
                       room.saveAnnotation(item.content, item.anchor, {
                         ...item,
@@ -881,6 +1011,15 @@ export function CollaborationCanvas({
                 {` · ${visible.length}`}
               </Button>
             ) : null}
+            {picking ? (
+              <Button
+                className="absolute bottom-16 left-4"
+                onClick={stopPicking}
+                variant="secondary"
+              >
+                Choose an element · Esc to cancel
+              </Button>
+            ) : null}
             {panel && room.connection ? (
               <aside
                 aria-label="Live annotations"
@@ -910,6 +1049,13 @@ export function CollaborationCanvas({
                   </Button>
                 </div>
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                  <Button
+                    onClick={() => startPicking()}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Annotate an element
+                  </Button>
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       checked={browserMenu}
@@ -919,8 +1065,8 @@ export function CollaborationCanvas({
                     Use browser right-click menu
                   </label>
                   <p className="text-muted-foreground text-xs">
-                    Or hold Shift while right-clicking. Annotation tools remain
-                    available here.
+                    Hold Shift over the document to open annotation tools at
+                    your pointer.
                   </p>
                   {isHostedId(target.origin) ? (
                     <Button onClick={editDocument} size="sm" variant="outline">
@@ -968,6 +1114,19 @@ export function CollaborationCanvas({
                       data-annotation-id={item.id}
                       key={item.id}
                     >
+                      <Button
+                        onClick={() => {
+                          if (
+                            sameDocumentTarget(item.target, room.activeTarget)
+                          ) {
+                            setHighlight(item.anchor);
+                          }
+                        }}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        Show element
+                      </Button>
                       <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
                         <span>
                           {room.profiles[item.participantId]?.name ??
@@ -1098,8 +1257,7 @@ export function CollaborationCanvas({
               className={menuItem}
               disabled={busy || !!inline}
               onSelect={() => {
-                setPanel(false);
-                setInline({ anchor, target: room.activeTarget, text: "" });
+                startPicking();
               }}
               title="Add text annotation"
             >
@@ -1111,13 +1269,7 @@ export function CollaborationCanvas({
               className={menuItem}
               disabled={busy || !!inline}
               onSelect={() => {
-                setPanel(false);
-                setInline({
-                  anchor,
-                  kind: "image",
-                  target: room.activeTarget,
-                  text: "",
-                });
+                startPicking("image");
               }}
               title="Add image or SVG"
             >

@@ -53,6 +53,7 @@ export interface Cursor {
   kind: "human" | "agent";
   online: boolean;
   participantId: string;
+  selecting?: boolean;
   sessionId: string;
   target: DocumentTarget;
   updatedAt: number;
@@ -362,13 +363,18 @@ export function useCollaboration(target: DocumentTarget) {
                     c.secret,
                     `${c.roomId}:cursor:${row.sessionId}`,
                     row.ciphertext
-                  )) as { target: unknown; anchor: unknown };
+                  )) as {
+                    target: unknown;
+                    anchor: unknown;
+                    selecting?: unknown;
+                  };
                   return {
                     anchor: parseAnchor(value.anchor),
                     clickCount: row.clickCount,
                     kind: row.kind,
                     online: row.online,
                     participantId: row.participantId,
+                    selecting: value.selecting === true,
                     sessionId: row.sessionId,
                     target: parseDocumentTarget(value.target),
                     updatedAt: row.updatedAt,
@@ -562,16 +568,22 @@ export function useCollaboration(target: DocumentTarget) {
       sessionProof: c.sessionProof,
     });
   }
-  function moveCursor(anchor: AnnotationAnchor, click = false) {
+  function moveCursor(
+    anchor: AnnotationAnchor,
+    click = false,
+    selecting = false,
+    force = false
+  ) {
     const c = connectionRef.current;
     // biome-ignore lint/suspicious/noUnnecessaryConditions: cursor events can outlive the connection
-    if (!c || (!click && Date.now() - lastCursor.current < 250)) {
+    if (!c || (!(click || force) && Date.now() - lastCursor.current < 250)) {
       return;
     }
     lastCursor.current = Date.now();
     const value = {
       anchor: parseAnchor(anchor),
       event: click ? "click" : "move",
+      selecting,
       target: activeTargetRef.current,
     };
     // Serialize encryption + writes so a slower movement cannot overwrite a later click.

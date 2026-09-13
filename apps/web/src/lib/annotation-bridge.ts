@@ -20,6 +20,7 @@ export function withAnnotationBridge(
 }
 
 function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
+  let picking = false;
   function linkFor(target: EventTarget | null) {
     const link = target instanceof Element ? target.closest("a[href]") : null;
     const href = link?.getAttribute("href")?.trim();
@@ -44,6 +45,10 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
       type,
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: native link handling keeps validation, local anchors, and popup hardening in one captured callback
       (event) => {
+        if (picking) {
+          event.preventDefault();
+          return;
+        }
         const link =
           event.target instanceof Element
             ? event.target.closest("a[href]")
@@ -109,12 +114,14 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
     id: string;
     anchor: {
       elementId?: string;
+      domPath?: string;
       quote?: { exact: string };
       point: { x: number; y: number };
     };
   }[] = [];
   let scheduled = false;
   let lastPointer = 0;
+  let pointerPoint: { x: number; y: number } | null = null;
   const send = (type: string, payload: unknown) =>
     postPortMessage.call(bridgePort, { payload, type });
   const trustedActivity = (event: Event) =>
@@ -122,11 +129,14 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
   const clamp = (n: number) => Math.max(0, Math.min(1, n));
   const selectedText = () =>
     window.getSelection?.()?.toString().slice(0, 32_000) ?? "";
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: keep point, ID, quote and structural fallback resolution together inside the serialized bridge
   function anchorFor(target: EventTarget | null, x: number, y: number) {
-    const element =
-      target instanceof Element
-        ? target.closest("[id],p,li,h1,h2,h3,h4,pre,blockquote,figure,section")
-        : null;
+    let element: Element | null = null;
+    if (target instanceof Element) {
+      element = picking
+        ? target
+        : target.closest("[id],p,li,h1,h2,h3,h4,pre,blockquote,figure,section");
+    }
     const documentPoint = () => ({
       point: {
         x: clamp(
@@ -139,6 +149,35 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
     });
     if (!element) {
       return documentPoint();
+    }
+    if (
+      picking &&
+      !element.id &&
+      element !== document.body &&
+      element !== document.documentElement
+    ) {
+      const parts: string[] = [];
+      let current: Element | null = element;
+      while (current && current !== document.body && parts.length < 64) {
+        const parentElement: Element | null = current.parentElement;
+        if (!parentElement) {
+          break;
+        }
+        parts.unshift(
+          `${current.tagName.toLowerCase()}:nth-child(${[...parentElement.children].indexOf(current) + 1})`
+        );
+        current = parentElement;
+      }
+      if (current === document.body && parts.length) {
+        const rect = element.getBoundingClientRect();
+        return {
+          domPath: `body>${parts.join(">")}`,
+          point: {
+            x: clamp((x - rect.left) / Math.max(1, rect.width)),
+            y: clamp((y - rect.top) / Math.max(1, rect.height)),
+          },
+        };
+      }
     }
     const rect = element.getBoundingClientRect();
     const exact = element.textContent?.trim().slice(0, 8000);
@@ -181,6 +220,14 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
         return null;
       }
       element = matches[0] ?? null;
+    } else if (
+      anchor.domPath &&
+      // biome-ignore lint/performance/useTopLevelRegex: this function is serialized into an isolated iframe
+      /^body(?:>[a-z][a-z0-9-]*:nth-child\([1-9][0-9]{0,5}\)){1,64}$/.test(
+        anchor.domPath
+      )
+    ) {
+      element = document.querySelector(anchor.domPath);
     } else if (anchor.quote?.exact) {
       const matches = [
         ...document.querySelectorAll(
@@ -204,6 +251,12 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
     }
     const rect = element.getBoundingClientRect();
     return {
+      bounds: {
+        height: rect.height,
+        width: rect.width,
+        x: rect.left,
+        y: rect.top,
+      },
       x: rect.left + rect.width * anchor.point.x,
       y: rect.top + rect.height * anchor.point.y,
     };
@@ -224,6 +277,30 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one private-port dispatcher validates each message shape before changing bridge state
   function receive(data: unknown) {
     if (!(data && typeof data === "object" && "type" in data)) {
+      return;
+    }
+    if (data.type === "pick") {
+      picking = "payload" in data && data.payload === true;
+      document.documentElement.style.cursor = picking
+        ? 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22%3E%3Cpath d=%22M15 3l6 6-3 3-2-2-9 9-4 1 1-4 9-9-2-2z%22 fill=%22white%22 stroke=%22black%22 stroke-width=%222%22/%3E%3C/svg%3E") 3 21, crosshair'
+        : "";
+      return;
+    }
+    if (
+      data.type === "open-tools" &&
+      pointerPoint &&
+      !picking &&
+      !browserMenu
+    ) {
+      const { x, y } = pointerPoint;
+      const target = document.elementFromPoint(x, y);
+      send("context", {
+        anchor: anchorFor(target, x, y),
+        href: linkFor(target),
+        selection: selectedText(),
+        x,
+        y,
+      });
       return;
     }
     if (data.type === "point") {
@@ -285,7 +362,7 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
     send("click", {
       anchor: anchorFor(event.target, event.clientX, event.clientY),
     });
-    if (browserMenu || event.shiftKey) {
+    if (browserMenu) {
       return;
     }
     event.preventDefault();
@@ -301,13 +378,24 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
     if (!trustedActivity(event)) {
       return;
     }
+    pointerPoint = { x: event.clientX, y: event.clientY };
     if (performance.now() - lastPointer < 250) {
       return;
     }
     lastPointer = performance.now();
     send("pointer", {
       anchor: anchorFor(event.target, event.clientX, event.clientY),
+      selecting: picking,
     });
+  });
+  document.addEventListener("pointerleave", (event) => {
+    if (!trustedActivity(event)) {
+      return;
+    }
+    pointerPoint = null;
+    if (picking) {
+      send("hover-end", {});
+    }
   });
   // Browser automation clicks emit the same events as human clicks. Never invent a location.
   for (const type of ["click", "auxclick"] as const) {
@@ -317,6 +405,15 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
         if (!trustedActivity(event) || event.button === 2) {
           return; // Right clicks are recorded by contextmenu, even when its native menu is prevented.
         }
+        if (picking) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          const anchor = anchorFor(event.target, event.clientX, event.clientY);
+          picking = false;
+          document.documentElement.style.cursor = "";
+          send("picked", { anchor });
+          return;
+        }
         send("click", {
           anchor: anchorFor(event.target, event.clientX, event.clientY),
         });
@@ -325,6 +422,35 @@ function installGeometryBridge(collaboration: boolean, browserMenu: boolean) {
     );
   }
   document.addEventListener("keydown", (event) => {
+    if (
+      trustedActivity(event) &&
+      event.key === "Shift" &&
+      !event.repeat &&
+      !(
+        event.target instanceof Element &&
+        event.target.closest("input,textarea,select,[contenteditable=true]")
+      ) &&
+      pointerPoint &&
+      !picking &&
+      !browserMenu
+    ) {
+      const { x, y } = pointerPoint;
+      const target = document.elementFromPoint(x, y);
+      send("context", {
+        anchor: anchorFor(target, x, y),
+        href: linkFor(target),
+        selection: selectedText(),
+        x,
+        y,
+      });
+      return;
+    }
+    if (trustedActivity(event) && picking && event.key === "Escape") {
+      picking = false;
+      document.documentElement.style.cursor = "";
+      send("pick-cancel", {});
+      return;
+    }
     if (trustedActivity(event) && event.shiftKey && event.key === "F10") {
       event.preventDefault();
       const rect = document.activeElement?.getBoundingClientRect();

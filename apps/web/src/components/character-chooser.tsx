@@ -130,6 +130,7 @@ export function CharacterChooser({
   const selectCharacter = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       const character = characterFromButton(event.currentTarget);
+      setOpen(false);
       choose({
         character,
         name:
