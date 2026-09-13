@@ -4,13 +4,11 @@ import { Check, Cloud, Copy, Info, Lock } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import { CharacterChooser } from "@/components/character-chooser";
 import { CollaborationCanvas } from "@/components/collaboration-canvas";
-import { HostedShareDialog } from "@/components/hosted-share-dialog";
 import { InlinePlanTitle } from "@/components/inline-plan-title";
 import { PlanPublishing } from "@/components/plan-publishing";
-import { ShareDraftDialog } from "@/components/share-draft-dialog";
+import { RevisionSharingProvider } from "@/components/revision-sharing";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +32,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
 import { sameDocumentTarget } from "@/lib/annotations";
 import { collaborationFragment } from "@/lib/collaboration-crypto";
@@ -47,21 +46,14 @@ import {
 } from "@/lib/envelope";
 import { formatByteSize, truncateMiddle } from "@/lib/format";
 import { isHostedId } from "@/lib/hosted-id";
-import {
-  linkWallet,
-  parseLinkFragment,
-  readerOnlyUrl,
-} from "@/lib/link-reader";
+import { linkWallet, parseLinkFragment } from "@/lib/link-reader";
 import {
   fetchOrdfsContent,
   type OrdfsContent,
   type OrdfsContentResult,
 } from "@/lib/ordfs";
 import { normalizeOrigin } from "@/lib/outpoint";
-import {
-  type CollaborationState,
-  useCollaboration,
-} from "@/lib/use-collaboration";
+import { useCollaboration } from "@/lib/use-collaboration";
 import {
   clampVersion,
   parseVersionQuery,
@@ -574,20 +566,38 @@ export function DraftViewer() {
 
   if (view.phase === "decrypted") {
     return (
-      <DecryptedView
-        canPublish={view.canPublish}
-        currentVersion={view.draft.currentVersion}
-        latestOutpoint={view.draft.latestOutpoint}
-        latestVersion={view.draft.latestVersion}
-        onVersion={handleVersion}
-        openedWithLink={view.openedWithLink}
+      <RevisionSharingProvider
+        currentAccess={{
+          link: !!view.openedWithLink,
+          recipients: parseEnvelope(
+            view.draft.content.bytes
+          ).header.key.slots.map((slot) => slot.identityKey),
+        }}
+        key={view.draft.origin}
         origin={view.draft.origin}
-        outpoint={view.draft.content.outpoint}
-        plaintext={view.plaintext}
-        senderIdentityKey={
-          parseEnvelope(view.draft.content.bytes).header.key.senderIdentityKey
-        }
-      />
+      >
+        <SidebarProvider
+          className="h-dvh min-h-0 flex-col"
+          defaultOpen={false}
+          style={{ "--sidebar-width": "24rem" } as React.CSSProperties}
+        >
+          <DecryptedView
+            canPublish={view.canPublish}
+            currentVersion={view.draft.currentVersion}
+            latestOutpoint={view.draft.latestOutpoint}
+            latestVersion={view.draft.latestVersion}
+            onVersion={handleVersion}
+            openedWithLink={view.openedWithLink}
+            origin={view.draft.origin}
+            outpoint={view.draft.content.outpoint}
+            plaintext={view.plaintext}
+            senderIdentityKey={
+              parseEnvelope(view.draft.content.bytes).header.key
+                .senderIdentityKey
+            }
+          />
+        </SidebarProvider>
+      </RevisionSharingProvider>
     );
   }
 
@@ -806,7 +816,6 @@ function EncryptedView({
 }
 
 function DecryptedView({
-  canPublish,
   openedWithLink,
   plaintext,
   currentVersion,
@@ -829,6 +838,7 @@ function DecryptedView({
   outpoint: string | null;
 }) {
   const baseTitle = plaintext.meta.title;
+  const [isPublisher, setIsPublisher] = useState(false);
   const target = {
     origin,
     sha256: plaintext.meta.fileSha256,
@@ -922,17 +932,6 @@ function DecryptedView({
           ) : null}
         </div>
         <div className="ml-auto flex items-center gap-1">
-          <PlanPublishing
-            latestOutpoint={latestOutpoint}
-            origin={origin}
-            senderIdentityKey={senderIdentityKey}
-          />
-          <DecryptedShare
-            canPublish={canPublish}
-            collaboration={collaboration}
-            openedWithLink={openedWithLink}
-            origin={origin}
-          />
           <MetaInfo
             meta={plaintext.meta}
             openedWithLink={openedWithLink}
@@ -992,80 +991,22 @@ function DecryptedView({
             }
             templates
           />
+          <PlanPublishing
+            latestOutpoint={latestOutpoint}
+            onPublisherChange={setIsPublisher}
+            origin={origin}
+            senderIdentityKey={senderIdentityKey}
+          />
         </div>
       </header>
       <CollaborationCanvas
         html={plaintext.html}
+        isPublisher={isPublisher}
         room={collaboration}
         target={target}
         title={title ?? "Draft"}
       />
     </div>
-  );
-}
-
-function DecryptedShare({
-  canPublish,
-  collaboration,
-  openedWithLink,
-  origin,
-}: {
-  canPublish: boolean;
-  collaboration: CollaborationState;
-  openedWithLink?: boolean;
-  origin: string;
-}) {
-  if (openedWithLink) {
-    return <ReaderLinkCopy includeCollaboration={!!collaboration.connection} />;
-  }
-  if (isHostedId(origin)) {
-    return <HostedShareDialog origin={origin} />;
-  }
-  if (canPublish) {
-    return <ShareDraftDialog origin={origin} />;
-  }
-  return null;
-}
-
-function ReaderLinkCopy({
-  includeCollaboration,
-}: {
-  includeCollaboration: boolean;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(
-        includeCollaboration
-          ? window.location.href
-          : readerOnlyUrl(window.location.href)
-      );
-      setCopied(true);
-      window.setTimeout(() => {
-        setCopied(false);
-      }, 2000);
-    } catch {
-      setCopied(false);
-      toast.error("Could not copy the link");
-    }
-  }, [includeCollaboration]);
-
-  const label = includeCollaboration
-    ? "Copy collaboration link"
-    : "Copy reader link";
-
-  return (
-    <Button
-      aria-label={copied ? "Copied" : label}
-      onClick={handleCopy}
-      size="icon-sm"
-      title={copied ? "Copied" : label}
-      type="button"
-      variant="ghost"
-    >
-      {copied ? <Check /> : <Copy />}
-    </Button>
   );
 }
 
@@ -1137,9 +1078,14 @@ function MetaInfo({
           <Info />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80">
+      <PopoverContent
+        align="end"
+        className="w-[min(28rem,calc(100vw-2rem))] gap-5 p-5"
+      >
         <PopoverHeader>
-          <PopoverTitle>Access &amp; draft info</PopoverTitle>
+          <PopoverTitle className="font-serif text-2xl">
+            Your workspace
+          </PopoverTitle>
           <PopoverDescription>
             How you opened this version, not its complete reader list.
             Connecting a wallet does not revoke links or change recipients.
@@ -1153,6 +1099,35 @@ function MetaInfo({
             </div>
           ))}
         </dl>
+        <section aria-label="Keyboard shortcuts" className="border-t pt-4">
+          <h3 className="mb-3 font-medium text-sm">Make your mark</h3>
+          <dl className="grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 text-sm">
+            {[
+              ["Select text", "V"],
+              ["Add a note", "T"],
+              ["Add an image", "I"],
+              ["Tools at your pointer", "Shift"],
+              ["Clear selection", "Esc"],
+              ["Remove selected text", "Delete"],
+              ["Save a note", "Enter"],
+              ["New line", "Shift + Enter"],
+            ].map(([action, key]) => (
+              <div className="contents" key={action}>
+                <dt className="text-muted-foreground">{action}</dt>
+                <dd>
+                  <kbd className="rounded-md border bg-muted px-2 py-1 font-mono text-xs shadow-sm">
+                    {key}
+                  </kbd>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-4 text-muted-foreground text-xs">
+            Click text to select. Click again or double-click to edit. New
+            version gathers feedback for your agent; it does not publish
+            automatically.
+          </p>
+        </section>
       </PopoverContent>
     </Popover>
   );

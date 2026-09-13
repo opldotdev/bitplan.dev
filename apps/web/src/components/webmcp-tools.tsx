@@ -15,6 +15,11 @@ interface ModelContext {
 }
 
 export interface WebMcpTool {
+  annotations?: {
+    readOnlyHint?: boolean;
+    untrustedContentHint?: boolean;
+    consequentialHint?: boolean;
+  };
   description: string;
   execute: (input: unknown) => unknown;
   inputSchema: Record<string, unknown>;

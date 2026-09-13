@@ -1,9 +1,73 @@
 import { expect, test } from "bun:test";
 import {
+  activeReviewEdits,
   materializeTextBlocks,
+  parseAuthorTextEdit,
   parseTextBlock,
+  retainAuthorTextEdit,
   textBlockKey,
 } from "./inline-text";
+
+test("annotation layers retain each author's latest patch independently", () => {
+  const first = parseAuthorTextEdit({
+    base: {
+      origin: "h_V2AE7cudMqACIdoFBJv2",
+      sha256: "a".repeat(64),
+      version: 1,
+    },
+    original: "Before",
+    participantId: "tina",
+    path: "body>p:nth-child(1)",
+    revision: 1,
+    roomId: "room",
+    schema: "bitplan-text/1",
+    sequence: 1,
+    sessionId: "browser",
+    text: "Tina's change",
+  });
+  const second = {
+    ...first,
+    participantId: "bob",
+    revision: 2,
+    sequence: 2,
+    text: "Bob's change",
+  };
+  expect(
+    activeReviewEdits([first, second], [{ ...second, text: second.original }])
+  ).toEqual([]);
+  expect(activeReviewEdits([first, second], [second])).toEqual([first, second]);
+  expect(
+    activeReviewEdits(
+      [first],
+      [
+        {
+          ...second,
+          base: { ...second.base, version: 2 },
+          text: second.original,
+        },
+      ]
+    )
+  ).toEqual([first]);
+  expect(
+    activeReviewEdits(
+      [first],
+      [{ ...second, deleted: true, text: second.original }]
+    )
+  ).toEqual([first]);
+  const third = {
+    ...first,
+    revision: 3,
+    sequence: 3,
+    text: "Tina's next change",
+  };
+  const edits = retainAuthorTextEdit(
+    retainAuthorTextEdit([first], second),
+    third
+  );
+  expect(edits).toEqual([second, third]);
+  expect(retainAuthorTextEdit(edits, first)).toEqual(edits);
+  expect(() => parseAuthorTextEdit({ ...first, sequence: 0 })).toThrow();
+});
 
 test("inline text uses independent exact-base addresses and cannot carry markup operations", async () => {
   const block = parseTextBlock({

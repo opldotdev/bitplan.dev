@@ -57,6 +57,51 @@ function record(
   };
 }
 
+test("schema 2 preserves author text patches without changing the encryption envelope", () => {
+  const textEdit = {
+    base: {
+      origin: document.origin,
+      outpoint: document.outpoint,
+      sha256: document.sha256,
+      version: document.version,
+    },
+    original: "Before",
+    participantId: "alice",
+    path: "body>p:nth-child(1)",
+    revision: 1,
+    roomId: "room",
+    schema: "bitplan-text/1" as const,
+    sequence: 1,
+    sessionId: "browser",
+    text: "After",
+  };
+  const checkpoint = payload({
+    schema: "bitplan-annotation-checkpoint/2",
+    textEdits: [textEdit],
+  });
+  expect(
+    parseAnnotationCheckpoint(JSON.parse(JSON.stringify(checkpoint))).textEdits
+  ).toEqual([textEdit]);
+  expect(() =>
+    parseAnnotationCheckpoint({
+      ...checkpoint,
+      textEdits: [{ ...textEdit, participantId: "bob" }],
+    })
+  ).toThrow();
+  expect(() =>
+    parseAnnotationCheckpoint({
+      ...checkpoint,
+      textEdits: [{ ...textEdit, base: { ...textEdit.base, version: 3 } }],
+    })
+  ).toThrow();
+  expect(() =>
+    parseAnnotationCheckpoint({
+      ...checkpoint,
+      schema: "bitplan-annotation-checkpoint/1",
+    })
+  ).toThrow();
+});
+
 test("checkpoint round-trips a full bounded snapshot and preserves hosted provenance", () => {
   const source = {
     origin: "h_12345678901234567890",

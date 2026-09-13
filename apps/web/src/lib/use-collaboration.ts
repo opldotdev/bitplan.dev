@@ -32,7 +32,13 @@ import {
   loadProfile,
   parseProfile,
 } from "./collaborator";
-import { parseTextBlock, type TextBlock, textBlockKey } from "./inline-text";
+import {
+  type AuthorTextEdit,
+  parseTextBlock,
+  retainAuthorTextEdit,
+  type TextBlock,
+  textBlockKey,
+} from "./inline-text";
 import {
   parseSharedDocument,
   type SharedDocument,
@@ -66,9 +72,16 @@ const message = (error: unknown) =>
 /** One operation surface shared by React, WebMCP, and headless clients. */
 export function useCollaboration(target: DocumentTarget) {
   const [connection, setConnection] = useState<Connection | null>(null);
+  const [textEdits, setTextEdits] = useState<AuthorTextEdit[]>([]);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [textBlocks, setTextBlocks] = useState<
-    (TextBlock & { key: string; revision: number })[]
+    (TextBlock & {
+      key: string;
+      revision: number;
+      participantId: string;
+      sessionId: string;
+      sequence: number;
+    })[]
   >([]);
   const [documentDraft, setDocumentDraft] = useState<
     (SharedDocument & { revision: number }) | null
@@ -201,6 +214,7 @@ export function useCollaboration(target: DocumentTarget) {
 
   useEffect(() => {
     setTextBlocks([]);
+    setTextEdits([]);
     if (!connection) {
       return;
     }
@@ -242,7 +256,15 @@ export function useCollaboration(target: DocumentTarget) {
                 if ((await textBlockKey(block)) !== row.key) {
                   throw new Error("Inline text address mismatch.");
                 }
-                return { ...block, key: row.key, revision: row.revision };
+                return {
+                  ...block,
+                  key: row.key,
+                  participantId: row.participantId,
+                  revision: row.revision,
+                  roomId: c.roomId,
+                  sequence: row.sequence,
+                  sessionId: row.sessionId,
+                };
               }
               if (row.kind === "document") {
                 const draft = await parseSharedDocument(
@@ -287,6 +309,9 @@ export function useCollaboration(target: DocumentTarget) {
             }
             for (const item of page.values) {
               if ("schema" in item && item.schema === "bitplan-text/1") {
+                setTextEdits((previous) =>
+                  retainAuthorTextEdit(previous, item)
+                );
                 setTextBlocks((previous) => {
                   const existing = previous.find(
                     (block) => block.key === item.key
@@ -736,6 +761,7 @@ export function useCollaboration(target: DocumentTarget) {
     sequence,
     start,
     textBlocks,
+    textEdits,
     updateProfile,
   };
 }

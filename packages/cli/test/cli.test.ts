@@ -54,6 +54,7 @@ describe('cli surface', () => {
 			'whoami',
 			'config',
 			'contact',
+			'contacts',
 			'team',
 			'version',
 			'upload',

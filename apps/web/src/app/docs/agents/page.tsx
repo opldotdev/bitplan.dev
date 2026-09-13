@@ -87,9 +87,11 @@ export default function AgentsAndWalletsPage() {
       <section id="web-agents">
         <h2>Browser agents</h2>
         <p>
-          BitPlan&apos;s WebMCP tools can prepare a plan, list encrypted plan
-          IDs, and open the viewer. They cannot publish or read decrypted plan
-          text.
+          In an authorized, connected viewer, WebMCP tools can read the
+          decrypted document with its annotations and per-author text edits, add
+          a note, or save a live document edit. They do not sign or broadcast
+          transactions. Tools belong to the outer viewer, not the untrusted plan
+          iframe.
         </p>
         <p>
           A browser agent can join an authorized live invitation and use the
@@ -97,6 +99,48 @@ export default function AgentsAndWalletsPage() {
           annotations or live edits. Read those before proposing a revision. If
           a sandbox blocks wallet access or installation, request scoped
           permission or use the browser; do not work around its restrictions.
+        </p>
+      </section>
+
+      <section id="iterate">
+        <h2>Turn feedback into a revision</h2>
+        <p>
+          Share and the revision sidebar use the same next-revision audience,
+          saved for this plan in this browser. Only selected public keys enter a
+          private-copy prompt, never your whole contact book. These choices do
+          not change current access. A private copy does not revoke old links or
+          make the existing live room wallet-only.
+        </p>
+        <ol>
+          <li>
+            Open New version. The publishing wallet chooses which suggestions to
+            consider; other participants review their own contributions.
+          </li>
+          <li>
+            Your authorized agent reads the live document and layers, then
+            drafts changes.
+          </li>
+          <li>
+            Copy the prompt. Publish on chain is off by default; turning it on
+            requests an on-chain review, not automatic signing or payment.
+          </li>
+        </ol>
+        <p>
+          Show live changes switches between the original loaded version and
+          live edits and annotations. It does not discard shared work.
+        </p>
+        <p>
+          Replies belong to their own author and retain the parent&apos;s exact
+          document target. Browser authorship is session-based, not yet verified
+          wallet authorship. An on-chain layer must reference an on-chain plan
+          revision; a hosted ID alone is insufficient. Author checkpoint
+          signing, recovery and confirmed receipts are not yet connected end to
+          end.
+        </p>
+        <p>
+          WebMCP is experimental and depends on browser support. Without it, use
+          the authorized browser interface. A public plan ID in a prompt does
+          not grant access.
         </p>
       </section>
 

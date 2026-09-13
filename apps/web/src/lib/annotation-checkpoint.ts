@@ -3,7 +3,9 @@ import {
   type DocumentTarget,
   parseAnnotation,
   parseDocumentTarget,
+  sameDocumentTarget,
 } from "./annotations";
+import { type AuthorTextEdit, parseAuthorTextEdit } from "./inline-text";
 
 /** Application plaintext inside the unchanged BPLN envelope. */
 export type CheckpointDocumentReference =
@@ -28,10 +30,11 @@ export interface AnnotationCheckpoint {
   knownHeads: string[];
   participantId: string;
   previous: string | null;
-  schema: "bitplan-annotation-checkpoint/1";
+  schema: "bitplan-annotation-checkpoint/1" | "bitplan-annotation-checkpoint/2";
   /** Original hosted/document version reviewed before publishing a replacement. */
   source?: DocumentTarget;
   target: CheckpointDocumentReference;
+  textEdits?: AuthorTextEdit[];
 }
 
 export const MAX_ANNOTATION_CHECKPOINT_BYTES = 4 * 1024 * 1024;
@@ -152,6 +155,41 @@ export function resolveCheckpointDocumentReference(
   };
 }
 
+function parseCheckpointTextEdits(
+  input: Record<string, unknown>,
+  validationTarget: DocumentTarget
+) {
+  let textEdits: AuthorTextEdit[] | undefined;
+  if (input.schema === "bitplan-annotation-checkpoint/2") {
+    if (!Array.isArray(input.textEdits) || input.textEdits.length > 1000) {
+      throw new Error("Invalid checkpoint text edits.");
+    }
+    const base =
+      input.source === undefined
+        ? validationTarget
+        : parseDocumentTarget(input.source);
+    const seen = new Set<string>();
+    textEdits = input.textEdits.map((value) => {
+      const edit = parseAuthorTextEdit(value);
+      const key = JSON.stringify([edit.roomId, edit.path]);
+      if (
+        edit.participantId !== input.participantId ||
+        !sameDocumentTarget(edit.base, base) ||
+        seen.has(key)
+      ) {
+        throw new Error(
+          "Text edits must belong to this author and source version, once per passage."
+        );
+      }
+      seen.add(key);
+      return edit;
+    });
+  } else if (input.textEdits !== undefined) {
+    throw new Error("Text edits require checkpoint schema 2.");
+  }
+  return textEdits;
+}
+
 export function parseAnnotationCheckpoint(
   value: unknown
 ): AnnotationCheckpoint {
@@ -160,7 +198,8 @@ export function parseAnnotationCheckpoint(
   }
   const input = object(value);
   if (
-    input.schema !== "bitplan-annotation-checkpoint/1" ||
+    (input.schema !== "bitplan-annotation-checkpoint/1" &&
+      input.schema !== "bitplan-annotation-checkpoint/2") ||
     typeof input.participantId !== "string" ||
     !ID.test(input.participantId) ||
     !Array.isArray(input.annotations) ||
@@ -174,6 +213,7 @@ export function parseAnnotationCheckpoint(
     VALIDATION_TXID
   );
   const ids = new Map<string, Omit<Annotation, "target">>();
+  const textEdits = parseCheckpointTextEdits(input, validationTarget);
   const annotations = input.annotations.map((rawAnnotation) => {
     const item = object(rawAnnotation);
     if ("target" in item) {
@@ -216,6 +256,7 @@ export function parseAnnotationCheckpoint(
   return {
     participantId: input.participantId,
     schema: input.schema,
+    ...(textEdits === undefined ? {} : { textEdits }),
     target,
     ...(input.source === undefined
       ? {}

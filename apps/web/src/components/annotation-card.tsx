@@ -54,6 +54,10 @@ export function AnnotationCard({
   const [placement, setPlacement] = useState<Annotation["placement"]>();
   const position = placement ?? item.placement;
   const size = draft ?? item.size;
+  const widget = item.content.type === "image" || item.content.type === "html";
+  const widgetControls = widget
+    ? " opacity-0 transition-opacity group-hover/annotation:opacity-100 group-focus-within/annotation:opacity-100 [@media(hover:none)]:opacity-100 bg-background/90"
+    : "";
   const clamp = (width: number, height: number) => ({
     height: Math.max(96, Math.min(1200, Math.round(height))),
     width: Math.max(160, Math.min(1200, Math.round(width))),
@@ -96,7 +100,7 @@ export function AnnotationCard({
     <article
       aria-busy={saving}
       aria-label={label}
-      className={`group/annotation pointer-events-auto absolute flex max-w-[90%] flex-col rounded-md text-sm ${item.content.type === "image" ? "bg-transparent outline-border focus-within:outline hover:outline" : "border bg-background p-2 pb-6 shadow-sm"}`}
+      className={`group/annotation pointer-events-auto absolute flex max-w-[90%] flex-col rounded-md text-sm ${widget ? "bg-transparent outline-border focus-within:outline hover:outline" : "border bg-background p-2 pb-6 shadow-sm"}`}
       data-annotation-anchor={item.id}
       onFocus={onSelect}
       onPointerCancel={() => {
@@ -136,7 +140,7 @@ export function AnnotationCard({
       ref={card}
       style={{
         ...style,
-        height: size?.height,
+        height: size?.height ?? (item.content.type === "html" ? 96 : undefined),
         touchAction:
           item.content.type === "image" && canResize ? "none" : undefined,
         translate: `${position.dx}px ${position.dy}px`,
@@ -144,7 +148,7 @@ export function AnnotationCard({
       }}
     >
       <div
-        className="min-h-0 flex-1 overflow-auto"
+        className={`min-h-0 flex-1 ${widget ? "overflow-hidden" : "overflow-auto"}`}
         style={{ maxHeight: size ? undefined : 240 }}
       >
         {children}
@@ -152,7 +156,7 @@ export function AnnotationCard({
       {canResize ? (
         <Button
           aria-label={`Move ${label.toLowerCase()}`}
-          className="absolute bottom-0 left-0 size-6 cursor-grab touch-none active:cursor-grabbing"
+          className={`absolute bottom-0 left-0 size-6 cursor-grab touch-none active:cursor-grabbing${widgetControls}`}
           data-move-annotation
           disabled={saving}
           onKeyDown={(event) => {
@@ -181,7 +185,7 @@ export function AnnotationCard({
       {canResize ? (
         <Button
           aria-label={`Resize ${label.toLowerCase()}`}
-          className="absolute right-0 bottom-0 size-6 cursor-se-resize touch-none"
+          className={`absolute right-0 bottom-0 size-6 cursor-se-resize touch-none${widgetControls}`}
           disabled={saving}
           onKeyDown={(event) => {
             if (

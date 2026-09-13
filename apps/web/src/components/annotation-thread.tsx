@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +15,7 @@ export function AnnotationThread({
   profiles,
   currentParticipantId,
   onReply,
+  onResolve,
   disabled = false,
 }: {
   item: Annotation;
@@ -21,6 +23,7 @@ export function AnnotationThread({
   profiles: Record<string, CollaboratorProfile>;
   currentParticipantId?: string;
   onReply: (text: string) => Promise<unknown>;
+  onResolve?: (reply: Annotation) => Promise<unknown>;
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -100,6 +103,18 @@ export function AnnotationThread({
                   ? render(reply.content.text)
                   : null}
               </p>
+              {onResolve &&
+              reply.participantId === currentParticipantId &&
+              reply.status === "open" ? (
+                <Button
+                  aria-label="Remove my reply"
+                  onClick={() => void onResolve(reply)}
+                  size="icon-sm"
+                  variant="ghost"
+                >
+                  <Trash2 />
+                </Button>
+              ) : null}
             </li>
           ))}
         </ol>

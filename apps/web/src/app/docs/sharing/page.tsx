@@ -86,10 +86,37 @@ export default function SharingPage() {
         invitation like a password. A reader-only link omits room access.
       </p>
       <h2>Invite a person or bot by identity</h2>
+      <h3>Your private address book</h3>
+      <p>
+        The CLI can sync a snapshot of your contacts and teams, encrypted only
+        for its connected wallet. In the Publish sidebar, the owner can choose
+        Private copy and unlock contacts using that same identity. Your book is not included in the plan,
+        its annotations, or its collaboration room.
+      </p>
+      <div className="not-typeset">
+        <CommandCopy command="bunx bitplan contacts sync --yes" />
+      </div>
+      <p>
+        Review your local contacts before syncing: this explicitly replaces that
+        wallet’s previous hosted address book. It does not change the local book
+        or grant anyone plan access. Different wallets have separate books, even
+        on the same device. Sync requires a CLI build that includes
+        <code> contacts sync</code>; check its help before running it.
+      </p>
+      <p>
+        Select a team, then adjust individual recipients. Only selected public
+        keys enter the sharing handoff; private contact labels and team names do
+        not. Initials identify contacts without claiming a roster character or
+        verified live presence. Contributors see the current recipients read-only;
+        they cannot change the document's access. Direct
+        creation of a private live copy is not wired yet: the sidebar still hands off
+        to your agent and does not re-encrypt an existing room.
+      </p>
       <p>
         Ask for their BRC-100 public identity key and verify it with them. Never
-        request their private key. Contacts and teams are local CLI address-book
-        entries; adding a member does not change any encrypted version yet.
+        request their private key. Contacts and teams are managed locally in the
+        CLI; syncing them is optional. Adding a member does not change any
+        encrypted version yet.
       </p>
       <div className="not-typeset space-y-2">
         <CommandCopy command="bunx bitplan contact set alice <public-identity-key>" />
@@ -105,8 +132,8 @@ export default function SharingPage() {
       </p>
       <p>
         “Self” means the publishing wallet, not every wallet on your device. Add
-        your other wallet identities as recipients too. Team names stay local;
-        recipient public keys are visible in the envelope header.
+        your other wallet identities as recipients too. Team names stay in your
+        private book; recipient public keys are visible in the envelope header.
       </p>
       <h2>Move away from link access</h2>
       <ol>

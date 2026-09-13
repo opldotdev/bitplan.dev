@@ -1,0 +1,20 @@
+# Deployment source must never include local wallet state or private drafts.
+.git
+**/node_modules
+**/.next
+**/.vercel
+**/.env
+**/.env.*
+wallet.db*
+**/wallet.db*
+plans
+.tmp
+**/.DS_Store
+SPEC-*.md
+docs/*-draft.md
+test-results
+playwright-report
+coverage
+**/*.log
+apps/web/.agents
+apps/web/.claude

@@ -31,6 +31,8 @@ export function installInlineTextBridge() {
   let selected: Block | null = null;
   let editing: Block | null = null;
   const byElement = new Map<EventTarget, Block>();
+  // biome-ignore lint/performance/useTopLevelRegex: this function is serialized into the isolated document and cannot capture module constants
+  const editorColor = /^hsl\([0-9.]+ 70% 65%\)$/;
   function collect() {
     if (blocks.size || !document.body) {
       return;
@@ -167,6 +169,36 @@ export function installInlineTextBridge() {
       return;
     }
     collect();
+    if (data.type === "attribution" && Array.isArray(data.payload)) {
+      for (const block of blocks.values()) {
+        block.element.style.removeProperty("--bitplan-editor-color");
+        block.element.removeAttribute("data-bitplan-editor");
+      }
+      for (const value of data.payload.slice(0, 1000)) {
+        if (!value || typeof value !== "object") {
+          continue;
+        }
+        const block = blocks.get(value.path);
+        if (
+          !block ||
+          typeof value.name !== "string" ||
+          value.name.length > 80 ||
+          typeof value.color !== "string" ||
+          !editorColor.test(value.color)
+        ) {
+          continue;
+        }
+        block.element.style.setProperty("--bitplan-editor-color", value.color);
+        if (value.other === true) {
+          block.element.setAttribute(
+            "data-bitplan-editor",
+            `Edited by ${value.name}`
+          );
+        } else {
+          block.element.removeAttribute("data-bitplan-editor");
+        }
+      }
+    }
     if (data.type === "mode") {
       enabled = data.payload === true;
       mode();
@@ -397,7 +429,7 @@ export function installInlineTextBridge() {
     mode();
     const style = document.createElement("style");
     style.textContent =
-      "[data-bitplan-editable]{cursor:default;outline-offset:5px}[data-bitplan-selected]{outline:1px solid currentColor;border-radius:2px}[data-bitplan-editable][contenteditable]{cursor:text}";
+      "[data-bitplan-editable]{cursor:default;outline-offset:5px}[data-bitplan-editable]:hover,[data-bitplan-selected]{outline:1px solid var(--bitplan-editor-color,currentColor);border-radius:2px}[data-bitplan-selected][data-bitplan-editor]{position:relative}[data-bitplan-selected][data-bitplan-editor]::after{content:attr(data-bitplan-editor);position:absolute;bottom:100%;left:0;z-index:10;white-space:nowrap;font:12px/1.4 system-ui,sans-serif;background:var(--bitplan-editor-color);color:#151515;padding:3px 7px;border-radius:5px;pointer-events:none}[data-bitplan-editable][contenteditable]{cursor:text}";
     document.head.append(style);
     send("ready", {});
   });

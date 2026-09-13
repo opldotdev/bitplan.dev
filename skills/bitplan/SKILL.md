@@ -6,12 +6,12 @@ description: >
   or update a plan, share one with a person or team, create a private reader
   link, move a hosted draft on chain, or explain bitplan.dev.
 metadata:
-  version: "0.2.14"
+  version: "0.2.15"
 ---
 
 # BitPlan
 
-**Skill version: 0.2.14**
+**Skill version: 0.2.15**
 
 BitPlan turns one self-contained HTML file into an encrypted living plan. A
 BRC-100 wallet owns the keys. A draft can stay hosted as ciphertext while it
@@ -482,13 +482,28 @@ Use the read tool to obtain the observed change cursor, annotations, and
 profiles. Read annotations together with the exact document version; fetching
 the plan HTML alone does not include independent layers. The read result also
 includes current shared HTML with live text edits materialized, the matching
-`textBlocks`, target, title, `documentRevision`, and `cursor`. For a hosted
+`textBlocks`, per-author `textEdits`, target, title, `documentRevision`, and `cursor`.
+Each text edit carries its exact base, participant, session, and room. Retain these
+alongside that participant’s notes when reading or exporting an annotation layer.
+They are room-session attribution, not proof of wallet authorship.
+For a hosted
 document edit, preserve that materialized HTML and pass both `documentRevision`
 as `expectedRevision` and `cursor` as `expectedSequence`. Both are required.
 On conflict, reread and reapply only the intended change; never retry stale HTML
 or substitute a CLI fetch that omits live edits and annotations.
 
-In Edit & annotate, “Edit text in place” enables plain-text editing of supported
+The viewer’s “Copy revision prompt” uses only the public plan ID and asks the
+agent to read live layers, reconcile changes, and request review before saving
+or publishing. “Show edits” and “Show annotations” are local comparison controls,
+not undo operations; hiding edits shows the original loaded version.
+WebMCP tools belong to the trusted outer viewer, not the plan iframe. Discover
+the available API in the running browser; newer Chrome accepts an object in
+`executeTool`, while older experimental builds require JSON-stringified input.
+Browser support is a progressive enhancement, not a prerequisite for reading
+and editing through the UI.
+
+Hosted drafts enable plain-text editing by default; “Edit text in place” toggles it.
+Editing supports
 leaf passages inside the document. It does not make scripts, links, form controls,
 or arbitrary nested markup into a rich-text editor. Text saves after a short pause;
 click once to select, again or double-click to edit. Escape clears selection or
@@ -497,6 +512,10 @@ encrypted text overlay; it is also removed from materialized exports. There is
 no undo UI yet. V enters text selection, T starts a comment, and I starts an image
 annotation; shortcuts do not intercept typing or modifier-key browser commands.
 Concurrent changes reject stale passage revisions instead of overwriting them.
+Edited passages use their latest editor’s cursor color. Selecting someone else’s
+edit shows their name. The annotation panel retains each author’s latest patch
+per passage, including patches superseded by another author. “Reload shared
+version” only discards unsaved HTML in the editor; it does not undo saved edits.
 Keep the page open until saves finish. A conflict or restored unsaved passage
 requires deliberate recovery; preserve or copy the text before loading latest.
 Full-document HTML editing still uses explicit Save. Neither path creates a
@@ -728,8 +747,20 @@ bunx bitplan contact set <name> <identity-key>
 bunx bitplan team add <team> <contact...>
 ```
 
-Contacts and teams are local labels. The server does not receive their names or
-membership. A contact may represent one wallet identity; give one person
+Contacts and teams are private labels. Optional `bitplan contacts sync --yes`
+uploads an owner-encrypted snapshot for the Share menu; first inspect
+`bitplan contacts sync --help` because older CLI releases lack this command.
+Explain that sync replaces this wallet's previous hosted book and get approval
+before uploading. Never upload the full config or draft store. The website
+receives ciphertext, not readable names or membership; the connected matching
+wallet decrypts the book privately in the Share dialog. Different wallet
+identities have separate books. No contact data belongs in plan HTML, live-room
+profiles, annotations, or agent prompts. Only explicitly selected public keys
+enter the sharing handoff. Contacts use initials, not guessed roster portraits
+or verified-presence claims. Syncing or selecting recipients does not change
+plan access. Direct private-live-copy creation remains an agent handoff until
+wallet-restricted room access is implemented.
+A contact may represent one wallet identity; give one person
 multiple clear contact names when they use multiple identities.
 
 ## Common failures

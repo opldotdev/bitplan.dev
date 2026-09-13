@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Monitor, Moon, Plus, Sun } from "lucide-react";
+import { Check, Monitor, Moon, Palette, Plus, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
 import { TemplatePreview } from "@/components/template-preview";
@@ -108,15 +108,14 @@ export function ThemeToggle({
       >
         <PopoverTrigger asChild>
           <Button
-            aria-label="Appearance"
+            aria-label="Themes"
             className="relative"
             size="icon"
             type="button"
             variant="ghost"
           >
-            <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Appearance</span>
+            <Palette className="size-5" />
+            <span className="sr-only">Themes</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent

@@ -9,6 +9,7 @@ import {
 	teamRemoveCommand,
 	teamSetCommand,
 } from './commands/addressBook.js'
+import { addressBookSyncCommand } from './commands/addressBookSync.js'
 import { authCommand } from './commands/auth.js'
 import { catalogSyncCommand } from './commands/catalog.js'
 import { configCommand } from './commands/config.js'
@@ -64,6 +65,21 @@ export function buildProgram(): Command {
 	const contact = program
 		.command('contact')
 		.description('Manage local names for wallet identities.')
+
+	program
+		.command('contacts')
+		.description('Private address-book sync.')
+		.command('sync')
+		.description(
+			'Replace your owner-encrypted hosted address book with this local snapshot.',
+		)
+		.option(
+			'-y, --yes',
+			'Approve uploading the encrypted address book snapshot',
+		)
+		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
+		.option('--site-url <url>', 'BitPlan site origin')
+		.action(addressBookSyncCommand)
 
 	contact
 		.command('set')

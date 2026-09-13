@@ -1,22 +1,12 @@
 "use client";
 
-import { Copy, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { useSidebar } from "@/components/ui/sidebar";
 import { walletOwnsDraft } from "@/lib/drafts";
-import { truncateMiddle } from "@/lib/format";
 import { isHostedId } from "@/lib/hosted-id";
-import {
-  type PlanAuthority,
-  planAuthority,
-  publicationPrompt,
-} from "@/lib/plan-authority";
+import { type PlanAuthority, planAuthority } from "@/lib/plan-authority";
 import { getConnectedWallet, onWalletChange } from "@/lib/wallet";
 
 /** Wallet changes update controls without remounting the live document. */
@@ -24,16 +14,18 @@ export function PlanPublishing({
   origin,
   senderIdentityKey,
   latestOutpoint,
+  onPublisherChange,
 }: {
   origin: string;
   senderIdentityKey: string;
   latestOutpoint: string | null;
+  onPublisherChange?: (publisher: boolean) => void;
 }) {
   const [access, setAccess] = useState<{
     identity: string;
     role: PlanAuthority;
   } | null>(null);
-  const [onChain, setOnChain] = useState(false);
+  const { toggleSidebar, open, openMobile, isMobile } = useSidebar();
   const hosted = isHostedId(origin);
   useEffect(() => {
     let generation = 0;
@@ -41,6 +33,7 @@ export function PlanPublishing({
       generation += 1;
       const current = generation;
       setAccess(null);
+      onPublisherChange?.(false);
       const wallet = getConnectedWallet();
       if (!wallet) {
         return;
@@ -51,6 +44,10 @@ export function PlanPublishing({
           ? false
           : await walletOwnsDraft(wallet, origin, latestOutpoint);
         if (current === generation && getConnectedWallet() === wallet) {
+          onPublisherChange?.(
+            planAuthority(origin, publicKey, senderIdentityKey, holdsLatest) !==
+              "connected"
+          );
           setAccess({
             identity: publicKey,
             role: planAuthority(
@@ -74,75 +71,19 @@ export function PlanPublishing({
       unsubscribe();
       window.removeEventListener("focus", changed);
     };
-  }, [hosted, origin, senderIdentityKey, latestOutpoint]);
+  }, [hosted, origin, senderIdentityKey, latestOutpoint, onPublisherChange]);
 
-  if (!access || access.role === "connected") {
-    return null;
-  }
-  const owner = access.role === "owner";
-  const label = owner ? "Owner" : "Publishing wallet";
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          aria-label={`${label} · Publish options`}
-          size="icon-sm"
-          title={`${label} · Publish options`}
-          variant="ghost"
-        >
-          <Upload aria-hidden="true" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="font-medium text-sm">{label}</p>
-          <span
-            className="font-mono text-muted-foreground text-xs"
-            title={access.identity}
-          >
-            {truncateMiddle(access.identity)}
-          </span>
-        </div>
-        <p className="text-muted-foreground text-xs">
-          {owner
-            ? "Your wallet holds the latest plan ordinal. Publishing rechecks ownership."
-            : "Your key matches this version’s encryption sender. Updating the draft also needs its saved publishing secret."}
-        </p>
-        {hosted ? (
-          <label className="grid gap-1 text-sm">
-            Destination
-            <select
-              className="h-9 rounded-md border bg-background px-2"
-              onChange={(event) => setOnChain(event.target.value === "chain")}
-              value={onChain ? "chain" : "draft"}
-            >
-              <option value="draft">Draft</option>
-              <option value="chain">On Chain</option>
-            </select>
-          </label>
-        ) : null}
-        <p className="text-muted-foreground text-xs">
-          Publish with your agent and the BitPlan CLI. This handoff includes no
-          secret keys and does not publish or sign anything here.
-        </p>
-        <Button
-          className="w-full"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(
-                publicationPrompt(origin, !hosted || onChain)
-              );
-              toast.success("Publishing instructions copied");
-            } catch {
-              toast.error("Could not copy publishing instructions");
-            }
-          }}
-          size="sm"
-        >
-          <Copy aria-hidden="true" />
-          Copy agent instructions
-        </Button>
-      </PopoverContent>
-    </Popover>
+    <Button
+      aria-controls="bitplan-annotations"
+      aria-expanded={isMobile ? openMobile : open}
+      aria-label="Publish"
+      onClick={toggleSidebar}
+      size="icon-sm"
+      title={access ? `Publish · ${access.role}` : "Publish"}
+      variant="ghost"
+    >
+      <Upload aria-hidden="true" />
+    </Button>
   );
 }

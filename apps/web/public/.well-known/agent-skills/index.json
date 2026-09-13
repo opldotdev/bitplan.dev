@@ -6,7 +6,7 @@
       "type": "skill-md",
       "description": "Create, review, host, publish, update, fetch, and share encrypted HTML plans with a BRC-100 wallet.",
       "url": "https://bitplan.dev/.well-known/agent-skills/bitplan/SKILL.md",
-      "digest": "sha256:7dcbfe3f2976a5390374c5ba12939fdf757fd2045d82fcd5f929b6809f7bf19e"
+      "digest": "sha256:9934277d1bf6d884aa56093373f43a04780a5437c05b07730aa54c7cea79143d"
     }
   ]
 }

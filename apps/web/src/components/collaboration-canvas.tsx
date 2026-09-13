@@ -4,11 +4,11 @@ import {
   Copy,
   ImagePlus,
   Link,
-  MessageSquare,
   PenTool,
   Plus,
   Settings,
   Shapes,
+  Trash2,
   Type,
   X,
 } from "lucide-react";
@@ -22,6 +22,9 @@ import { AnnotationDrawLayer } from "@/components/annotation-draw-layer";
 import { AnnotationImagePicker } from "@/components/annotation-image-picker";
 import { AnnotationOnboarding } from "@/components/annotation-onboarding";
 import { AnnotationThread } from "@/components/annotation-thread";
+import { DocumentEditSummary } from "@/components/document-edit-summary";
+import { PlanAccessPanel } from "@/components/plan-access-panel";
+import { useRevisionSharing } from "@/components/revision-sharing";
 import { usePlanAppearance } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +33,8 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sidebar, useSidebar } from "@/components/ui/sidebar";
+import { Switch } from "@/components/ui/switch";
 import { registerWebMcpTool } from "@/components/webmcp-tools";
 import { withAnnotationBridge } from "@/lib/annotation-bridge";
 import { annotationInputAction } from "@/lib/annotation-input";
@@ -46,15 +51,21 @@ import {
   sameDocumentTarget,
 } from "@/lib/annotations";
 import { characterPortrait } from "@/lib/collaborator";
-import { cursorIsActive } from "@/lib/cursor-activity";
+import { cursorIsActive, cursorTimeAgo } from "@/lib/cursor-activity";
 import type { DrawingTool } from "@/lib/drawing-asset";
 import { isHostedId } from "@/lib/hosted-id";
 import {
+  activeReviewEdits,
   materializeTextBlocks,
   parseTextBlock,
   type TextBlock,
 } from "@/lib/inline-text";
 import { planAppearanceCss } from "@/lib/plan-appearance";
+import {
+  annotationPublicationPrompt,
+  revisionSelectionPrompt,
+} from "@/lib/plan-authority";
+import { printPlan } from "@/lib/print-plan";
 import { withRenderPolicy } from "@/lib/render-policy";
 import type { CollaborationState } from "@/lib/use-collaboration";
 
@@ -62,7 +73,6 @@ const center: AnnotationAnchor = { point: { x: 0.5, y: 0.1 } };
 const menuItem =
   "flex cursor-default items-center gap-1 rounded-sm px-2 py-2 text-sm outline-none data-highlighted:bg-muted data-disabled:opacity-50 [&_svg]:size-4";
 const CONTEXT_LINK = /^(https?:\/\/|mailto:|#)/i;
-type AnnotationMode = "text" | "html" | "image";
 interface AnchorPosition {
   bounds?: { x: number; y: number; width: number; height: number };
   x: number;
@@ -70,39 +80,6 @@ interface AnchorPosition {
 }
 const sessionColor = (id: string) =>
   `hsl(${[...id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360} 70% 65%)`;
-
-function contentFor(
-  mode: AnnotationMode,
-  text: string,
-  image: string | null
-): AnnotationContent {
-  if (mode === "html") {
-    if (!text.trim()) {
-      throw new Error("Write something first.");
-    }
-    return { html: text, type: "html" };
-  }
-  if (mode === "image") {
-    if (!image) {
-      throw new Error("Choose an image first.");
-    }
-    return { alt: text, dataUrl: image, type: "image" };
-  }
-  if (!text.trim()) {
-    throw new Error("Write something first.");
-  }
-  return { text, type: "text" };
-}
-
-function annotationInputLabel(mode: AnnotationMode): string {
-  if (mode === "html") {
-    return "Annotation HTML";
-  }
-  if (mode === "image") {
-    return "Image description";
-  }
-  return "Comment";
-}
 
 function AnnotationAttachmentStatus({
   item,
@@ -145,13 +122,18 @@ export function CollaborationCanvas({
   title,
   target,
   room,
+  isPublisher = false,
 }: {
   html: string;
   title: string;
   target: DocumentTarget;
   room: CollaborationState;
+  isPublisher?: boolean;
 }) {
   const { preset } = usePlanAppearance();
+  const sharing = useRevisionSharing();
+  const draftingRevision = isPublisher;
+  const reviewEdits = activeReviewEdits(room.textEdits, room.textBlocks);
   const { resolvedTheme } = useTheme();
   const frame = useRef<HTMLIFrameElement>(null);
   const connectedFrame = useRef<HTMLIFrameElement | null>(null);
@@ -160,14 +142,30 @@ export function CollaborationCanvas({
   const textRecovery = useRef(
     new Map<string, TextBlock & { revision: number }>()
   );
-  const [inlineEditing, setInlineEditing] = useState(false);
+  const [inlineEditing, setInlineEditing] = useState(() =>
+    isHostedId(target.origin)
+  );
   const [inlineEditError, setInlineEditError] = useState<string | null>(null);
   const inlineEditingRef = useRef(inlineEditing);
   inlineEditingRef.current = inlineEditing;
   const [bridgeHostReady, setBridgeHostReady] = useState(false);
   const trigger = useRef<HTMLDivElement>(null);
-  const [panel, setPanel] = useState(false);
+  const {
+    open: sidebarOpen,
+    openMobile,
+    isMobile,
+    setOpen,
+    setOpenMobile,
+  } = useSidebar();
+  const panel = isMobile ? openMobile : sidebarOpen;
+  const setPanel = isMobile ? setOpenMobile : setOpen;
   const [browserMenu, setBrowserMenu] = useState(false);
+  const [showEdits, setShowEdits] = useState(true);
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [revisionNotes, setRevisionNotes] = useState("");
+  const [publishOnChain, setPublishOnChain] = useState(false);
+  const showEditsRef = useRef(showEdits);
+  showEditsRef.current = showEdits;
   const [picking, setPicking] = useState(false);
   const pickingRef = useRef(false);
   const [highlight, setHighlight] = useState<AnnotationAnchor | null>(null);
@@ -178,13 +176,8 @@ export function CollaborationCanvas({
   const resolveDrawingAnchor = useRef<
     ((anchor: AnnotationAnchor) => void) | null
   >(null);
-  const [anchor, setAnchor] = useState<AnnotationAnchor>(center);
   const [contextLink, setContextLink] = useState<string | null>(null);
   const [contextSelection, setContextSelection] = useState("");
-  const [mode, setMode] = useState<AnnotationMode>("text");
-  const [text, setText] = useState("");
-  const [image, setImage] = useState<string | null>(null);
-  const [imageAlt, setImageAlt] = useState("");
   const [busy, setBusy] = useState(false);
   const [inline, setInline] = useState<{
     anchor: AnnotationAnchor;
@@ -219,20 +212,62 @@ export function CollaborationCanvas({
   htmlRef.current = currentHtml;
   const titleRef = useRef(title);
   titleRef.current = title;
+  const print = sharing?.print;
+  useEffect(() => {
+    if (!print) {
+      return;
+    }
+    print.current = (annotations) =>
+      printPlan(
+        {
+          annotations: roomRef.current.annotations,
+          blocks: roomRef.current.textBlocks,
+          html: htmlRef.current,
+          profiles: roomRef.current.profiles,
+          target: roomRef.current.activeTarget,
+          title: titleRef.current,
+        },
+        annotations
+      );
+    return () => {
+      print.current = null;
+    };
+  }, [print]);
   const documentHtml = useMemo(
     () =>
       withAnnotationBridge(
-        currentHtml,
-        !!room.connection,
+        showEdits ? currentHtml : html,
+        !!room.connection && showEdits,
         preset ? planAppearanceCss(preset) : "",
         browserMenu,
         target.origin
       ),
-    [currentHtml, !!room.connection, preset, browserMenu, target.origin]
+    [
+      currentHtml,
+      html,
+      showEdits,
+      !!room.connection,
+      preset,
+      browserMenu,
+      target.origin,
+    ]
   );
   useEffect(() => {
     textPort.current?.postMessage({ payload: inlineEditing, type: "mode" });
   }, [inlineEditing]);
+  useEffect(() => {
+    textPort.current?.postMessage({
+      payload: room.textBlocks
+        .filter((block) => sameDocumentTarget(block.base, room.activeTarget))
+        .map((block) => ({
+          color: sessionColor(block.sessionId),
+          name: room.profiles[block.participantId]?.name ?? "Collaborator",
+          other: block.participantId !== room.connection?.participantId,
+          path: block.path,
+        })),
+      type: "attribution",
+    });
+  }, [room.textBlocks, room.profiles, room.connection, room.activeTarget]);
   useEffect(() => {
     function beforeUnload(event: BeforeUnloadEvent) {
       if (textRecovery.current.size) {
@@ -254,11 +289,29 @@ export function CollaborationCanvas({
   useEffect(() => {
     function sync() {
       const { current } = roomRef;
-      textPort.current?.postMessage({
+      const port = textPort.current;
+      // biome-ignore lint/suspicious/noUnnecessaryConditions: iframe teardown clears this ref independently of message delivery
+      if (!port) {
+        return;
+      }
+      port.postMessage({
+        payload: current.textBlocks
+          .filter((block) =>
+            sameDocumentTarget(block.base, current.activeTarget)
+          )
+          .map((block) => ({
+            color: sessionColor(block.sessionId),
+            name: current.profiles[block.participantId]?.name ?? "Collaborator",
+            other: block.participantId !== current.connection?.participantId,
+            path: block.path,
+          })),
+        type: "attribution",
+      });
+      port.postMessage({
         payload: inlineEditingRef.current,
         type: "mode",
       });
-      textPort.current?.postMessage({
+      port.postMessage({
         payload: current.textBlocks.filter((block) =>
           sameDocumentTarget(block.base, current.activeTarget)
         ),
@@ -388,6 +441,7 @@ export function CollaborationCanvas({
   }, [documentHtml]);
   const visible = room.annotations.filter(
     (item) =>
+      showEdits &&
       sameDocumentTarget(item.target, room.activeTarget) &&
       !item.replyTo &&
       item.status === "open"
@@ -414,6 +468,9 @@ export function CollaborationCanvas({
     });
   }
   function startPicking(kind: "text" | "image" = "text") {
+    if (!showEditsRef.current) {
+      return;
+    }
     textPort.current?.postMessage({ type: "clear-selection" });
     picker.current = kind;
     setPanel(false);
@@ -480,7 +537,7 @@ export function CollaborationCanvas({
         if (!(position(payload) && "anchor" in payload)) {
           return;
         }
-        setAnchor(parseAnchor(payload.anchor));
+        parseAnchor(payload.anchor);
         setContextSelection(
           "selection" in payload &&
             typeof payload.selection === "string" &&
@@ -573,6 +630,9 @@ export function CollaborationCanvas({
   }
 
   function keyboardAction(key: unknown) {
+    if (!showEditsRef.current) {
+      return;
+    }
     if (key === "Escape" || key === "v") {
       stopPicking();
       setDrawing(null);
@@ -609,6 +669,9 @@ export function CollaborationCanvas({
     }
     window.addEventListener("message", acceptGeometryPort);
     function keyboardTools(event: KeyboardEvent) {
+      if (!showEditsRef.current) {
+        return;
+      }
       if (event.isTrusted && event.key === "Escape" && !event.isComposing) {
         keyboardAction("Escape");
         return;
@@ -648,10 +711,12 @@ export function CollaborationCanvas({
     }
     const cleanups = [
       registerWebMcpTool({
+        annotations: { readOnlyHint: true, untrustedContentHint: true },
         description:
           "Read decrypted annotations and the latest observed change cursor for the collaboration already open in this tab. Never returns invitation or wallet secrets.",
         execute: () => ({
           annotations: roomRef.current.annotations,
+          baseHtml: htmlRef.current,
           collaborators: roomRef.current.profiles,
           cursor: roomRef.current.sequence,
           documentRevision: roomRef.current.documentRevision,
@@ -666,6 +731,7 @@ export function CollaborationCanvas({
           textBlocks: roomRef.current.textBlocks.filter((block) =>
             sameDocumentTarget(block.base, roomRef.current.activeTarget)
           ),
+          textEdits: roomRef.current.textEdits,
           title: titleRef.current,
         }),
         inputSchema: {
@@ -767,33 +833,6 @@ export function CollaborationCanvas({
     };
   }, [room.connection]);
 
-  async function save() {
-    if (busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const content = contentFor(mode, text, image);
-      if (content.type === "image" && imageAlt) {
-        content.alt = imageAlt;
-      }
-      await room.saveAnnotation(content, anchor);
-      setText("");
-      setImage(null);
-      setImageAlt("");
-      if (mode === "text") {
-        setPanel(false);
-      }
-    } catch (failure) {
-      toast.error(
-        failure instanceof Error
-          ? failure.message
-          : "Could not save annotation."
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
   async function resolve(item: Annotation) {
     try {
       await room.saveAnnotation(item.content, item.anchor, {
@@ -907,9 +946,9 @@ export function CollaborationCanvas({
   }
 
   return (
-    <>
-      {room.connection ? <AnnotationOnboarding /> : null}
-      {inlineEditing || inlineEditError ? (
+    <div className="relative flex min-h-0 flex-1">
+      {room.connection && showEdits && !panel ? <AnnotationOnboarding /> : null}
+      {showEdits && inlineEditError ? (
         <div
           className="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2 text-sm"
           role="status"
@@ -965,13 +1004,16 @@ export function CollaborationCanvas({
         </div>
       ) : null}
       <ContextMenu.Root>
-        <ContextMenu.Trigger asChild disabled={!room.connection || browserMenu}>
+        <ContextMenu.Trigger
+          asChild
+          disabled={!room.connection || browserMenu || !showEdits}
+        >
           <div
             className="relative min-h-0 flex-1 overflow-hidden"
             data-bitplan-connected={room.connection ? room.online : undefined}
             data-bitplan-sequence={room.connection ? room.sequence : undefined}
             onContextMenuCapture={(event) => {
-              if (browserMenu || !room.connection) {
+              if (browserMenu || !room.connection || !showEdits) {
                 event.stopPropagation();
                 return;
               }
@@ -1007,7 +1049,10 @@ export function CollaborationCanvas({
                 title={title}
               />
             ) : null}
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+              style={{ visibility: showEdits ? undefined : "hidden" }}
+            >
               {drawing ? (
                 <AnnotationDrawLayer
                   color={drawingColor}
@@ -1138,7 +1183,8 @@ export function CollaborationCanvas({
                   >
                     <button
                       className={
-                        item.content.type === "image"
+                        item.content.type === "image" ||
+                        item.content.type === "html"
                           ? "absolute -top-6 left-0 rounded bg-background/90 px-1 text-muted-foreground text-xs opacity-0 group-focus-within/annotation:opacity-100 group-hover/annotation:opacity-100"
                           : "mb-1 block text-muted-foreground text-xs"
                       }
@@ -1235,7 +1281,9 @@ export function CollaborationCanvas({
                       <span className="rounded bg-background px-1 py-0.5">
                         {profile.name}
                         {cursor.kind === "agent" ? " · Agent" : ""} ·{" "}
-                        {cursor.online ? "connected" : "last seen"}
+                        {active
+                          ? "connected"
+                          : cursorTimeAgo(cursor.updatedAt, activityTime)}
                         {onPage ? "" : " · offscreen"}
                       </span>
                     </div>
@@ -1249,7 +1297,7 @@ export function CollaborationCanvas({
               >
                 <summary
                   className="flex cursor-pointer list-none items-center -space-x-2"
-                  title="Last seen on earlier versions"
+                  title="Collaborators on earlier versions"
                 >
                   {earlierCursors.slice(0, 4).map((cursor) => {
                     const profile = room.profiles[cursor.participantId];
@@ -1262,7 +1310,7 @@ export function CollaborationCanvas({
                         referrerPolicy="no-referrer"
                         src={characterPortrait(profile.character)}
                         style={{ height: 24, width: 24 }}
-                        title={profile.name}
+                        title={`${profile.name} · ${cursorTimeAgo(cursor.updatedAt, activityTime)}`}
                         unoptimized
                         width={24}
                       />
@@ -1277,7 +1325,8 @@ export function CollaborationCanvas({
                     <p key={cursor.sessionId}>
                       {room.profiles[cursor.participantId]?.name ??
                         "Collaborator"}
-                      {cursor.kind === "agent" ? " · Agent" : ""} · earlier
+                      {cursor.kind === "agent" ? " · Agent" : ""} ·{" "}
+                      {cursorTimeAgo(cursor.updatedAt, activityTime)} · earlier
                       version
                     </p>
                   ))}
@@ -1344,21 +1393,6 @@ export function CollaborationCanvas({
                 </p>
               </form>
             ) : null}
-            {room.connection ? (
-              <Button
-                aria-controls="bitplan-annotations"
-                aria-expanded={panel}
-                className="absolute right-4 bottom-4 shadow-sm"
-                onClick={() => setPanel((value) => !value)}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                <MessageSquare />
-                {isHostedId(target.origin) ? "Edit & annotate" : "Annotations"}
-                {` · ${visible.length}`}
-              </Button>
-            ) : null}
             {picking ? (
               <Button
                 className="absolute bottom-16 left-4"
@@ -1367,268 +1401,6 @@ export function CollaborationCanvas({
               >
                 Choose an element · Esc to cancel
               </Button>
-            ) : null}
-            {panel && room.connection ? (
-              <aside
-                aria-label="Live annotations"
-                className="absolute inset-y-0 right-0 z-20 flex w-80 max-w-full flex-col border-l bg-background shadow-sm"
-                data-bitplan-collaboration="live"
-                id="bitplan-annotations"
-              >
-                <div className="flex items-center justify-between border-b p-3">
-                  <div>
-                    <h2 className="font-medium text-sm">
-                      {isHostedId(target.origin)
-                        ? "Edit & annotate"
-                        : "Annotations"}
-                    </h2>
-                    <p className="text-muted-foreground text-xs" role="status">
-                      {room.online ? "Live · encrypted" : "Reconnecting…"} ·
-                      change {room.sequence}
-                    </p>
-                  </div>
-                  <Button
-                    aria-label="Close annotations"
-                    onClick={() => setPanel(false)}
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    <X />
-                  </Button>
-                </div>
-                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-                  <Button
-                    onClick={() => startPicking()}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Annotate an element
-                  </Button>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      checked={browserMenu}
-                      onChange={(event) => setBrowserMenu(event.target.checked)}
-                      type="checkbox"
-                    />
-                    Use browser right-click menu
-                  </label>
-                  <p className="text-muted-foreground text-xs">
-                    Hold Shift over the document to open annotation tools at
-                    your pointer.
-                  </p>
-                  {isHostedId(target.origin) ? (
-                    <>
-                      <Button
-                        onClick={() => {
-                          setInlineEditing((value) => !value);
-                          setPanel(false);
-                        }}
-                        size="sm"
-                        variant="outline"
-                      >
-                        {inlineEditing
-                          ? "Finish editing text"
-                          : "Edit text in place"}
-                      </Button>
-                      <Button onClick={editDocument} size="sm" variant="ghost">
-                        Edit HTML
-                      </Button>
-                    </>
-                  ) : null}
-                  {room.documentDraft ? (
-                    <p className="text-muted-foreground text-xs">
-                      Hosted draft edit {room.documentDraft.revision} · not
-                      published on chain
-                    </p>
-                  ) : null}
-                  <section
-                    aria-label="Collaborators"
-                    className="flex flex-wrap gap-2"
-                  >
-                    {Object.entries(room.profiles).map(([id, profile]) => (
-                      <span
-                        className="flex items-center gap-1 text-xs"
-                        key={id}
-                      >
-                        <Image
-                          alt=""
-                          className="shrink-0 rounded-full"
-                          height={20}
-                          referrerPolicy="no-referrer"
-                          src={characterPortrait(profile.character)}
-                          style={{ height: 20, width: 20 }}
-                          unoptimized
-                          width={20}
-                        />
-                        {profile.name}
-                      </span>
-                    ))}
-                  </section>
-                  {room.annotations.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">
-                      Right-click anywhere on the plan to leave a note. Or add
-                      one below.
-                    </p>
-                  ) : null}
-                  {room.annotations
-                    .filter((item) => !item.replyTo)
-                    .map((item) => (
-                      <article
-                        className="space-y-2 rounded-lg border p-3 text-sm"
-                        data-annotation-id={item.id}
-                        key={item.id}
-                      >
-                        <Button
-                          onClick={() => {
-                            if (
-                              sameDocumentTarget(item.target, room.activeTarget)
-                            ) {
-                              setHighlight(item.anchor);
-                            }
-                          }}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          Show element
-                        </Button>
-                        <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
-                          <span>
-                            {room.profiles[item.participantId]?.name ??
-                              "Collaborator"}
-                          </span>
-                          <span>{item.status}</span>
-                        </div>
-                        <AnnotationAttachmentStatus
-                          item={item}
-                          position={positions[item.id]}
-                          target={room.activeTarget}
-                        />
-                        {item.content.type === "text" ? (
-                          <AnnotationThread
-                            currentParticipantId={
-                              room.connection?.participantId
-                            }
-                            disabled={
-                              !(
-                                room.online &&
-                                sameDocumentTarget(
-                                  item.target,
-                                  room.activeTarget
-                                )
-                              )
-                            }
-                            item={item}
-                            onReply={(replyText) =>
-                              room.saveAnnotation(
-                                { text: replyText, type: "text" },
-                                item.anchor,
-                                undefined,
-                                undefined,
-                                item.id
-                              )
-                            }
-                            profiles={room.profiles}
-                            replies={annotationReplies(item, room.annotations)}
-                          />
-                        ) : (
-                          <AnnotationBody content={item.content} />
-                        )}
-                        {item.participantId ===
-                        room.connection?.participantId ? (
-                          <Button
-                            onClick={() => void resolve(item)}
-                            size="sm"
-                            variant="ghost"
-                          >
-                            {item.status === "open" ? "Resolve" : "Reopen"}
-                          </Button>
-                        ) : null}
-                      </article>
-                    ))}
-                </div>
-                <form
-                  className="space-y-2 border-t p-3"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void save();
-                  }}
-                >
-                  <label className="flex items-center justify-between text-xs">
-                    Add annotation
-                    <select
-                      className="rounded border bg-background p-1"
-                      onChange={(event) => {
-                        if (event.target.value === "image") {
-                          startPicking("image");
-                          return;
-                        }
-                        setMode(event.target.value as typeof mode);
-                      }}
-                      value={mode}
-                    >
-                      <option value="text">Comment</option>
-                      <option value="html">HTML</option>
-                      <option value="image">Image</option>
-                    </select>
-                  </label>
-                  {mode === "image" ? (
-                    <AnnotationImagePicker
-                      onLoad={(dataUrl, alt) => {
-                        setImage(dataUrl);
-                        setImageAlt(alt ?? "");
-                      }}
-                    />
-                  ) : null}
-                  <textarea
-                    aria-label={annotationInputLabel(mode)}
-                    className="min-h-24 w-full resize-y rounded-md border bg-background p-2 text-sm"
-                    maxLength={mode === "html" ? 200_000 : 32_000}
-                    onChange={(event) => setText(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (mode !== "text") {
-                        return;
-                      }
-                      const action = annotationInputAction(event);
-                      if (!action) {
-                        return;
-                      }
-                      event.preventDefault();
-                      if (busy) {
-                        return;
-                      }
-                      if (action === "cancel") {
-                        setPanel(false);
-                      } else if (text.trim()) {
-                        void save();
-                      }
-                    }}
-                    placeholder={
-                      mode === "html" ? "<p>Your HTML…</p>" : "Leave a note…"
-                    }
-                    readOnly={busy}
-                    value={text}
-                  />
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground text-xs">
-                      Hosted only · no transaction
-                    </span>
-                    {mode === "text" ? (
-                      <span
-                        className="text-muted-foreground text-xs"
-                        role="status"
-                      >
-                        {busy
-                          ? "Saving…"
-                          : "Enter to save · Shift+Enter for newline"}
-                      </span>
-                    ) : (
-                      <Button disabled={busy} size="sm" type="submit">
-                        {busy ? "Saving…" : "Add"}
-                      </Button>
-                    )}
-                  </div>
-                </form>
-              </aside>
             ) : null}
           </div>
         </ContextMenu.Trigger>
@@ -1647,7 +1419,7 @@ export function CollaborationCanvas({
               onSelect={() => {
                 setBrowserMenu(true);
                 toast.info(
-                  "Right-click again for the browser menu. Restore annotation tools in Edit & annotate.",
+                  "Right-click again for the browser menu. Restore annotation tools in New version.",
                   { position: "top-center" }
                 );
               }}
@@ -1767,6 +1539,373 @@ export function CollaborationCanvas({
           </ContextMenu.Content>
         </ContextMenu.Portal>
       </ContextMenu.Root>
+      {room.connection ? (
+        <Sidebar
+          aria-label="Live annotations"
+          className="top-[49px] h-[calc(100svh-49px)] bg-background"
+          data-bitplan-collaboration="live"
+          id="bitplan-annotations"
+          side="right"
+        >
+          <div className="flex items-center justify-between border-b p-3">
+            <div>
+              <h2 className="font-serif text-2xl">
+                {draftingRevision ? "Publish" : "Your contributions"}
+              </h2>
+              <p className="text-muted-foreground text-xs" role="status">
+                {room.online ? "Live · encrypted" : "Reconnecting…"} · change{" "}
+                {room.sequence}
+              </p>
+            </div>
+            <Button
+              aria-label="Close annotations"
+              onClick={() => setPanel(false)}
+              size="icon-sm"
+              variant="ghost"
+            >
+              <X />
+            </Button>
+          </div>
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+            <details className="space-y-3 border-b pb-3" id="view-editing-tools">
+              <summary className="cursor-pointer text-muted-foreground text-sm">
+                View & editing tools
+              </summary>
+              <fieldset className="space-y-2 pb-3">
+                <legend className="mb-2 font-medium text-sm">Your view</legend>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    checked={showEdits}
+                    onChange={(event) => {
+                      if (
+                        textRecovery.current.size ||
+                        inline ||
+                        editor ||
+                        drawing
+                      ) {
+                        toast.info(
+                          "Finish your current edit before comparing."
+                        );
+                        return;
+                      }
+                      stopPicking();
+                      setShowEdits(event.target.checked);
+                    }}
+                    type="checkbox"
+                  />
+                  Show live changes
+                </label>
+                <p className="text-muted-foreground text-xs">
+                  {showEdits
+                    ? "Only changes your view. Nothing is removed."
+                    : "Original version · read-only. Live changes are still saved."}
+                </p>
+              </fieldset>
+              <Button
+                disabled={!showEdits}
+                onClick={() => startPicking()}
+                size="sm"
+                variant="outline"
+              >
+                Annotate an element
+              </Button>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  checked={browserMenu}
+                  onChange={(event) => setBrowserMenu(event.target.checked)}
+                  type="checkbox"
+                />
+                Use browser right-click menu
+              </label>
+              {isHostedId(target.origin) ? (
+                <>
+                  <Button
+                    disabled={!showEdits}
+                    onClick={() => {
+                      setInlineEditing((value) => !value);
+                      setPanel(false);
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {inlineEditing
+                      ? "Finish editing text"
+                      : "Edit text in place"}
+                  </Button>
+                  <Button
+                    disabled={!showEdits}
+                    onClick={editDocument}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Edit HTML
+                  </Button>
+                </>
+              ) : null}
+            </details>
+            <PlanAccessPanel origin={target.origin} publisher={isPublisher} />
+            <DocumentEditSummary
+              blocks={reviewEdits.filter(
+                (block) =>
+                  sameDocumentTarget(block.base, room.activeTarget) &&
+                  (isPublisher ||
+                    block.participantId === room.connection?.participantId)
+              )}
+              currentParticipantId={room.connection?.participantId}
+              excluded={excluded}
+              htmlRevision={
+                room.documentDraft?.html === undefined
+                  ? undefined
+                  : room.documentDraft.revision
+              }
+              onConsiderAll={
+                isPublisher
+                  ? (include) =>
+                      setExcluded((previous) => {
+                        const next = new Set(previous);
+                        for (const block of reviewEdits.filter((entry) =>
+                          sameDocumentTarget(entry.base, room.activeTarget)
+                        )) {
+                          const key = JSON.stringify([
+                            block.participantId,
+                            block.path,
+                          ]);
+                          if (include) {
+                            next.delete(key);
+                          } else {
+                            next.add(key);
+                          }
+                        }
+                        return next;
+                      })
+                  : undefined
+              }
+              onRevert={async (block) => {
+                const latest = room.textBlocks.find(
+                  (item) =>
+                    item.path === block.path &&
+                    sameDocumentTarget(item.base, block.base)
+                );
+                if (
+                  !latest ||
+                  latest.revision !== block.revision ||
+                  latest.participantId !== room.connection?.participantId
+                ) {
+                  toast.error(
+                    "This passage changed. Review the latest edit first."
+                  );
+                  return;
+                }
+                try {
+                  await room.saveTextBlock(
+                    { ...block, deleted: false, text: block.original },
+                    block.revision
+                  );
+                  toast.success("Original text restored. History is retained.");
+                } catch {
+                  toast.error(
+                    "Could not restore text. Refresh and review the latest edit."
+                  );
+                }
+              }}
+              onToggle={
+                isPublisher
+                  ? (id) =>
+                      setExcluded((previous) => {
+                        const next = new Set(previous);
+                        if (!next.delete(id)) {
+                          next.add(id);
+                        }
+                        return next;
+                      })
+                  : undefined
+              }
+              profiles={room.profiles}
+            />
+            {room.annotations.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                Right-click anywhere on the plan to leave a note.
+              </p>
+            ) : null}
+            {room.annotations
+              .filter(
+                (item) =>
+                  item.status === "open" &&
+                  (isPublisher
+                    ? !item.replyTo
+                    : item.participantId === room.connection?.participantId)
+              )
+              .map((item) => (
+                <article
+                  className="space-y-2 rounded-lg border p-3 text-sm"
+                  data-annotation-id={item.id}
+                  key={item.id}
+                >
+                  {isPublisher ? (
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        checked={!excluded.has(item.id)}
+                        onChange={() =>
+                          setExcluded((previous) => {
+                            const next = new Set(previous);
+                            if (!next.delete(item.id)) {
+                              next.add(item.id);
+                            }
+                            return next;
+                          })
+                        }
+                        type="checkbox"
+                      />
+                      Consider in revision
+                    </label>
+                  ) : null}
+                  <Button
+                    onClick={() => {
+                      if (sameDocumentTarget(item.target, room.activeTarget)) {
+                        setHighlight(item.anchor);
+                      }
+                    }}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Show element
+                  </Button>
+                  <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
+                    <span>
+                      {room.profiles[item.participantId]?.name ??
+                        "Collaborator"}
+                    </span>
+                    <span>{item.status}</span>
+                  </div>
+                  <AnnotationAttachmentStatus
+                    item={item}
+                    position={positions[item.id]}
+                    target={room.activeTarget}
+                  />
+                  {item.content.type === "text" ? (
+                    <AnnotationThread
+                      currentParticipantId={room.connection?.participantId}
+                      disabled={
+                        !(
+                          room.online &&
+                          sameDocumentTarget(item.target, room.activeTarget)
+                        )
+                      }
+                      item={item}
+                      onReply={(replyText) =>
+                        room.saveAnnotation(
+                          { text: replyText, type: "text" },
+                          item.anchor,
+                          undefined,
+                          undefined,
+                          item.id
+                        )
+                      }
+                      onResolve={resolve}
+                      profiles={room.profiles}
+                      replies={annotationReplies(item, room.annotations)}
+                    />
+                  ) : (
+                    <AnnotationBody content={item.content} />
+                  )}
+                  {item.participantId === room.connection?.participantId ? (
+                    <Button
+                      aria-label="Remove my annotation"
+                      onClick={() => void resolve(item)}
+                      size="icon-sm"
+                      title="Resolve this annotation; its history is retained"
+                      variant="ghost"
+                    >
+                      <Trash2 />
+                    </Button>
+                  ) : null}
+                </article>
+              ))}
+          </div>
+          <div className="space-y-3 border-t bg-background p-4">
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-sm" htmlFor="revision-on-chain">
+                Publish on chain
+              </label>
+              <Switch
+                checked={publishOnChain}
+                id="revision-on-chain"
+                onCheckedChange={setPublishOnChain}
+              />
+            </div>
+            <textarea
+              aria-label="Instructions for the next version"
+              className="min-h-20 w-full resize-y rounded-lg border bg-background p-3 text-sm"
+              maxLength={4000}
+              onChange={(event) => setRevisionNotes(event.target.value)}
+              placeholder="Anything else for your agent?"
+              value={revisionNotes}
+            />
+            <p className="text-muted-foreground text-xs">
+              {draftingRevision
+                ? "Selection is just for this draft. Nothing is deleted or published."
+                : "Your notes and replies stay yours. Copying a prompt does not publish them."}
+            </p>
+            <Button
+              className="w-full"
+              disabled={
+                isPublisher &&
+                sharing?.value.mode === "private" &&
+                !sharing.value.recipients.length
+              }
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(
+                    draftingRevision
+                      ? revisionSelectionPrompt(target.origin, {
+                          annotations: room.annotations
+                            .filter(
+                              (item) => !item.replyTo && item.status === "open"
+                            )
+                            .map((item) => ({
+                              id: item.id,
+                              include: !excluded.has(item.id),
+                              revision: item.revision,
+                            })),
+                          cursor: room.sequence,
+                          documentRevision: room.documentRevision,
+                          notes: revisionNotes,
+                          publishOnChain,
+                          sharing: sharing?.value,
+                          target: room.activeTarget,
+                          textEdits: reviewEdits
+                            .filter((item) =>
+                              sameDocumentTarget(item.base, room.activeTarget)
+                            )
+                            .map((item) => ({
+                              include: !excluded.has(
+                                JSON.stringify([item.participantId, item.path])
+                              ),
+                              participantId: item.participantId,
+                              path: item.path,
+                              revision: item.revision,
+                            })),
+                        })
+                      : annotationPublicationPrompt(target.origin, {
+                          cursor: room.sequence,
+                          notes: revisionNotes,
+                          participantId: room.connection?.participantId ?? "",
+                          publishOnChain,
+                          sharingMode: "preserve",
+                          target: room.activeTarget,
+                        })
+                  );
+                  toast.success("Revision prompt copied");
+                } catch {
+                  toast.error("Could not copy the prompt");
+                }
+              }}
+            >
+              <Copy /> Copy prompt
+            </Button>
+          </div>
+        </Sidebar>
+      ) : null}
       <Dialog
         onOpenChange={(open) => {
           if (!(open || savingDocument)) {
@@ -1779,7 +1918,9 @@ export function CollaborationCanvas({
           <DialogTitle>Edit page</DialogTitle>
           <DialogDescription>
             Save sends this HTML to every collaborator. It does not publish a
-            transaction. Newer edits reject a stale save.
+            transaction. Newer edits reject a stale save. Reload shared version
+            only discards unsaved changes in this text box; it does not undo
+            text edits already saved live.
           </DialogDescription>
           <textarea
             aria-label="Plan HTML"
@@ -1793,7 +1934,7 @@ export function CollaborationCanvas({
           />
           <p className="text-muted-foreground text-xs">
             Editing revision {editor?.revision ?? 0} · latest{" "}
-            {room.documentDraft?.revision ?? 0}
+            {room.documentRevision}
           </p>
           {editError ? (
             <p className="text-destructive text-sm" role="alert">
@@ -1807,7 +1948,7 @@ export function CollaborationCanvas({
               onClick={editDocument}
               variant="outline"
             >
-              Discard mine &amp; load latest
+              Reload shared version
             </Button>
             <Button
               disabled={savingDocument}
@@ -1818,11 +1959,12 @@ export function CollaborationCanvas({
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
 
 function AnnotationBody({ content }: { content: AnnotationContent }) {
+  const { resolvedTheme } = useTheme();
   if (content.type === "text") {
     const href = annotationLink(content.text);
     if (href) {
@@ -1853,9 +1995,12 @@ function AnnotationBody({ content }: { content: AnnotationContent }) {
   if (content.type === "html") {
     return (
       <iframe
-        className="h-48 w-full rounded border"
+        className="block h-full min-h-24 w-full border-0 bg-transparent"
         sandbox=""
-        srcDoc={withRenderPolicy(content.html)}
+        srcDoc={withRenderPolicy(
+          content.html,
+          `<style>:root{color-scheme:${resolvedTheme === "dark" ? "dark" : "light"}}html,body{margin:0;background:transparent}body{overflow-wrap:anywhere}</style>`
+        )}
         title="HTML annotation"
       />
     );

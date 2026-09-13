@@ -13,6 +13,7 @@ function bridge() {
   let receive: (event: MessageEvent) => void = () => undefined;
   const body = { children: [] as object[] };
   const attributes = new Map<string, string>();
+  const styles = new Map<string, string>();
   let removed = false;
   const element = {
     blur: () => undefined,
@@ -25,6 +26,10 @@ function bridge() {
       removed = true;
     },
     setAttribute: (key: string, value: string) => attributes.set(key, value),
+    style: {
+      removeProperty: (key: string) => styles.delete(key),
+      setProperty: (key: string, value: string) => styles.set(key, value),
+    },
     tagName: "P",
     textContent: "Original",
   };
@@ -125,8 +130,28 @@ function bridge() {
       return removed;
     },
     send,
+    styles,
   };
 }
+
+test("edited text uses author color and only labels another participant, clearing stale attribution", () => {
+  const view = bridge();
+  const author = {
+    color: "hsl(120 70% 65%)",
+    name: "Tina",
+    other: true,
+    path: "body>p:nth-child(1)",
+  };
+  view.send("attribution", [author]);
+  expect(view.styles.get("--bitplan-editor-color")).toBe(author.color);
+  expect(view.attributes.get("data-bitplan-editor")).toBe("Edited by Tina");
+  view.send("attribution", [{ ...author, other: false }]);
+  expect(view.attributes.has("data-bitplan-editor")).toBe(false);
+  view.send("attribution", [{ ...author, color: "url(https://example.com)" }]);
+  expect(view.styles.size).toBe(0);
+  view.send("attribution", []);
+  expect(view.attributes.has("data-bitplan-editor")).toBe(false);
+});
 
 test("serialized bridge reports drafts immediately and restores without overwriting shared text", () => {
   const first = bridge();

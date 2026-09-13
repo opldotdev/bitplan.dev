@@ -1,6 +1,5 @@
 "use client";
 
-import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const DISMISSED = "bitplan.annotation-onboarding.dismissed.v1";
@@ -32,24 +31,21 @@ export function AnnotationOnboarding() {
       className="absolute top-20 right-4 z-40 w-64 max-w-[calc(100%-2rem)] rounded-md border bg-background p-3 text-sm shadow-md"
     >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-muted-foreground text-xs">
-          Getting started · only you
-        </span>
+        <span className="font-medium">Make your mark</span>
         <button
           aria-label="Dismiss annotation tutorial"
           className="rounded p-1 focus-visible:outline"
           onClick={dismiss}
           type="button"
         >
-          <X className="size-4" />
+          Done
         </button>
       </div>
       <p>Add a note beside anything you want to discuss.</p>
       <p className="mt-2 text-muted-foreground text-xs">
-        Right-click or hold Shift for tools, then choose text and click an
-        element. Enter saves; Shift+Enter adds a line. On a phone, use Edit
-        &amp; annotate. Keep your collaboration invitation private: anyone
-        holding it can contribute.
+        Click text to select; click again to edit. Right-click for annotation
+        tools. Open New version to prepare a revision. Shortcuts are in the
+        navbar info menu.
       </p>
     </aside>
   );
