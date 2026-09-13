@@ -118,6 +118,11 @@ https://bitplan.dev/templates/brief.html or
 https://bitplan.dev/templates/terminal.html for these self-contained formats.
 https://bitplan.dev/templates/blank.html is intentionally empty; annotation
 tools belong to the viewer, not the starter HTML.
+Brief and Terminal include a “Your call” questionnaire with consequences,
+Unsure, optional notes, and Copy my decisions. Replace the sample question with
+a real unresolved decision; leave every option unselected. If nothing needs a
+decision, remove it. Choices are local until copied or added as an annotation,
+not automatically synchronized or sent to an agent. Blank stays empty.
 
 For sensitive plans, offer named-contact encryption before generating a reader
 link. Verify the contact's public identity key with the operator, then use

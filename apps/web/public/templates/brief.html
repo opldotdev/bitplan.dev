@@ -18,4 +18,68 @@
 <div class="columns"><div><section id="goal"><h2>The goal</h2><p>Use this example to try a shared review in BitPlan. Open the same collaboration link with a colleague and check that you can see each other's saved notes.</p><aside class="note"><small>Example note · not shared</small><p>“Could we show the steps for someone opening their first plan?”</p></aside></section><section id="next-step"><h2>Next step</h2><p>Read the notes together. Ask your agent to revise the document using that feedback, then publish a new hosted version.</p><p>Keep unresolved questions visible. Publishing does not mean every reader agrees.</p></section></div>
 <div><section id="scope"><h2>What is included</h2><ul><li>A document everyone can read.</li><li>Text, images, and drawings saved as annotations.</li><li>A version selector for published revisions.</li></ul><p>Choose your display name and character from the avatar menu. A portrait is a preference, not proof of identity.</p></section><section id="share-privately"><h2>Share deliberately</h2><p>A complete reader link is a key to the plan. Send it privately, and keep it out of public chats, screenshots, and repositories. A collaboration invitation also lets its holder contribute.</p><p>For sensitive work, ask your agent to create a wallet-encrypted plan for named contacts without a reader link.</p><details><summary>Manage contacts with your agent</summary><p>Ask: “Verify Dave's public identity key with me, save him as a contact, and create a new hosted plan encrypted to Dave and my wallet. Do not create a reader link.”</p><pre><code>npx bitplan contact set dave &lt;verified-public-identity-key&gt;
 npx bitplan contact list
-npx bitplan upload ./private-plan.html --hosted --share-with dave</code></pre><p>Use a new plan file for this example. Existing drafts can retain earlier reader-link recipients; leaving off <code>--link</code> does not revoke them. Contacts are local labels. Never give your agent a private key or wallet password.</p><p>Reading permission is separate from the live collaboration invitation. Removing a recipient affects future versions, not copies already shared.</p></details></section></div></div><details><summary>How to use this plan</summary><p>Open a collaboration invitation to join. Right-click beside a passage and choose + T to add a note. Enter saves it; Shift+Enter adds a line. If your browser takes over right-click, use the Annotations button.</p><p>For images, choose Photos, Stickers, or Draw. Notes belong to the annotation layer; they do not rewrite the document. Read them before publishing your next revision.</p><p>A hosted revision is not an on-chain record. Annotation checkpoints on chain are still planned.</p></details><footer>Brief starter · replace the example with your project.</footer></main></body></html>
+npx bitplan upload ./private-plan.html --hosted --share-with dave</code></pre><p>Use a new plan file for this example. Existing drafts can retain earlier reader-link recipients; leaving off <code>--link</code> does not revoke them. Contacts are local labels. Never give your agent a private key or wallet password.</p><p>Reading permission is separate from the live collaboration invitation. Removing a recipient affects future versions, not copies already shared.</p></details></section></div></div><details><summary>How to use this plan</summary><p>Open a collaboration invitation to join. Right-click beside a passage and choose + T to add a note. Enter saves it; Shift+Enter adds a line. If your browser takes over right-click, use the Annotations button.</p><p>For images, choose Photos, Stickers, or Draw. Notes belong to the annotation layer; they do not rewrite the document. Read them before publishing your next revision.</p><p>A hosted revision is not an on-chain record. Annotation checkpoints on chain are still planned.</p></details><style>
+.bp-decisions{border-top:1px solid var(--line);padding-top:32px;margin-top:48px}
+.bp-decision-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:40px}
+.bp-decisions fieldset{border:0;margin:0;padding:0;min-width:0}
+.bp-decisions legend{font-family:Georgia,serif;font-size:24px;margin-bottom:16px}
+.bp-option{display:grid;grid-template-columns:18px 1fr;gap:12px;padding:14px 0;border-top:1px solid var(--line);cursor:pointer}
+.bp-option input{margin-top:6px;accent-color:var(--bp-accent)}
+.bp-option strong{font-weight:500}.bp-option small{display:block;color:var(--bp-muted);font-size:13px;margin-top:4px}
+.bp-option:has(input:checked){color:var(--bp-accent)}
+.bp-decisions textarea{width:100%;box-sizing:border-box;background:transparent;color:inherit;font:inherit;border:1px solid var(--line);border-radius:3px;padding:12px;min-height:88px;resize:vertical;margin-top:8px}
+.bp-handoff{border-left:1px solid var(--line);padding-left:28px;min-width:0}
+.bp-handoff pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.7 ui-monospace,monospace;background:transparent;padding:0;user-select:all}
+.bp-handoff button{font:inherit;color:var(--bp-paper);background:var(--bp-ink);border:0;border-radius:4px;padding:10px 16px;cursor:pointer}
+.bp-answer{display:none}body:has(#bp-next-a:checked) .bp-answer-a,body:has(#bp-next-b:checked) .bp-answer-b,body:has(#bp-next-unsure:checked) .bp-answer-unsure{display:inline}
+body:has(input[name=bp-next]:checked) .bp-unanswered{display:none}
+.bp-decision-note{font-size:13px;color:var(--bp-muted);margin-top:12px}
+@media(max-width:650px){.bp-decision-grid{display:block}.bp-handoff{border-left:0;border-top:1px solid var(--line);padding:24px 0 0;margin-top:24px}}
+</style>
+<!-- Authoring: replace this question with a real unresolved decision. Keep Unsure, consequences, and no preselected answers. Remove the section if nothing needs deciding. -->
+<section class="bp-decisions" id="decisions">
+<h2>Your call</h2>
+<p>Choose a next step and send it to your agent.</p>
+<div class="bp-decision-grid"><div><fieldset>
+<legend>What should we resolve next?</legend>
+<label class="bp-option"><input id="bp-next-a" name="bp-next" type="radio"><span><strong>Clarify the goal</strong><small>Agree on the outcome before expanding the plan.</small></span></label>
+<label class="bp-option"><input id="bp-next-b" name="bp-next" type="radio"><span><strong>Narrow the scope</strong><small>Choose what belongs in the next revision and defer the rest.</small></span></label>
+<label class="bp-option"><input id="bp-next-unsure" name="bp-next" type="radio"><span><strong>Unsure</strong><small>Ask for the missing evidence before choosing a path.</small></span></label>
+</fieldset>
+<label for="bp-decision-notes">Anything else?</label>
+<textarea id="bp-decision-notes" placeholder="Constraints, questions, or changes"></textarea></div>
+<aside class="bp-handoff"><h3>Your response</h3>
+<pre id="bp-response">BitPlan response · Brief starter
+What should we resolve next?
+<span class="bp-unanswered">Not answered</span><span class="bp-answer bp-answer-a">Clarify the goal — Agree on the outcome before expanding the plan.</span><span class="bp-answer bp-answer-b">Narrow the scope — Choose what belongs in the next revision and defer the rest.</span><span class="bp-answer bp-answer-unsure">Unsure — Ask for the missing evidence before choosing a path.</span></pre>
+<button id="bp-copy-decisions" type="button">Copy my decisions</button>
+<p class="bp-decision-note" id="bp-copy-status" role="status">Choices stay in this tab until you share them.</p>
+<textarea id="bp-copy-fallback" aria-label="Response to copy" readonly hidden></textarea>
+<noscript><p class="bp-decision-note">Select the response text to copy it, then include any notes above.</p></noscript>
+</aside></div></section>
+<script>
+(() => {
+  const button = document.getElementById("bp-copy-decisions");
+  const output = document.getElementById("bp-response");
+  const notes = document.getElementById("bp-decision-notes");
+  const status = document.getElementById("bp-copy-status");
+  const fallback = document.getElementById("bp-copy-fallback");
+  button.addEventListener("click", async () => {
+    const text = output.innerText.trim() + (notes.value.trim() ? "\nNotes: " + notes.value.trim() : "");
+    try {
+      await navigator.clipboard.writeText(text);
+      status.textContent = "Copied. Paste into your agent or add as an annotation.";
+    } catch {
+      fallback.hidden = false;
+      fallback.value = text;
+      fallback.focus();
+      fallback.select();
+      let copied = false;
+      try { copied = document.execCommand("copy"); } catch {}
+      status.textContent = copied ? "Copied." : "Copy the selected response with your browser.";
+      if (copied) fallback.hidden = true;
+    }
+  });
+})();
+</script>
+<footer>Brief starter · replace the example with your project.</footer></main></body></html>

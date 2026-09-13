@@ -481,7 +481,8 @@ function SharedStarter({
         open
       >
         <DialogContent
-          className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto bg-background/95 p-6 motion-reduce:animate-none sm:max-w-lg sm:p-10"
+          className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto bg-background/95 p-6 motion-reduce:animate-none sm:max-w-lg sm:p-10 data-[step=style]:sm:max-w-2xl"
+          data-step={step}
           fullScreenOnMobile={false}
           onEscapeKeyDown={(event) => {
             if (creating) {
@@ -499,16 +500,14 @@ function SharedStarter({
           >
             <div className="motion-safe:fade-in motion-safe:slide-in-from-bottom-2 space-y-3 motion-safe:animate-in motion-safe:duration-300">
               <DialogTitle className="font-heading text-3xl leading-tight sm:text-4xl">
-                {step === "name"
-                  ? "Name your plan."
-                  : "Choose a starting point."}
+                {step === "name" ? "Name your plan." : "Choose a template."}
               </DialogTitle>
               <DialogDescription
                 className={step === "name" ? "sr-only" : undefined}
               >
                 {step === "name"
                   ? "Choose a name or skip. You can rename it later."
-                  : `A style for ${title.trim()}. You can change it later.`}
+                  : "You can change it later."}
               </DialogDescription>
             </div>
             {step === "name" ? (
@@ -530,7 +529,10 @@ function SharedStarter({
                 />
               </>
             ) : (
-              <fieldset className="grid grid-cols-3 gap-2" disabled={creating}>
+              <fieldset
+                className="grid grid-cols-3 gap-3 sm:gap-5"
+                disabled={creating}
+              >
                 <legend className="sr-only">Template</legend>
                 {PLAN_APPEARANCES.map((preset, index) => (
                   <label className="min-w-0 cursor-pointer" key={preset.layout}>
@@ -543,14 +545,22 @@ function SharedStarter({
                       type="radio"
                       value={preset.layout}
                     />
-                    <span className="block overflow-hidden rounded-lg border p-1 peer-checked:border-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-ring motion-safe:transition-colors">
+                    <span className="block rounded-sm border-transparent border-b pb-2 peer-checked:border-foreground peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-focus-visible:outline-offset-4 motion-safe:transition-colors">
                       <TemplatePreview
-                        className="h-32 sm:h-40"
+                        className="h-36 rounded-sm border border-foreground/10 sm:h-56"
                         dark={resolvedTheme === "dark"}
                         preset={preset}
                       />
-                      <span className="block py-2 text-center text-sm">
+                      <span className="flex items-center justify-between pt-3 font-heading text-lg sm:text-xl">
                         {preset.name}
+                        {starter.layout === preset.layout ? (
+                          <span
+                            aria-hidden="true"
+                            className="font-sans text-xs"
+                          >
+                            ✓
+                          </span>
+                        ) : null}
                       </span>
                     </span>
                   </label>
@@ -588,27 +598,27 @@ function SharedStarter({
                   Skip
                 </Button>
               ) : null}
+              {step === "style" ? (
+                <Button
+                  disabled={creating}
+                  onClick={() => {
+                    setStep("name");
+                    setError(undefined);
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  Back
+                </Button>
+              ) : null}
             </div>
-            {step === "style" ? (
-              <Button
-                disabled={creating}
-                onClick={() => {
-                  setStep("name");
-                  setError(undefined);
-                }}
-                type="button"
-                variant="ghost"
-              >
-                Back
-              </Button>
-            ) : null}
             {step === "style" ? (
               <p className="text-muted-foreground text-xs leading-relaxed">
                 Anyone with the full link can read and contribute. Keep it
                 private.
               </p>
             ) : null}
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 border-foreground/10 border-t pt-3">
               <Button
                 disabled={creating}
                 onClick={onAdvanced}
