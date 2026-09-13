@@ -6,12 +6,12 @@ description: >
   or update a plan, share one with a person or team, create a private reader
   link, move a hosted draft on chain, or explain bitplan.dev.
 metadata:
-  version: "0.2.10"
+  version: "0.2.11"
 ---
 
 # BitPlan
 
-**Skill version: 0.2.10**
+**Skill version: 0.2.11**
 
 BitPlan turns one self-contained HTML file into an encrypted living plan. A
 BRC-100 wallet owns the keys. A draft can stay hosted as ciphertext while it
@@ -32,10 +32,16 @@ currently serves authenticated wallet storage; it is not a drop-in endpoint
 for BitPlan's BRC-100 `HTTPWalletJSON` client. Do not point BitPlan at it or
 claim the fallback works until the 1Sat headless-wallet acceptance test passes.
 
-If no compatible wallet is available, explain that BitPlan cannot create or
-update an encrypted plan today. Let the calling workflow offer a local file or
-an explicitly approved non-BitPlan host. Never weaken BitPlan into a plaintext
-or agent-held-key mode to make the command succeed.
+The browser's Get started flow can create a link-owned hosted starter without
+a funding wallet. Its throwaway reader key is generated inside the browser;
+it is not a CLI wallet fallback or permission to handle private keys in model
+context. CLI publishing and contact-based encryption still require a compatible
+BRC-100 wallet. Never substitute a funding key into a reader link.
+Get started offers Brief, Terminal, and Blank, then opens the new draft's
+encrypted collaboration room automatically. Save the full invitation privately.
+This disposable draft has no retained hosted-update secret or wallet ownership;
+live room edits do not create base-document versions. Use the wallet/CLI path
+when the user needs controlled recipients, version publishing, or inscription.
 
 ## Check the live product first
 
@@ -94,6 +100,27 @@ Do not describe a hosted plan as on chain. Do not call a 1Sat Ordinal a
 "BRC-100 inscription."
 
 ## Write the plan before publishing it
+
+The player offers Brief (editorial paper), Terminal (monochrome dither), and
+Blank (white paper / dark chalkboard) appearance presets, with Light, Dark, and
+System modes. Applying a preset restyles the current document locally; it does
+not replace content, publish a version, or erase annotations. Import presets
+are validated JSON palettes, not arbitrary executable templates. Start from
+https://bitplan.dev/templates/brief.html or
+https://bitplan.dev/templates/terminal.html for these self-contained formats.
+https://bitplan.dev/templates/blank.html is intentionally empty; annotation
+tools belong to the viewer, not the starter HTML.
+
+For sensitive plans, offer named-contact encryption before generating a reader
+link. Verify the contact's public identity key with the operator, then use
+`npx bitplan contact set <name> <public-identity-key>` and
+`npx bitplan contact list`. For a new plan, use
+`npx bitplan upload ./private-plan.html --hosted --share-with <name>` without
+`--link`. A complete reader link is a bearer credential; a collaboration
+invitation also permits contributions. Keep both out of public artifacts.
+Omitting `--link` on an existing draft does not revoke inherited readers.
+Do not combine `--private` with `--share-with`; inspect the current access and
+CLI help before changing recipients, and explain that old versions stay shared.
 
 Choose the format before authoring:
 
@@ -435,6 +462,12 @@ explicit Save, not per keystroke, and do not inscribe a transaction.
 Right-click the document for the contextual icon bar: + T adds text; the image
 icon opens Photos, Stickers, and Draw. Raster uploads up to 20 MB are resized
 locally to fit the 170 KB image budget; SVG/GIF must already fit that budget.
+The gear enables the native browser menu on subsequent right-clicks; restore
+the annotation toolbar with the checkbox in Edit & annotate. Shift-right-click
+temporarily passes through to the browser. Browsers cannot be told to open their
+native menu programmatically. If a browser intercepts right-click before the
+page receives it, use Edit & annotate instead; do not weaken the iframe sandbox
+or native event validation. This is also the mobile entry point.
 Draw supports pen, rectangle, ellipse, a shared color, and lasso/move within the
 drawing. It exports a transparent image, not editable vector strokes. Drawing
 directly over document text is not implemented. Choose Use image, then save the

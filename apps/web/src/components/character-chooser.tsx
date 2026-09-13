@@ -216,7 +216,7 @@ export function CharacterChooser({
                 <Button
                   aria-label={character}
                   aria-pressed={profile?.character === character}
-                  className="aspect-square h-auto min-w-0 rounded-md p-1 aria-pressed:bg-muted aria-pressed:ring-2 aria-pressed:ring-ring"
+                  className="relative aspect-square h-auto min-w-0 overflow-hidden rounded-md p-0 aria-pressed:ring-2 aria-pressed:ring-ring"
                   key={character}
                   onBlur={showSelectedCharacter}
                   onClick={selectCharacter}
@@ -230,14 +230,13 @@ export function CharacterChooser({
                 >
                   <Image
                     alt=""
-                    className="shrink-0 rounded-full object-cover"
-                    height={36}
+                    className="rounded-[inherit] object-cover"
+                    fill
                     loading="lazy"
                     referrerPolicy="no-referrer"
+                    sizes="(max-width: 639px) 20vw, 76px"
                     src={characterPortrait(character)}
-                    style={{ height: 36, width: 36 }}
                     unoptimized
-                    width={36}
                   />
                 </Button>
               ))}

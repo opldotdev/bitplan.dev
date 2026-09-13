@@ -49,7 +49,10 @@ import {
   type OrdfsContentResult,
 } from "@/lib/ordfs";
 import { normalizeOrigin } from "@/lib/outpoint";
-import { useCollaboration } from "@/lib/use-collaboration";
+import {
+  type CollaborationState,
+  useCollaboration,
+} from "@/lib/use-collaboration";
 import {
   clampVersion,
   parseVersionQuery,
@@ -571,6 +574,7 @@ export function DraftViewer() {
         origin={view.draft.origin}
         outpoint={view.draft.content.outpoint}
         plaintext={view.plaintext}
+        startCollaboration={searchParams.get("collaborate") === "1"}
       />
     );
   }
@@ -798,6 +802,7 @@ function DecryptedView({
   onVersion,
   origin,
   outpoint,
+  startCollaboration,
 }: {
   canPublish: boolean;
   openedWithLink?: boolean;
@@ -807,6 +812,7 @@ function DecryptedView({
   onVersion: (version: number) => void;
   origin: string;
   outpoint: string | null;
+  startCollaboration: boolean;
 }) {
   const { title } = plaintext.meta;
   const target = {
@@ -816,6 +822,17 @@ function DecryptedView({
     ...(!isHostedId(origin) && outpoint ? { outpoint } : {}),
   };
   const collaboration = useCollaboration(target);
+  const startRoom = useRef(collaboration.start);
+  startRoom.current = collaboration.start;
+
+  useEffect(() => {
+    if (
+      !(startCollaboration && isHostedId(origin) && collaboration.configured)
+    ) {
+      return;
+    }
+    void startRoom.current();
+  }, [collaboration.configured, origin, startCollaboration]);
 
   useEffect(() => {
     const genericTitle = document.title;
@@ -853,6 +870,7 @@ function DecryptedView({
         <div className="ml-auto flex items-center gap-1">
           <DecryptedShare
             canPublish={canPublish}
+            collaboration={collaboration}
             openedWithLink={openedWithLink}
             origin={origin}
           />
@@ -860,29 +878,11 @@ function DecryptedView({
           <CharacterChooser onChange={collaboration.updateProfile}>
             <div className="border-t pt-2">
               {collaboration.connection ? (
-                <>
-                  <p className="text-muted-foreground text-xs" role="status">
-                    {collaboration.online
-                      ? "Connected · encrypted collaboration"
-                      : "Reconnecting…"}
-                  </p>
-                  <Button
-                    className="mt-2 w-full"
-                    onClick={() => {
-                      void navigator.clipboard
-                        .writeText(window.location.href)
-                        .then(
-                          () =>
-                            toast.success("Collaboration invitation copied"),
-                          () => toast.error("Could not copy invitation")
-                        );
-                    }}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Copy collaboration invitation
-                  </Button>
-                </>
+                <p className="text-muted-foreground text-xs" role="status">
+                  {collaboration.online
+                    ? "Connected · encrypted collaboration"
+                    : "Reconnecting..."}
+                </p>
               ) : (
                 <Button
                   className="w-full"
@@ -905,7 +905,7 @@ function DecryptedView({
               ) : null}
             </div>
           </CharacterChooser>
-          <ThemeToggle />
+          <ThemeToggle templates />
         </div>
       </header>
       <CollaborationCanvas
@@ -920,15 +920,17 @@ function DecryptedView({
 
 function DecryptedShare({
   canPublish,
+  collaboration,
   openedWithLink,
   origin,
 }: {
   canPublish: boolean;
+  collaboration: CollaborationState;
   openedWithLink?: boolean;
   origin: string;
 }) {
   if (openedWithLink) {
-    return <ReaderLinkCopy />;
+    return <ReaderLinkCopy includeCollaboration={!!collaboration.connection} />;
   }
   if (isHostedId(origin)) {
     return <HostedShareDialog origin={origin} />;
@@ -939,28 +941,40 @@ function DecryptedShare({
   return null;
 }
 
-function ReaderLinkCopy() {
+function ReaderLinkCopy({
+  includeCollaboration,
+}: {
+  includeCollaboration: boolean;
+}) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(readerOnlyUrl(window.location.href));
+      await navigator.clipboard.writeText(
+        includeCollaboration
+          ? window.location.href
+          : readerOnlyUrl(window.location.href)
+      );
       setCopied(true);
       window.setTimeout(() => {
         setCopied(false);
       }, 2000);
     } catch {
       setCopied(false);
-      toast.error("Could not copy the reader link");
+      toast.error("Could not copy the link");
     }
-  }, []);
+  }, [includeCollaboration]);
+
+  const label = includeCollaboration
+    ? "Copy collaboration link"
+    : "Copy reader link";
 
   return (
     <Button
-      aria-label={copied ? "Copied" : "Copy link"}
+      aria-label={copied ? "Copied" : label}
       onClick={handleCopy}
       size="icon-sm"
-      title={copied ? "Copied" : "Copy link"}
+      title={copied ? "Copied" : label}
       type="button"
       variant="ghost"
     >

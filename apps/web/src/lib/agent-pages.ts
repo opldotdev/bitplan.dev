@@ -5,6 +5,8 @@ const PAGES: Record<string, string> = {
 
 Secure agent plans. Encrypted before upload. Keep a draft hosted while it changes, then put it on Bitcoin when it should be permanent.
 
+Get started at /new to create a browser-encrypted shared starter without a funding wallet. Choose Brief, Terminal, or Blank. Keep its complete invitation private. This link-owned working draft is separate from wallet-owned CLI publication.
+
 Publish a self-contained HTML file with the CLI:
 
     npx bitplan auth
@@ -196,7 +198,7 @@ Read an encrypted envelope:
 
 For an on-chain origin, this returns public ciphertext from 1Sat. For a hosted ID, it returns hosted ciphertext. The CLI is the npm package bitplan: https://www.npmjs.com/package/bitplan
 
-Creating and updating a plan goes through the user's wallet via \`npx bitplan\`. Decryption happens in the browser or CLI. Drafts at /d/<origin> are ciphertext and are not indexed.
+The browser's /new flow creates a link-owned encrypted hosted starter and opens live collaboration without a funding wallet. Keep its invitation private. Wallet-owned CLI publishing still uses the user's BRC-100 wallet via \`npx bitplan\`. Decryption happens in the browser or CLI. Drafts at /d/<origin> are ciphertext and are not indexed.
 `;
 
 export function markdownForPath(pathname: string): string | null {

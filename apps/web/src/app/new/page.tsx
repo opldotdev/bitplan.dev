@@ -4,7 +4,7 @@ import { PlanComposer } from "@/components/plan-composer";
 
 export const metadata: Metadata = {
   robots: { follow: false, index: false },
-  title: "New plan",
+  title: "New shared draft",
 };
 
 export default function NewPlanPage() {

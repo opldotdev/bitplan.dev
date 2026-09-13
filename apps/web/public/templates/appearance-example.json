@@ -1,0 +1,16 @@
+{
+  "name": "My preset",
+  "layout": "brief",
+  "light": {
+    "paper": "#faf7ef",
+    "ink": "#24221e",
+    "muted": "#69645b",
+    "accent": "#79563c"
+  },
+  "dark": {
+    "paper": "#181817",
+    "ink": "#eee9de",
+    "muted": "#aaa499",
+    "accent": "#c2a586"
+  }
+}

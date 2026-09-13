@@ -6,16 +6,19 @@ import {
   Link,
   MessageSquare,
   Plus,
+  Settings,
   Type,
   X,
 } from "lucide-react";
 import Image from "next/image";
+import { useTheme } from "next-themes";
 import { ContextMenu } from "radix-ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AnnotationCard } from "@/components/annotation-card";
 import { AnnotationImagePicker } from "@/components/annotation-image-picker";
 import { AnnotationOnboarding } from "@/components/annotation-onboarding";
+import { usePlanAppearance } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -40,6 +43,7 @@ import {
 import { characterPortrait } from "@/lib/collaborator";
 import { cursorIsActive } from "@/lib/cursor-activity";
 import { isHostedId } from "@/lib/hosted-id";
+import { planAppearanceCss } from "@/lib/plan-appearance";
 import { withRenderPolicy } from "@/lib/render-policy";
 import type { CollaborationState } from "@/lib/use-collaboration";
 
@@ -129,12 +133,15 @@ export function CollaborationCanvas({
   target: DocumentTarget;
   room: CollaborationState;
 }) {
+  const { preset } = usePlanAppearance();
+  const { resolvedTheme } = useTheme();
   const frame = useRef<HTMLIFrameElement>(null);
   const connectedFrame = useRef<HTMLIFrameElement | null>(null);
   const geometryPort = useRef<MessagePort | null>(null);
   const [bridgeHostReady, setBridgeHostReady] = useState(false);
   const trigger = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState(false);
+  const [browserMenu, setBrowserMenu] = useState(false);
   const [anchor, setAnchor] = useState<AnnotationAnchor>(center);
   const [contextLink, setContextLink] = useState<string | null>(null);
   const [contextSelection, setContextSelection] = useState("");
@@ -173,8 +180,14 @@ export function CollaborationCanvas({
   const htmlRef = useRef(currentHtml);
   htmlRef.current = currentHtml;
   const documentHtml = useMemo(
-    () => withAnnotationBridge(currentHtml, !!room.connection),
-    [currentHtml, !!room.connection]
+    () =>
+      withAnnotationBridge(
+        currentHtml,
+        !!room.connection,
+        preset ? planAppearanceCss(preset) : "",
+        browserMenu
+      ),
+    [currentHtml, !!room.connection, preset, browserMenu]
   );
   const visible = room.annotations.filter(
     (item) =>
@@ -550,12 +563,16 @@ export function CollaborationCanvas({
     <>
       {room.connection ? <AnnotationOnboarding /> : null}
       <ContextMenu.Root>
-        <ContextMenu.Trigger asChild disabled={!room.connection}>
+        <ContextMenu.Trigger asChild disabled={!room.connection || browserMenu}>
           <div
             className="relative min-h-0 flex-1 overflow-hidden"
             data-bitplan-connected={room.connection ? room.online : undefined}
             data-bitplan-sequence={room.connection ? room.sequence : undefined}
             onContextMenuCapture={(event) => {
+              if (browserMenu || event.shiftKey || !room.connection) {
+                event.stopPropagation();
+                return;
+              }
               if (event.target === event.currentTarget) {
                 return; // Geometry bridge's positioned menu event.
               }
@@ -584,6 +601,7 @@ export function CollaborationCanvas({
                 ref={frame}
                 sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
                 srcDoc={documentHtml}
+                style={{ colorScheme: resolvedTheme }}
                 title={title}
               />
             ) : null}
@@ -856,7 +874,8 @@ export function CollaborationCanvas({
                 variant="outline"
               >
                 <MessageSquare />
-                Annotations · {visible.length}
+                {isHostedId(target.origin) ? "Edit & annotate" : "Annotations"}
+                {` · ${visible.length}`}
               </Button>
             ) : null}
             {panel && room.connection ? (
@@ -868,7 +887,11 @@ export function CollaborationCanvas({
               >
                 <div className="flex items-center justify-between border-b p-3">
                   <div>
-                    <h2 className="font-medium text-sm">Annotations</h2>
+                    <h2 className="font-medium text-sm">
+                      {isHostedId(target.origin)
+                        ? "Edit & annotate"
+                        : "Annotations"}
+                    </h2>
                     <p className="text-muted-foreground text-xs" role="status">
                       {room.online ? "Live · encrypted" : "Reconnecting…"} ·
                       change {room.sequence}
@@ -884,9 +907,21 @@ export function CollaborationCanvas({
                   </Button>
                 </div>
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      checked={browserMenu}
+                      onChange={(event) => setBrowserMenu(event.target.checked)}
+                      type="checkbox"
+                    />
+                    Use browser right-click menu
+                  </label>
+                  <p className="text-muted-foreground text-xs">
+                    Or hold Shift while right-clicking. Annotation tools remain
+                    available here.
+                  </p>
                   {isHostedId(target.origin) ? (
                     <Button onClick={editDocument} size="sm" variant="outline">
-                      Edit shared document
+                      Edit page
                     </Button>
                   ) : null}
                   {room.documentDraft ? (
@@ -1042,6 +1077,20 @@ export function CollaborationCanvas({
             }}
           >
             <ContextMenu.Item
+              aria-label="Use browser right-click menu"
+              className={menuItem}
+              onSelect={() => {
+                setBrowserMenu(true);
+                toast.info(
+                  "Right-click again for the browser menu. Restore annotation tools in Edit & annotate.",
+                  { position: "top-center" }
+                );
+              }}
+              title="Use browser menu on your next right-click"
+            >
+              <Settings />
+            </ContextMenu.Item>
+            <ContextMenu.Item
               aria-label="Add text annotation"
               className={menuItem}
               disabled={busy || !!inline}
@@ -1119,7 +1168,7 @@ export function CollaborationCanvas({
         open={!!editor}
       >
         <DialogContent className="sm:max-w-3xl">
-          <DialogTitle>Edit shared document</DialogTitle>
+          <DialogTitle>Edit page</DialogTitle>
           <DialogDescription>
             Save sends this HTML to every collaborator. It does not publish a
             transaction. Newer edits reject a stale save.
@@ -1156,7 +1205,7 @@ export function CollaborationCanvas({
               disabled={savingDocument}
               onClick={() => void saveDocument()}
             >
-              {savingDocument ? "Saving…" : "Save shared document"}
+              {savingDocument ? "Saving…" : "Save page"}
             </Button>
           </div>
         </DialogContent>

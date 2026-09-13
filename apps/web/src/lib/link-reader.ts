@@ -5,13 +5,37 @@
 
 import { PrivateKey, ProtoWallet, Utils } from "@bsv/sdk";
 
-import type { EnvelopeWallet } from "@/lib/envelope";
+import type { EncryptingEnvelopeWallet, EnvelopeWallet } from "@/lib/envelope";
 
 const LINK_SECRET_BYTES = 32;
+
+/** Generate a browser-only reader secret. This is never a funding key. */
+export function newLinkSecret(): string {
+  return PrivateKey.fromRandom()
+    .toHex()
+    .padStart(LINK_SECRET_BYTES * 2, "0");
+}
+
+/** Encode a validated reader secret for the URL fragment. */
+export function linkFragment(secretHex: string): string {
+  const bytes = Uint8Array.from(Utils.toArray(secretHex, "hex"));
+  if (bytes.length !== LINK_SECRET_BYTES) {
+    throw new Error("A reader secret must be exactly 32 bytes.");
+  }
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+}
 
 /** Copying a reader link must not accidentally grant collaboration authority. */
 export function readerOnlyUrl(value: string): string {
   const url = new URL(value);
+  url.searchParams.delete("collaborate");
   const source = new URLSearchParams(url.hash.slice(1));
   const fragment = new URLSearchParams();
   const key = source.get("k");
@@ -36,7 +60,9 @@ export function parseLinkFragment(input: string): string | null {
 }
 
 /** `new ProtoWallet(PrivateKey.fromHex(secretHex))` narrowed to EnvelopeWallet. */
-export function linkWallet(secretHex: string): EnvelopeWallet {
+export function linkWallet(
+  secretHex: string
+): EnvelopeWallet & EncryptingEnvelopeWallet {
   return new ProtoWallet(PrivateKey.fromHex(secretHex));
 }
 

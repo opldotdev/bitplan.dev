@@ -437,11 +437,10 @@ export function useCollaboration(target: DocumentTarget) {
       const params = new URLSearchParams(window.location.hash.slice(1));
       params.set("room", roomId);
       params.set("collab", secret);
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}#${params}`
-      );
+      const location = new URL(window.location.href);
+      location.searchParams.delete("collaborate");
+      location.hash = params.toString();
+      window.history.replaceState(null, "", location);
       await connect({ roomId, secret });
     } catch (failure) {
       setError(message(failure));

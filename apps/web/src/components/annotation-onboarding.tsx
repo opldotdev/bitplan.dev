@@ -44,10 +44,11 @@ export function AnnotationOnboarding() {
           <X className="size-4" />
         </button>
       </div>
-      <p>Dismiss this tip with the close button.</p>
+      <p>Add a note beside anything you want to discuss.</p>
       <p className="mt-2 text-muted-foreground text-xs">
         Right-click the plan to add a note. Enter saves; Shift+Enter adds a
-        line.
+        line. On a phone, use Edit &amp; annotate. Keep your collaboration
+        invitation private: anyone holding it can contribute.
       </p>
     </aside>
   );
