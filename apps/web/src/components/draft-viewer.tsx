@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { CharacterChooser } from "@/components/character-chooser";
 import { CollaborationCanvas } from "@/components/collaboration-canvas";
 import { HostedShareDialog } from "@/components/hosted-share-dialog";
+import { InlinePlanTitle } from "@/components/inline-plan-title";
 import { ShareDraftDialog } from "@/components/share-draft-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { sameDocumentTarget } from "@/lib/annotations";
 import { type DraftsWallet, walletOwnsDraft } from "@/lib/drafts";
 import type { DraftMeta, DraftPlaintext, EnvelopeWallet } from "@/lib/envelope";
 import { EnvelopeAccessError, openEnvelope } from "@/lib/envelope";
@@ -814,7 +816,7 @@ function DecryptedView({
   outpoint: string | null;
   startCollaboration: boolean;
 }) {
-  const { title } = plaintext.meta;
+  const baseTitle = plaintext.meta.title;
   const target = {
     origin,
     sha256: plaintext.meta.fileSha256,
@@ -822,6 +824,12 @@ function DecryptedView({
     ...(!isHostedId(origin) && outpoint ? { outpoint } : {}),
   };
   const collaboration = useCollaboration(target);
+  const liveDraft =
+    collaboration.documentDraft &&
+    sameDocumentTarget(collaboration.documentDraft.base, target)
+      ? collaboration.documentDraft
+      : null;
+  const title = liveDraft?.title ?? baseTitle ?? "Untitled plan";
   const startRoom = useRef(collaboration.start);
   startRoom.current = collaboration.start;
 
@@ -852,21 +860,30 @@ function DecryptedView({
           latestVersion={latestVersion}
           onVersion={onVersion}
         />
-        {title ? (
-          <p className="min-w-0 flex-1 truncate text-muted-foreground text-sm">
-            {title}
-            {collaboration.contributorCount > 1 ? (
-              <span
-                className="ml-2 text-xs"
-                title="Multiple people have contributed to this plan"
-              >
-                · Collaborative
-              </span>
-            ) : null}
-          </p>
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex min-w-0 flex-1 items-center text-muted-foreground text-sm">
+          <InlinePlanTitle
+            key={`${origin}:${currentVersion}`}
+            onSave={
+              isHostedId(origin) && collaboration.online
+                ? (nextTitle) =>
+                    collaboration.saveDocument(
+                      liveDraft?.html,
+                      collaboration.documentRevision,
+                      nextTitle
+                    )
+                : undefined
+            }
+            title={title}
+          />
+          {collaboration.contributorCount > 1 ? (
+            <span
+              className="ml-2 text-xs"
+              title="Multiple people have contributed to this plan"
+            >
+              · Collaborative
+            </span>
+          ) : null}
+        </div>
         <div className="ml-auto flex items-center gap-1">
           <DecryptedShare
             canPublish={canPublish}

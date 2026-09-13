@@ -11,6 +11,7 @@ import {
   useCallback,
   useEffect,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 import { TemplatePreview } from "@/components/template-preview";
@@ -35,7 +36,11 @@ import {
 import type { DraftPlaintext } from "@/lib/envelope";
 import { createInstantDraft } from "@/lib/instant-draft";
 import { PLAN_APPEARANCES } from "@/lib/plan-appearance";
-import { connectBrowserWalletClient } from "@/lib/wallet";
+import {
+  connectBrowserWalletClient,
+  isWalletConnected,
+  onWalletChange,
+} from "@/lib/wallet";
 
 const PLAN_PLACEHOLDER = `Outcome
 
@@ -55,19 +60,16 @@ export function PlanComposer() {
   const [publishing, setPublishing] = useState(false);
   const [repository, setRepository] = useState("");
   const [title, setTitle] = useState("");
-  const [walletStatus, setWalletStatus] = useState("");
+  const [walletError, setWalletError] = useState("");
   const [connectingWallet, setConnectingWallet] = useState(false);
   const openWallet = useCallback(async () => {
     setAdvancedOpen(true);
     setConnectingWallet(true);
-    setWalletStatus("Connecting to your wallet…");
+    setWalletError("");
     try {
       await connectBrowserWalletClient();
-      setWalletStatus(
-        "Wallet connected. Publishing still requires your approval."
-      );
     } catch {
-      setWalletStatus(
+      setWalletError(
         "Could not connect. Unlock your BRC-100 wallet and retry. If this browser cannot reach it, open BitPlan in your wallet-enabled browser."
       );
     } finally {
@@ -266,6 +268,7 @@ export function PlanComposer() {
     return (
       <SharedStarter
         onAdvanced={() => void openWallet()}
+        setTitle={setTitle}
         title={title}
         updateTitle={updateTitle}
       />
@@ -273,7 +276,7 @@ export function PlanComposer() {
   }
 
   return (
-    <WalletFlowShell title="Use your wallet">
+    <WalletFlowShell connecting={connectingWallet} title="Use your wallet">
       <Button
         onClick={() => setAdvancedOpen(false)}
         type="button"
@@ -284,18 +287,22 @@ export function PlanComposer() {
 
       <div className="border-t pt-6">
         <h2 className="font-heading text-2xl">Wallet access</h2>
-        <p className="mt-3 text-muted-foreground text-sm" role="status">
-          {walletStatus}
-        </p>
-        <Button
-          className="mt-3"
-          disabled={connectingWallet}
-          onClick={() => void openWallet()}
-          type="button"
-          variant="outline"
-        >
-          {connectingWallet ? "Connecting…" : "Reconnect wallet"}
-        </Button>
+        {walletError ? (
+          <>
+            <p className="mt-3 text-muted-foreground text-sm" role="alert">
+              {walletError}
+            </p>
+            <Button
+              className="mt-3"
+              disabled={connectingWallet}
+              onClick={() => void openWallet()}
+              type="button"
+              variant="outline"
+            >
+              {connectingWallet ? "Connecting…" : "Reconnect wallet"}
+            </Button>
+          </>
+        ) : null}
         <form className="mt-6 space-y-6" onSubmit={review}>
           <p className="text-muted-foreground text-sm">
             Only your wallet can open this plan. Review it before publishing.
@@ -349,11 +356,27 @@ export function PlanComposer() {
 function WalletFlowShell({
   children,
   title,
+  connecting = false,
 }: {
   children: ReactNode;
   title: string;
+  connecting?: boolean;
 }) {
   const { resolvedTheme } = useTheme();
+  const connected = useSyncExternalStore(
+    onWalletChange,
+    isWalletConnected,
+    () => false
+  );
+  let walletLabel = "Wallet disconnected";
+  let orbColor = "bg-muted-foreground";
+  if (connecting) {
+    walletLabel = "Connecting to wallet";
+    orbColor = "bg-amber-500 motion-safe:animate-pulse";
+  } else if (connected) {
+    walletLabel = "Wallet connected";
+    orbColor = "bg-emerald-500";
+  }
   return (
     <>
       <TemplatePreview
@@ -370,6 +393,18 @@ function WalletFlowShell({
           showCloseButton={false}
         >
           <DialogTitle className="sr-only">{title}</DialogTitle>
+          <span
+            aria-label={walletLabel}
+            className="absolute top-4 right-4 flex size-6 items-center justify-center"
+            role="status"
+            title={walletLabel}
+          >
+            <span
+              aria-hidden="true"
+              className={`size-2 rounded-full ${orbColor}`}
+            />
+            <span className="sr-only">{walletLabel}</span>
+          </span>
           <DialogDescription className="sr-only">
             Wallet-controlled encryption and permanent publication. No
             transaction is sent until you review and approve publishing.
@@ -383,10 +418,12 @@ function WalletFlowShell({
 
 function SharedStarter({
   title,
+  setTitle,
   updateTitle,
   onAdvanced,
 }: {
   title: string;
+  setTitle: (title: string) => void;
   updateTitle: (event: ChangeEvent<HTMLInputElement>) => void;
   onAdvanced: () => void;
 }) {
@@ -463,12 +500,14 @@ function SharedStarter({
             <div className="motion-safe:fade-in motion-safe:slide-in-from-bottom-2 space-y-3 motion-safe:animate-in motion-safe:duration-300">
               <DialogTitle className="font-heading text-3xl leading-tight sm:text-4xl">
                 {step === "name"
-                  ? "Name your document."
+                  ? "Name your plan."
                   : "Choose a starting point."}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription
+                className={step === "name" ? "sr-only" : undefined}
+              >
                 {step === "name"
-                  ? "Start with a name. You can shape the page together."
+                  ? "Choose a name or skip. You can rename it later."
                   : `A style for ${title.trim()}. You can change it later.`}
               </DialogDescription>
             </div>
@@ -485,7 +524,7 @@ function SharedStarter({
                   id="shared-draft-title"
                   maxLength={160}
                   onChange={updateTitle}
-                  placeholder="What are you working on?"
+                  placeholder="Plan name"
                   required
                   value={title}
                 />
@@ -537,7 +576,18 @@ function SharedStarter({
                 )}
                 {creating ? "Opening your draft…" : actionLabel}
               </Button>
-              <span className="text-muted-foreground text-xs">press Enter</span>
+              {step === "name" ? (
+                <Button
+                  onClick={() => {
+                    setTitle("Master Plan");
+                    setStep("style");
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  Skip
+                </Button>
+              ) : null}
             </div>
             {step === "style" ? (
               <Button
@@ -552,11 +602,12 @@ function SharedStarter({
                 Back
               </Button>
             ) : null}
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              No wallet needed. Anyone with the full private link can read and
-              contribute. This working draft is link-owned; permanent publishing
-              uses a wallet.
-            </p>
+            {step === "style" ? (
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Anyone with the full link can read and contribute. Keep it
+                private.
+              </p>
+            ) : null}
             <div className="flex items-center justify-between gap-3">
               <Button
                 disabled={creating}

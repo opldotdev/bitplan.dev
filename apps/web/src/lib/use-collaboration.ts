@@ -527,13 +527,25 @@ export function useCollaboration(target: DocumentTarget) {
       setError(message(failure));
     }
   }, []);
-  async function saveDocument(html: string, expectedRevision: number) {
+  async function saveDocument(
+    html: string | undefined,
+    expectedRevision: number,
+    title?: string
+  ) {
     const c = connectionRef.current;
     // biome-ignore lint/suspicious/noUnnecessaryConditions: actions can race the asynchronous disconnect cleanup
     if (!c) {
       throw new Error("Open a collaboration invitation first.");
     }
-    const draft = await sharedDocument(targetRef.current, html);
+    const previousTitle =
+      documentDraft && sameDocumentTarget(documentDraft.base, targetRef.current)
+        ? documentDraft.title
+        : undefined;
+    const draft = await sharedDocument(
+      targetRef.current,
+      html,
+      title ?? previousTitle
+    );
     const ciphertext = await encryptRoomValue(
       c.secret,
       `${c.roomId}:document:${expectedRevision + 1}:${c.participantId}`,

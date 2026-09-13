@@ -175,10 +175,12 @@ export function CollaborationCanvas({
   roomRef.current = room;
   const currentHtml =
     room.documentDraft && sameDocumentTarget(room.documentDraft.base, target)
-      ? room.documentDraft.html
+      ? (room.documentDraft.html ?? html)
       : html;
   const htmlRef = useRef(currentHtml);
   htmlRef.current = currentHtml;
+  const titleRef = useRef(title);
+  titleRef.current = title;
   const documentHtml = useMemo(
     () =>
       withAnnotationBridge(
@@ -348,6 +350,7 @@ export function CollaborationCanvas({
           locations: roomRef.current.cursors,
           online: roomRef.current.online,
           target: roomRef.current.activeTarget,
+          title: titleRef.current,
         }),
         inputSchema: {
           additionalProperties: false,

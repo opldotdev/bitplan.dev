@@ -42,6 +42,11 @@ name and continue, then choose Brief, Terminal, or Blank from the previews.
 Back preserves your choices. View shared draft creates the draft and opens its
 encrypted collaboration room automatically. Page styles remain available in
 the viewer. Save the full invitation privately.
+Skip uses “Master Plan.” On a connected hosted plan, click the navbar title to
+rename it inline; Enter or leaving the field saves, Escape cancels. The name is
+an encrypted live-room update, not a new hosted envelope or on-chain version.
+The collaboration read tool returns the live title alongside the HTML; carry
+both into the next published version. Renaming does not change annotation anchors.
 This disposable draft has no retained hosted-update secret or wallet ownership;
 live room edits do not create base-document versions. Use the wallet/CLI path
 when the user needs controlled recipients, version publishing, or inscription.

@@ -10,7 +10,7 @@ agent-browser --session "$session" fill '#shared-draft-title' 'Wallet flow check
 agent-browser --session "$session" find role button click --name 'Use wallet' --exact
 agent-browser --session "$session" wait '#plan-title'
 agent-browser --session "$session" wait --fn 'document.querySelector("[role=dialog] #plan-title")?.value === "Wallet flow check" && Boolean(document.querySelector("iframe[title=\"Brief template preview\"]"))'
-agent-browser --session "$session" wait --fn '/Wallet connected|Could not connect/.test(document.querySelector("[role=status]")?.textContent ?? "")'
+agent-browser --session "$session" wait --fn '/Wallet connected|Wallet disconnected/.test(document.querySelector("[role=status]")?.textContent ?? "")'
 agent-browser --session "$session" fill '#plan-body' 'Review only. Do not publish this test.'
 agent-browser --session "$session" find role button click --name 'Review plan' --exact
 agent-browser --session "$session" wait '[role="dialog"] iframe[title="Plan preview"]'
