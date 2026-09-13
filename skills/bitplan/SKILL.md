@@ -259,6 +259,14 @@ Charts need measured values, units, sources, and a readable text equivalent;
 never invent growth, percentages, scores, endorsements, or completion metrics.
 Without meaningful numbers, use a diagram instead of a decorative chart.
 
+Populated starter templates include a shared-DOM layers explainer and two local
+SVG charts backed by visible tables: a review timeline and contribution mix.
+These values are explicitly illustrative, not product analytics. Keep that
+label until replacing them with sourced project data; adapt units and captions
+together. Numeric table edits redraw the charts locally without network access.
+Preserve the tables as accessible, scripts-off alternatives and use stable
+section IDs for annotations. Blank intentionally remains an empty canvas.
+
 Make visuals part of the explanation, not wallpaper. Use inline SVG with titles,
 descriptions, theme-aware paint, and readable labels; use HTML/CSS when text must
 reflow on phones. Give important visual sections stable IDs for annotations.

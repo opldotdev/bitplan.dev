@@ -72,7 +72,7 @@ describe('comprehensive proposal template', () => {
 				)
 			},
 		}
-		runInNewContext(scripts[0]!, {
+		runInNewContext(scripts.find(script => script.includes('.vp-output'))!, {
 			document: {
 				querySelectorAll() {
 					return [root]

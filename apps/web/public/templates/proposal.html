@@ -1133,7 +1133,111 @@ Agent: Unsure requests its stated check; it does not accept an option. Ask about
           </p>
         </details>
       </section>
-    </main>
+    <!-- bitplan-visuals:start -->
+<style>
+.bp-visuals{margin:64px 0;padding:40px 0;border-top:1px solid currentColor;text-align:left}
+.bp-visuals h2{font:normal clamp(30px,4vw,48px)/1.12 Georgia,serif;margin:0 0 16px}
+.bp-visuals h3{font:normal 24px/1.2 Georgia,serif;margin:0 0 12px}
+.bp-visuals p{max-width:65ch;line-height:1.65}
+.bp-visuals .bp-v-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px;margin-top:32px}
+.bp-visuals figure{margin:0;min-width:0}
+.bp-visuals svg{display:block;width:100%;height:auto;color:inherit;overflow:visible}
+.bp-visuals svg text{font:12px ui-monospace,monospace;fill:currentColor}
+.bp-visuals .bp-v-accent{color:var(--accent,currentColor)}
+.bp-visuals figcaption,.bp-visuals summary{font:13px/1.6 system-ui,sans-serif;margin-top:14px}
+.bp-visuals details{margin-top:18px}
+.bp-visuals summary{cursor:pointer}
+.bp-visuals table{width:100%;border-collapse:collapse;font:13px/1.6 ui-monospace,monospace}
+.bp-visuals th,.bp-visuals td{text-align:left;padding:8px 4px;border-bottom:1px solid currentColor}
+.bp-visuals .bp-v-layers{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin:28px 0 44px}
+.bp-visuals .bp-v-layer{border-left:2px solid currentColor;padding:0 0 0 16px}
+.bp-visuals .bp-v-layer b{font:normal 21px Georgia,serif}
+.bp-visuals .bp-v-layer p{font-size:14px;margin-bottom:0}
+@media(max-width:640px){.bp-visuals .bp-v-grid,.bp-visuals .bp-v-layers{grid-template-columns:1fr}.bp-visuals{margin:40px 0;padding:28px 0}}
+</style>
+<section class="bp-visuals" id="shared-planning">
+<h2>A document you can build on.</h2>
+<p>The page is HTML, not a flattened picture. Put a question beside a sentence, draw around a chart, or ask your agent to propose a new section as an HTML overlay.</p>
+<div class="bp-v-layers" aria-label="How shared planning fits together">
+<div class="bp-v-layer"><b>01 / The document</b><p>Readable text, diagrams, images, and local data. Each section is a place to discuss a specific idea.</p></div>
+<div class="bp-v-layer"><b>02 / Your contributions</b><p>Text edits, notes, drawings, and HTML widgets live in attributed layers. In a connected room, saved changes appear for other readers.</p></div>
+<div class="bp-v-layer"><b>03 / The next version</b><p>Review the layers in Publish, choose what to consider, and copy the agent prompt. A hosted revision gets a new version; recording on chain is a separate, deliberate step.</p></div>
+</div>
+<h3>Make the evidence visible.</h3>
+<p>Two ways to inspect a review: how notes accumulated, and what kinds of contributions arrived. These are illustrative local datasets, not BitPlan analytics or this room’s activity.</p>
+<div class="bp-v-grid">
+<figure id="review-timeline">
+<h3>Notes over a review</h3>
+<svg viewBox="0 0 360 220" role="img" aria-labelledby="bp-trend-title bp-trend-desc">
+<title id="bp-trend-title">Cumulative notes over four days</title>
+<desc id="bp-trend-desc">Illustrative local data: day 1 zero, day 2 four, day 3 nine, day 4 twelve notes. Exact values are in the data table.</desc>
+<g fill="none" stroke="currentColor" opacity=".18"><path d="M40 24V180H340M40 128H340M40 76H340M40 24H340"/></g>
+<g data-bp-trend-ticks><text x="8" y="184">0</text><text x="8" y="132">4</text><text x="8" y="80">8</text><text x="8" y="28">12</text></g>
+<path data-bp-area d="M40 180L140 128L240 63L340 24L340 180Z" fill="currentColor" opacity=".06"/>
+<path data-bp-line d="M40 180L140 128L240 63L340 24" fill="none" stroke="currentColor" stroke-width="2.5" class="bp-v-accent"/>
+<g data-bp-points fill="currentColor"><circle cx="40" cy="180" r="4"/><circle cx="140" cy="128" r="4"/><circle cx="240" cy="63" r="4"/><circle cx="340" cy="24" r="4"/></g>
+<g><text x="40" y="208" text-anchor="middle">Day 1</text><text x="140" y="208" text-anchor="middle">Day 2</text><text x="240" y="208" text-anchor="middle">Day 3</text><text x="340" y="208" text-anchor="middle">Day 4</text></g>
+</svg>
+<figcaption>Count of notes, cumulative. Attach a note to a turning point and explain what changed—not just the number.</figcaption>
+<details><summary>Local data · inspect or edit</summary><table data-bp-trend-data><caption>Illustrative review · cumulative notes</caption><thead><tr><th scope="col">Day</th><th scope="col">Notes</th></tr></thead><tbody><tr><th scope="row">1</th><td>0</td></tr><tr><th scope="row">2</th><td>4</td></tr><tr><th scope="row">3</th><td>9</td></tr><tr><th scope="row">4</th><td>12</td></tr></tbody></table></details>
+</figure>
+<figure id="contribution-mix">
+<h3>More than comments</h3>
+<svg viewBox="0 0 360 220" role="img" aria-labelledby="bp-mix-title bp-mix-desc">
+<title id="bp-mix-title">Contribution types in a sample review</title>
+<desc id="bp-mix-desc">Illustrative counts: twelve notes, eight text edits, five drawings, three HTML widgets. Bars begin at zero.</desc>
+<g fill="currentColor" opacity=".12"><rect x="110" y="20" width="200" height="22"/><rect x="110" y="68" width="200" height="22"/><rect x="110" y="116" width="200" height="22"/><rect x="110" y="164" width="200" height="22"/></g>
+<g fill="currentColor" class="bp-v-accent" data-bp-bars><rect x="110" y="20" width="200" height="22"/><rect x="110" y="68" width="133.333" height="22"/><rect x="110" y="116" width="83.333" height="22"/><rect x="110" y="164" width="50" height="22"/></g>
+<g><text x="0" y="36">Notes</text><text x="0" y="84">Text edits</text><text x="0" y="132">Drawings</text><text x="0" y="180">HTML widgets</text></g>
+<g data-bp-bar-values><text x="330" y="36">12</text><text x="330" y="84">8</text><text x="330" y="132">5</text><text x="330" y="180">3</text></g>
+<text x="110" y="208">0</text><text data-bp-bar-max x="310" y="208" text-anchor="end">12 items</text>
+</svg>
+<figcaption>Contribution count, not quality or agreement. Use an image for evidence, a drawing for emphasis, or an HTML widget for a proposed layout.</figcaption>
+<details><summary>Local data · inspect or edit</summary><table data-bp-mix-data><caption>Illustrative review · contribution counts</caption><thead><tr><th scope="col">Type</th><th scope="col">Items</th></tr></thead><tbody><tr><th scope="row">Notes</th><td>12</td></tr><tr><th scope="row">Text edits</th><td>8</td></tr><tr><th scope="row">Drawings</th><td>5</td></tr><tr><th scope="row">HTML widgets</th><td>3</td></tr></tbody></table></details>
+</figure>
+</div>
+<p style="font-size:13px;margin-top:28px">Try it: expand a data table and edit a number in the live viewer. The chart redraws locally from those cells. Only the viewer’s saved text edits are shared; these charts do not query your room, wallet, or contacts. Replace sample values and source labels with your project’s evidence.</p>
+<p data-bp-chart-status role="status" style="font-size:13px"></p>
+</section>
+<script>
+(() => {
+  const root = document.getElementById("shared-planning");
+  if (!root) return;
+  const trend = root.querySelector("[data-bp-trend-data]");
+  const mix = root.querySelector("[data-bp-mix-data]");
+  const values = table => Array.from(table.querySelectorAll("tbody td"), cell => {
+    const raw = cell.textContent.trim();
+    return raw === "" ? NaN : Number(raw);
+  });
+  function redraw() {
+    const series = values(trend), counts = values(mix);
+    const status = root.querySelector("[data-bp-chart-status]");
+    if (series.length !== 4 || counts.length !== 4 || [...series,...counts].some(n => !Number.isFinite(n) || n < 0 || n > 1000000)) {
+      status.textContent = "Use four non-negative values up to 1,000,000 in each table. Charts retain their last valid view.";
+      return;
+    }
+    status.textContent = "";
+    const max = Math.max(3, Math.ceil(Math.max(...series) / 3) * 3);
+    const points = series.map((n,i) => [40+i*100,180-n/max*156]);
+    const path = points.map((p,i) => (i ? "L" : "M")+p.join(" ")).join("");
+    root.querySelector("[data-bp-line]").setAttribute("d",path);
+    root.querySelector("[data-bp-area]").setAttribute("d",path+"L340 180L40 180Z");
+    root.querySelectorAll("[data-bp-points] circle").forEach((node,i) => node.setAttribute("cy",String(points[i][1])));
+    root.querySelectorAll("[data-bp-trend-ticks] text").forEach((node,i) => node.textContent=String(i*max/3));
+    root.querySelector("#bp-trend-desc").textContent="Illustrative cumulative note counts by day: "+series.join(", ")+". Source: local table.";
+    const peak = Math.max(1,...counts);
+    root.querySelectorAll("[data-bp-bars] rect").forEach((node,i) => node.setAttribute("width",String(counts[i]/peak*200)));
+    root.querySelectorAll("[data-bp-bar-values] text").forEach((node,i) => node.textContent=String(counts[i]));
+    root.querySelector("[data-bp-bar-max]").textContent=peak+" items";
+    root.querySelector("#bp-mix-desc").textContent="Illustrative contribution counts, in table order: "+counts.join(", ")+". Bars begin at zero.";
+  }
+  redraw();
+  const observer = new MutationObserver(redraw);
+  [trend,mix].forEach(table => observer.observe(table,{subtree:true,childList:true,characterData:true}));
+})();
+</script>
+<!-- bitplan-visuals:end -->
+</main>
     <script>
     "use strict";
     (() => {

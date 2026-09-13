@@ -60,7 +60,7 @@ an explicit colors-and-typography-only change, or a new plan. Blank never
 silently deletes the current document. New Plan initializes actual template
 content. The final onboarding action is “Start with [document name].”
 
-Brief, Terminal, and Decision are project starters, not product demonstrations.
+Brief, Terminal, and Decision are project starters with a compact capability showcase.
 Keep the opening questions specific to the work; replace them as answers become
 known. The prominent Copy agent prompt action uses only the public plan ID
 injected by the viewer as `data-bitplan-id`. Never derive it from `location`, a
@@ -103,6 +103,22 @@ visual needs readable labels, theme support, and a narrow-screen treatment.
 - `components.html`: editorial component gallery with serif headlines, a
   before/after spread, impact map, annotated figure, evidence ledger, and
   checkpoint timeline. Adapt useful compositions to actual facts; omit filler.
+
+## Local charts and shared planning
+
+Every populated template includes a document/layers/revision explainer and two
+SVG charts: a cumulative review timeline and contribution-type bars. Their data
+is explicitly illustrative, not room telemetry. Replace values, units, dates,
+and provenance with the project's evidence before presenting them as results.
+Expand the local tables to inspect values. Saved text changes to numeric cells
+redraw charts locally; no network or chart library is required. Inline SVG and
+tables remain readable with scripts disabled and in PDF exports.
+
+Blank stays empty. The reusable source is
+`shared-planning.fragment.html`; regenerate its embedded copies with
+`bun scripts/sync-template-visuals.ts`. Verify with
+`bun scripts/sync-template-visuals.ts --check` and
+`bun test packages/cli/test/template-charts.test.ts`.
 
 ## Links in the viewer
 
