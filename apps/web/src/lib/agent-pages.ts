@@ -120,9 +120,9 @@ Private plans use BRC-100 wallet encryption with [2, "bitplan"], a public keyID,
 
 See ${SITE_URL}/docs/how-it-works
 `,
-  "/new": `# New plan · BitPlan
+  "/new": `# New shared draft · BitPlan
 
-Create and review a private BitPlan in the browser at ${SITE_URL}/new.
+Choose Brief, Terminal, or Blank at ${SITE_URL}/new and create an encrypted shared starter without a funding wallet. The viewer joins realtime collaboration automatically. Keep the complete invitation private: its holder can read and contribute. This disposable link-owned draft has no retained hosted-update secret; room edits are not published document versions. Use the wallet/CLI flow for controlled recipients and permanent publication.
 
 Browser agents with WebMCP can call \`start_bitplan_plan\` to open the composer, then \`prepare_bitplan_plan\` with a title, plan body, and optional HTTPS repository URL. The tool validates and stages the exact review preview. It never connects a wallet or publishes; the user must approve publishing through their BRC-100 wallet.
 
