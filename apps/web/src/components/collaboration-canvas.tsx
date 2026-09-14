@@ -193,6 +193,7 @@ export function CollaborationCanvas({
   const annotationActionBusy = useRef(false);
   const [publishSection, setPublishSection] = useState("Review changes");
   const preferenceSection = [
+    "Wallet",
     "Revisions",
     "Interaction",
     "Appearance",
@@ -1969,6 +1970,7 @@ export function CollaborationCanvas({
               {[
                 "Review changes",
                 "Revisions",
+                "Wallet",
                 "Access",
                 "Export PDF",
                 "Interaction",

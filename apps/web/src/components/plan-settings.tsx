@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { WalletSettings } from "@/components/wallet-settings";
 import {
   getSoundPreference,
   playUiSound,
@@ -178,6 +179,7 @@ export function PlanSettings({
         </div>
       ) : null}
       {section === "Document details" ? details : null}
+      {section === "Wallet" ? <WalletSettings /> : null}
     </section>
   );
 }
