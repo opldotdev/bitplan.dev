@@ -8,6 +8,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+## Linting
+
+After making changes, run `bun run lint` and fix all errors. The `@shadcn/lint`
+plugin is registered in `.oxlintrc.json`; add design-system rules there when
+you are ready to enable enforcement.
+
 <!-- convex-ai-start -->
 
 This project uses [Convex](https://convex.dev) as its backend.

@@ -22,7 +22,7 @@
 		"lint:fix": "bun run lint:fix:root && bun run --cwd apps/web fix",
 		"lint:fix:root": "biome check --write .",
 		"lint:root": "biome check .",
-		"lint:web": "bun run --cwd apps/web check",
+		"lint:web": "bun run --cwd apps/web lint",
 		"typecheck": "bun run --filter '*' typecheck",
 		"test": "bun test"
 	},
