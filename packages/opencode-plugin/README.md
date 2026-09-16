@@ -61,7 +61,7 @@ Every option is optional. Pass them as the second element of the plugin entry:
         "walletUrl": "http://127.0.0.1:3321",
         "gatewayUrl": "https://gateway.bitplan.dev",
         "byok": ["opencode-go"],
-        "maxOutputTokens": 32000
+        "maxOutputTokens": 8192
       }
     ]
   ]
@@ -73,7 +73,7 @@ Every option is optional. Pass them as the second element of the plugin entry:
 | `walletUrl` | see below | BRC-100 JSON API endpoint. `https`, or `http` on localhost only. |
 | `gatewayUrl` | `https://gateway.bitplan.dev` | Gateway origin. |
 | `byok` | `[]` | Gateway BYOK provider ids you have stored a key for (`opencode`, `opencode-go`). Their `byok_only` models are listed only when named here; without the stored key the gateway refuses the call. |
-| `maxOutputTokens` | `32000` | Output limit advertised for every model. The gateway sizes its per-call hold by `max_tokens`, so a smaller value keeps holds small. |
+| `maxOutputTokens` | `8192` | Output limit advertised for every model. The gateway sizes its per-call hold by `max_tokens`, so a smaller value keeps holds small. |
 
 The wallet endpoint is resolved in this order, first match wins: the
 `walletUrl` option, the `BITPLAN_WALLET_URL` environment variable, `walletUrl`

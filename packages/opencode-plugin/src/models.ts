@@ -52,7 +52,12 @@ export interface MapOptions {
 }
 
 /** OpenCode caps requested output at 32k; the gateway sizes its hold by it. */
-export const DEFAULT_MAX_OUTPUT_TOKENS = 32_000
+/**
+ * Default output limit. The gateway holds max_tokens times the output price
+ * before every call, so this directly sizes the up-front reserve; 8k keeps
+ * a first call on a frontier model to cents while leaving room for code.
+ */
+export const DEFAULT_MAX_OUTPUT_TOKENS = 8192
 export const DEFAULT_CONTEXT_WINDOW = 128_000
 
 /** The gateway provider a model runs on: the first id segment for BYOK-only ids. */

@@ -64,7 +64,7 @@ export interface BitplanPluginOptions {
 	gatewayUrl?: string
 	/** Gateway BYOK provider ids this account has stored a key for, e.g. ["opencode-go"]. */
 	byok?: string[]
-	/** Output token limit advertised for every model. Default 32000. */
+	/** Output token limit advertised for every model. Default 8192. */
 	maxOutputTokens?: number
 }
 

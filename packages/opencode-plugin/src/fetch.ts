@@ -63,9 +63,32 @@ async function readPaymentRequired(
 
 function fundingHint(required: PaymentRequired): string {
 	const paymail = required.fund?.paymail
-	return paymail
-		? ` You can also send BSV to ${paymail} from any paymail wallet and retry.`
-		: ''
+	const ways = [
+		'add funds to the wallet',
+		paymail ? `send BSV to ${paymail} from any paymail wallet` : undefined,
+		'add credits at https://gateway.bitplan.dev',
+	].filter((w): w is string => w !== undefined)
+	return ` To continue, ${ways.join(', or ')}, then retry. Nothing was charged.`
+}
+
+/** Satoshis the wallet said it was short by, when its error says so. */
+function shortBySats(error: unknown): number | undefined {
+	const message = errorMessage(error)
+	const match = /(\d[\d,]*) more satoshis/.exec(message)
+	if (!match?.[1]) return undefined
+	const n = Number(match[1].replace(/,/g, ''))
+	return Number.isFinite(n) ? n : undefined
+}
+
+function walletRefusal(error: unknown, amountSats: number): string {
+	const need = formatBsv(amountSats)
+	const short = shortBySats(error)
+	if (short !== undefined) {
+		return `This call needs a ${need} reserve (${amountSats.toLocaleString('en-US')} sats, unused reserve comes back as credits) and the wallet is short by about ${short.toLocaleString('en-US')} sats.`
+	}
+	// Keep the wallet's first sentence only; the raw call dump helps nobody.
+	const first = errorMessage(error).split(/[.\n]/)[0]?.trim() ?? ''
+	return `The wallet declined to pay the ${need} reserve (${amountSats.toLocaleString('en-US')} sats)${first ? `: ${first}` : ''}.`
 }
 
 export function createGatewayFetch(options: GatewayFetchOptions): FetchLike {
@@ -116,7 +139,7 @@ export function createGatewayFetch(options: GatewayFetchOptions): FetchLike {
 			proof = await payChallenge(wallet, challenge)
 		} catch (error) {
 			throw new GatewayError(
-				`The wallet did not pay the gateway's ${formatBsv(challenge.amount_sats)} (${challenge.amount_sats.toLocaleString('en-US')} sats) challenge: ${errorMessage(error)}${fundingHint(required)}`,
+				`${walletRefusal(error, challenge.amount_sats)}${fundingHint(required)}`,
 			)
 		}
 
