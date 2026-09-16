@@ -109,6 +109,7 @@ flowchart TD
 | --- | --- |
 | [`apps/web`](apps/web) | Next.js website, plan viewer, docs, and sponsorships |
 | [`packages/cli`](packages/cli) | Published `bitplan` command-line package |
+| [`packages/opencode-plugin`](packages/opencode-plugin) | `opencode-plugin-bitplan`: gateway.bitplan.dev as an OpenCode provider, paid from a BRC-100 wallet |
 
 ```sh
 bun install --frozen-lockfile

@@ -1,0 +1,54 @@
+{
+	"name": "opencode-plugin-bitplan",
+	"version": "0.0.1",
+	"description": "OpenCode provider plugin for gateway.bitplan.dev: models paid from a BRC-100 wallet over HTTP 402.",
+	"license": "MIT",
+	"homepage": "https://gateway.bitplan.dev",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/opldotdev/bitplan.dev.git",
+		"directory": "packages/opencode-plugin"
+	},
+	"bugs": {
+		"url": "https://github.com/opldotdev/bitplan.dev/issues"
+	},
+	"keywords": [
+		"opencode",
+		"opencode-plugin",
+		"bitcoin",
+		"brc-100",
+		"bsv",
+		"x402",
+		"llm-gateway"
+	],
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist/",
+		"LICENSE",
+		"README.md"
+	],
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json && bun build src/index.ts --target=node --format=esm --packages=external --outfile=dist/index.js",
+		"clean": "rm -rf dist",
+		"prepack": "bun run build",
+		"test": "bun test",
+		"typecheck": "tsc -p tsconfig.test.json"
+	},
+	"dependencies": {
+		"@bsv/sdk": "^2.4.2"
+	},
+	"devDependencies": {
+		"@opencode-ai/plugin": "^1.18.31",
+		"@opencode-ai/sdk": "^1.18.31",
+		"@types/node": "^26.4.0",
+		"typescript": "^7.0.2"
+	}
+}
