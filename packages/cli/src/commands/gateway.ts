@@ -1,0 +1,289 @@
+/**
+ * gateway.bitplan.dev from the connected wallet: mint a session token, check
+ * credits, deposit, and list models. The wallet signs and pays; nothing is
+ * exported and no key is typed anywhere.
+ */
+
+import { Transaction, Utils, type WalletInterface } from '@bsv/sdk'
+import { CliError } from '../errors.js'
+import { assertSecureHttpUrl, withTimeoutSignal } from '../http.js'
+import { connectWallet, errorMessage, identityKey } from '../wallet.js'
+
+export const DEFAULT_GATEWAY_URL = 'https://gateway.bitplan.dev'
+const HTTP_TIMEOUT_MS = 60_000
+const TOKEN_PROTOCOL: [1, string] = [1, 'bitcoin auth']
+
+export interface GatewayOptions {
+	json?: boolean
+	walletUrl?: string
+	gatewayUrl?: string
+}
+
+interface Challenge {
+	version: 'bsv-tx-v1'
+	challenge_id: string
+	amount_sats: number
+	payee_locking_script_hex: string
+	payee_address: string
+	expires_at: string
+}
+
+interface Account {
+	identity_key: string
+	balance_sats: number
+	pending_confirmation_sats: number
+	min_deposit_sats: number
+}
+
+interface Rate {
+	bsv_usd: number
+	min_deposit_sats: number
+	min_deposit_usd: number
+}
+
+function gatewayOrigin(override?: string): string {
+	const raw = override ?? DEFAULT_GATEWAY_URL
+	let url: URL
+	try {
+		url = new URL(raw)
+	} catch {
+		throw new CliError(`Invalid gateway URL: ${JSON.stringify(raw)}`)
+	}
+	assertSecureHttpUrl(url, 'gateway')
+	return url.origin
+}
+
+/**
+ * A bitcoin-auth session token in the brc100 scheme:
+ * `pubkey|brc100|timestamp|<origin>/v1|signature`. The wallet signs
+ * `<origin>/v1|<timestamp>|` with protocol [1, "bitcoin auth"], key id =
+ * timestamp, counterparty "anyone"; the gateway verifies with the same
+ * derivation. Valid for 24 hours on every /v1 route.
+ */
+export async function mintGatewayToken(
+	wallet: WalletInterface,
+	key: string,
+	origin: string,
+): Promise<string> {
+	const requestPath = `${origin}/v1`
+	const timestamp = new Date().toISOString()
+	const message = Utils.toArray(`${requestPath}|${timestamp}|`, 'utf8')
+	const { signature } = await wallet.createSignature({
+		data: message,
+		protocolID: TOKEN_PROTOCOL,
+		keyID: timestamp,
+		counterparty: 'anyone',
+	})
+	return `${key.toLowerCase()}|brc100|${timestamp}|${requestPath}|${Utils.toBase64(signature)}`
+}
+
+function formatBsv(sats: number): string {
+	const bsv = sats / 1e8
+	const digits = bsv >= 1 ? 2 : bsv >= 0.01 ? 4 : 6
+	return `${bsv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: digits })} BSV`
+}
+
+async function gatewayFetch(
+	origin: string,
+	path: string,
+	init: RequestInit & { token?: string; proof?: string } = {},
+): Promise<Response> {
+	const headers = new Headers(init.headers)
+	if (init.token) headers.set('authorization', `Bearer ${init.token}`)
+	if (init.proof) headers.set('x402-proof', init.proof)
+	return fetch(`${origin}${path}`, {
+		...init,
+		headers,
+		signal: withTimeoutSignal(HTTP_TIMEOUT_MS),
+	})
+}
+
+async function failure(res: Response, what: string): Promise<CliError> {
+	const body = (await res.json().catch(() => ({}))) as {
+		error?: { message?: string; code?: string }
+	}
+	return new CliError(
+		`${what} failed (${res.status}): ${body.error?.message ?? 'unexpected response'}${body.error?.code ? ` [${body.error.code}]` : ''}`,
+	)
+}
+
+/** Pay a challenge from the wallet and return the X402-Proof header value. */
+export async function payChallenge(
+	wallet: WalletInterface,
+	challenge: Challenge,
+): Promise<string> {
+	const action = await wallet.createAction({
+		description: `gateway.bitplan.dev credits: ${formatBsv(challenge.amount_sats)}`,
+		outputs: [
+			{
+				lockingScript: challenge.payee_locking_script_hex,
+				satoshis: challenge.amount_sats,
+				outputDescription: 'gateway.bitplan.dev credits',
+			},
+		],
+		options: { randomizeOutputs: false },
+	})
+	if (!action.tx) throw new CliError('The wallet did not return the transaction.')
+	const tx = Transaction.fromAtomicBEEF(action.tx)
+	const proof = JSON.stringify({
+		version: 'bsv-tx-v1',
+		challenge_id: challenge.challenge_id,
+		rawtx_base64: Utils.toBase64(tx.toBinary()),
+		txid: tx.id('hex'),
+	})
+	return Utils.toBase64(Utils.toArray(proof, 'utf8'))
+		.replaceAll('+', '-')
+		.replaceAll('/', '_')
+		.replace(/=+$/, '')
+}
+
+async function session(
+	options: GatewayOptions,
+): Promise<{ wallet: WalletInterface; token: string; key: string; origin: string }> {
+	const origin = gatewayOrigin(options.gatewayUrl)
+	const { wallet } = await connectWallet(options.walletUrl)
+	const key = await identityKey(wallet)
+	let token: string
+	try {
+		token = await mintGatewayToken(wallet, key, origin)
+	} catch (error) {
+		throw new CliError(`The wallet declined to sign the token: ${errorMessage(error)}`)
+	}
+	return { wallet, token, key, origin }
+}
+
+/** bitplan gateway token — print a 24 h API key signed by the wallet. */
+export async function gatewayTokenCommand(options: GatewayOptions): Promise<void> {
+	const { token, key, origin } = await session(options)
+	if (options.json) {
+		console.log(JSON.stringify({ token, identityKey: key, gateway: origin, validMinutes: 1440 }))
+		return
+	}
+	console.log(token)
+}
+
+/** bitplan gateway credits — balance for this wallet's account. */
+export async function gatewayCreditsCommand(options: GatewayOptions): Promise<void> {
+	const { token, origin } = await session(options)
+	const res = await gatewayFetch(origin, '/v1/account', { token })
+	if (!res.ok) throw await failure(res, 'Reading credits')
+	const account = (await res.json()) as Account
+	const rateRes = await gatewayFetch(origin, '/v1/rate')
+	const rate = rateRes.ok ? ((await rateRes.json()) as Rate) : null
+	if (options.json) {
+		console.log(JSON.stringify({ ...account, bsv_usd: rate?.bsv_usd ?? null }, null, 2))
+		return
+	}
+	const usd = rate ? ` (≈ $${((account.balance_sats / 1e8) * rate.bsv_usd).toFixed(2)})` : ''
+	console.log(`Credits:  ${formatBsv(account.balance_sats)}${usd}`)
+	if (account.pending_confirmation_sats > 0) {
+		console.log(`Pending:  ${formatBsv(account.pending_confirmation_sats)} (waiting for a confirmation)`)
+	}
+	console.log(`Account:  ${account.identity_key}`)
+}
+
+export interface DepositOptions extends GatewayOptions {
+	yes?: boolean
+}
+
+/** bitplan gateway deposit [sats] — top up credits from the wallet. */
+export async function gatewayDepositCommand(
+	satsArg: string | undefined,
+	options: DepositOptions,
+): Promise<void> {
+	const { wallet, token, origin } = await session(options)
+	let sats: number | undefined
+	if (satsArg !== undefined) {
+		sats = Number(satsArg)
+		if (!Number.isSafeInteger(sats) || sats <= 0) {
+			throw new CliError(`Amount must be a whole number of satoshis, got ${JSON.stringify(satsArg)}.`)
+		}
+	}
+	const body = JSON.stringify({ sats })
+	const first = await gatewayFetch(origin, '/v1/deposit', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body,
+		token,
+	})
+	if (first.status !== 402) throw await failure(first, 'Requesting a deposit')
+	const { challenge } = (await first.json()) as { challenge: Challenge }
+	if (!options.yes) {
+		console.error(
+			`Deposit ${formatBsv(challenge.amount_sats)} (${challenge.amount_sats.toLocaleString('en-US')} sats) to ${challenge.payee_address}? Re-run with --yes to approve. The wallet will still ask.`,
+		)
+		return
+	}
+	const proof = await payChallenge(wallet, challenge)
+	const second = await gatewayFetch(origin, '/v1/deposit', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body,
+		token,
+		proof,
+	})
+	if (!second.ok) throw await failure(second, 'Confirming the deposit')
+	const result = (await second.json()) as {
+		txid: string
+		satoshis: number
+		credited: boolean
+		balance_sats: number
+	}
+	if (options.json) {
+		console.log(JSON.stringify(result, null, 2))
+		return
+	}
+	console.log(`Paid:     ${formatBsv(result.satoshis)} (${result.txid})`)
+	console.log(
+		result.credited
+			? `Credits:  ${formatBsv(result.balance_sats)}`
+			: 'Credits:  arrive after one confirmation',
+	)
+}
+
+export interface ModelsOptions extends GatewayOptions {
+	query?: string
+	starred?: boolean
+	limit?: string
+}
+
+interface CatalogModel {
+	id: string
+	name: string
+	owned_by: string
+	type: string
+	recommended: boolean
+	pricing: {
+		sats_per_million_input: number | null
+		sats_per_million_output: number | null
+		sats_per_image: number | null
+	}
+}
+
+/** bitplan gateway models — the catalog with prices in BSV. */
+export async function gatewayModelsCommand(options: ModelsOptions): Promise<void> {
+	const origin = gatewayOrigin(options.gatewayUrl)
+	const res = await gatewayFetch(origin, '/v1/models')
+	if (!res.ok) throw await failure(res, 'Listing models')
+	const body = (await res.json()) as { data: CatalogModel[]; bsv_usd: number }
+	const q = options.query?.toLowerCase()
+	const limit = options.limit ? Number(options.limit) : 40
+	const rows = body.data
+		.filter((m) => !options.starred || m.recommended)
+		.filter((m) => !q || m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
+		.sort((a, b) => Number(b.recommended) - Number(a.recommended) || a.id.localeCompare(b.id))
+		.slice(0, Number.isFinite(limit) && limit > 0 ? limit : 40)
+	if (options.json) {
+		console.log(JSON.stringify({ bsv_usd: body.bsv_usd, models: rows }, null, 2))
+		return
+	}
+	console.log(`1 BSV = $${body.bsv_usd.toFixed(2)} · prices per 1M tokens, markup included`)
+	for (const m of rows) {
+		const star = m.recommended ? '★' : ' '
+		const price =
+			m.pricing.sats_per_image !== null
+				? `${formatBsv(m.pricing.sats_per_image)} per image`
+				: `in ${formatBsv(m.pricing.sats_per_million_input ?? 0)} · out ${formatBsv(m.pricing.sats_per_million_output ?? 0)}`
+		console.log(`${star} ${m.id.padEnd(44)} ${price}`)
+	}
+}

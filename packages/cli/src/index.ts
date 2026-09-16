@@ -14,6 +14,12 @@ import { authCommand } from './commands/auth.js'
 import { catalogSyncCommand } from './commands/catalog.js'
 import { configCommand } from './commands/config.js'
 import { fetchCommand } from './commands/fetch.js'
+import {
+	gatewayCreditsCommand,
+	gatewayDepositCommand,
+	gatewayModelsCommand,
+	gatewayTokenCommand,
+} from './commands/gateway.js'
 import { inscribeCommand } from './commands/inscribe.js'
 import { listCommand } from './commands/list.js'
 import { uploadCommand } from './commands/upload.js'
@@ -49,6 +55,47 @@ export function buildProgram(): Command {
 		.option('--json', 'Print raw JSON')
 		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
 		.action(whoamiCommand)
+
+	const gateway = program
+		.command('gateway')
+		.description(
+			'Use gateway.bitplan.dev (inference paid in BSV) from the connected wallet.',
+		)
+
+	gateway
+		.command('token')
+		.description('Print a 24 h API key signed by the wallet.')
+		.option('--json', 'Print raw JSON')
+		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
+		.option('--gateway-url <url>', 'Gateway origin', 'https://gateway.bitplan.dev')
+		.action(gatewayTokenCommand)
+
+	gateway
+		.command('credits')
+		.description('Show credits for this wallet\'s gateway account.')
+		.option('--json', 'Print raw JSON')
+		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
+		.option('--gateway-url <url>', 'Gateway origin', 'https://gateway.bitplan.dev')
+		.action(gatewayCreditsCommand)
+
+	gateway
+		.command('deposit [sats]')
+		.description('Add credits from the wallet (minimum 0.5 BSV).')
+		.option('--yes', 'Approve the payment; the wallet still confirms')
+		.option('--json', 'Print raw JSON')
+		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')
+		.option('--gateway-url <url>', 'Gateway origin', 'https://gateway.bitplan.dev')
+		.action(gatewayDepositCommand)
+
+	gateway
+		.command('models')
+		.description('List models and prices in BSV.')
+		.option('--query <text>', 'Filter by id or name')
+		.option('--starred', 'Only recommended models')
+		.option('--limit <n>', 'Rows to show', '40')
+		.option('--json', 'Print raw JSON')
+		.option('--gateway-url <url>', 'Gateway origin', 'https://gateway.bitplan.dev')
+		.action(gatewayModelsCommand)
 
 	program
 		.command('config')
