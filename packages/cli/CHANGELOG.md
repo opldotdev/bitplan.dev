@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.19
+
+### Added
+
+- `bitplan gateway token | credits | deposit [sats] | models`: use
+  gateway.bitplan.dev from the connected BRC-100 wallet. The wallet signs the
+  24-hour bearer and pays deposits; nothing is configured or stored.
+
 ## 0.0.18
 
 ### Added
