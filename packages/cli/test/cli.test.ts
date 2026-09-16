@@ -52,6 +52,7 @@ describe('cli surface', () => {
 		expect(program.commands.map((c) => c.name())).toEqual([
 			'auth',
 			'whoami',
+			'gateway',
 			'config',
 			'contact',
 			'contacts',
