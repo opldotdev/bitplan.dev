@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.2
+
+- Default output limit lowered from 32,000 to 8,192 tokens so the gateway's
+  up-front reserve for a first call stays at cents.
+- When the wallet cannot pay a reserve, the error now says how much it is
+  short by and how to fund it, instead of dumping the wallet call.
+
 ## 0.0.1
 
 - First release: gateway.bitplan.dev as an OpenCode provider (`bitplan`).
