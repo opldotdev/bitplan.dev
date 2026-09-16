@@ -13,7 +13,9 @@ metadata:
 
 An OpenAI chat completions endpoint in front of every model on Vercel AI
 Gateway and OpenRouter. Identity is a Bitcoin key. Deposits arrive over HTTP
-402. Each call is deducted from the balance at provider cost plus 30%.
+402. Each call is deducted from the balance at provider cost plus 20% to
+start, 10% after $100 a month of provider cost and 7% after $1,000 (see
+Prices).
 
 Base URL: `https://gateway.bitplan.dev`. Discovery: `GET /.well-known/x402-info`.
 
@@ -23,7 +25,10 @@ Base URL: `https://gateway.bitplan.dev`. Discovery: `GET /.well-known/x402-info`
 | `POST /v1/chat/completions` | bearer | OpenAI chat completions, JSON or `stream: true` |
 | `GET /v1/account` | bearer | balance in sats |
 | `POST /v1/deposit` `{"sats": N}` | bearer | top up; always answers 402 until paid |
+| `POST /v1/credits/checkout` `{"usd": 5}` | bearer | buy credits by card: returns a Stripe Checkout URL for a person to open; poll `GET /v1/credits/checkout/:id` until `credited` |
 | `GET /v1/account/usage` | bearer | last 50 requests and ledger entries |
+| `PUT /v1/account/paymail` `{"handle": "name"}` | bearer | claim a human paymail handle (409 when taken) |
+| `DELETE /v1/account/paymail` | bearer | release the handle; the automatic alias remains |
 | `PUT /v1/account/byok` | bearer | store your own key for one provider, encrypted |
 | `DELETE /v1/account/byok` | bearer | forget the stored key for one provider |
 
@@ -37,10 +42,15 @@ Only ids returned by `/v1/models` are accepted.
 
 Use gateway.bitplan.dev for AI inference. It is an OpenAI-compatible API paid in BSV. There are no API keys.
 
-1. Add the MCP server https://mcp.bitplan.dev (Streamable HTTP, no auth). If you cannot use MCP, call POST https://gateway.bitplan.dev/v1/chat/completions with an OpenAI-format body.
-2. Call list_models (or GET /v1/models) and pick a starred model. Prices are per million tokens in BSV.
-3. Call chat. If the result says payment_required, pay challenge.amount_sats to challenge.payee_address from your BSV wallet using a P2PKH input, then call chat again with the same arguments plus proof = base64url of {"version":"bsv-tx-v1","challenge_id":"…","rawtx_base64":"…","txid":"…"}. The key that paid is now your account and any unused reserve stays there as credits.
-4. If you were given a token, pass it as the token argument (MCP) or Authorization: Bearer <token> (HTTP) and payment is only requested when credits run out.
+1. Get a token from the wallet, in this order, and stop at the first that works:
+   - `bitplan gateway token` (the `bitplan` CLI, if installed, asks the connected BRC-100 wallet to sign a 24-hour bearer; nothing to configure).
+   - The `BITPLAN_GATEWAY_TOKEN` environment variable, if set.
+   - With a WIF in `$WIF` only: `bun "$SKILL_DIR/scripts/token.ts" --wif "$WIF"` (see below).
+   Pass the token as the `token` argument to MCP tools or as `Authorization: Bearer <token>` on HTTP.
+2. Add the MCP server https://mcp.bitplan.dev (Streamable HTTP, no auth). If you cannot use MCP, call POST https://gateway.bitplan.dev/v1/chat/completions with an OpenAI-format body.
+3. Call list_models (or GET /v1/models) and pick a starred model. Prices are per million tokens in BSV.
+4. Call chat with the token. If the result says payment_required, the account has no credits for the call's reserve: fund it, then call chat again with the same arguments. Ways to fund, in order: `bitplan gateway deposit <sats>` (wallet pays); tell the person the paymail from `bitplan gateway credits` / GET /v1/account and wait for credits; or, with a WIF, pay challenge.amount_sats to challenge.payee_address and retry with proof = base64url of {"version":"bsv-tx-v1","challenge_id":"…","rawtx_base64":"…","txid":"…"}. Unused reserve stays as credits.
+5. Report the model's answer and the settled cost from the chat result (`charge_sats`) or GET /v1/account/usage.
 
 ## Identity: a self-signed bearer token
 
@@ -58,8 +68,10 @@ Schemes: `brc77` (signature with a raw private key) or `brc100` (a BRC-100
 wallet's `createSignature` with `protocolID [1, "bitcoin auth"]`,
 `keyID = timestamp`, `counterparty "anyone"`; no key export).
 
-Mint a session token from a WIF with the bundled script. Install its two
-dependencies once, then run it from anywhere:
+Prefer the wallet: `bitplan gateway token` (npm `bitplan`) signs the token
+with the connected BRC-100 wallet and prints it. Only when you hold a raw WIF
+and no wallet, mint one with the bundled script. Install its two dependencies
+once, then run it from anywhere:
 
 ```sh
 (cd "$SKILL_DIR/scripts" && bun install --silent)
@@ -121,6 +133,49 @@ quote for the `bsv-tx-v1` challenge; approve it with `x402_payQuote`.
 Do not pay a challenge twice. If a paid request fails, check
 `GET /v1/account/usage` and the txid before doing anything else.
 
+## Fund by paymail
+
+Every account is also a paymail address, so a person (or any paymail
+wallet: HandCash, Yours, RelayX, Panda, ...) can add credits without
+touching the API. `GET /v1/account` reports it:
+
+```json
+{ "paymail": "satchmo@gateway.bitplan.dev",
+  "paymail_auto": "02a1b2c3d4e5f60718@gateway.bitplan.dev", ... }
+```
+
+`paymail_auto` is the automatic alias, the first 16 hex characters of the
+identity key; `paymail` is the claimed handle when there is one, else the
+alias. A 402 for an authenticated caller also carries
+`fund: { paymail, note }`. The flow for an agent that is out of credits:
+
+1. Read `paymail` from `GET /v1/account` (or `fund.paymail` from the 402)
+   and tell the person: "send at least N sats to `<paymail>`".
+2. Poll `GET /v1/account` until `balance_sats` covers the call (or
+   `pending_confirmation_sats` shows the deposit waiting for a block: a
+   large deposit is credited after one confirmation).
+3. Retry the original request with the same bearer.
+
+A P2P send (the wallet delivers the transaction to the gateway) is credited
+within seconds; a basic paymail send is found by the gateway's on-chain scan
+within about ten minutes. No proof header is involved: paymail deposits
+credit the account directly.
+
+Claim a human handle once (3 to 20 characters of `a-z`, `0-9` and hyphen,
+not starting or ending with a hyphen, one per identity):
+
+```sh
+curl -X PUT https://gateway.bitplan.dev/v1/account/paymail \
+  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"handle":"satchmo"}'      # 409 handle_taken when someone has it
+curl -X DELETE https://gateway.bitplan.dev/v1/account/paymail \
+  -H "Authorization: Bearer $TOKEN"   # 204; the automatic alias remains
+```
+
+The bsvalias service itself is discoverable at
+`https://gateway.bitplan.dev/.well-known/bsvalias` (`paymail_domain` in
+`/.well-known/x402-info`), for wallets and tooling that resolve paymails.
+
 ## MCP server
 
 `https://mcp.bitplan.dev` is a Streamable HTTP MCP server (2026-07-28 spec)
@@ -160,8 +215,18 @@ in the balance.
 `GET /v1/models` returns, per model, `pricing.sats_per_million_input`,
 `pricing.sats_per_million_output` and the same amounts in USD, plus the
 top-level `bsv_usd` rate used. All prices include the markup (`markup_bps`
-per model, 30% by default; `featured: true` marks a reduced markup). Estimate
+per model; `featured: true` marks a promotion below your rate). Estimate
 a call as `input_tokens x sats_per_million_input / 1e6 + output_tokens x sats_per_million_output / 1e6`.
+
+The markup falls with volume. The top-level `tiers` array is the ladder
+(`name`, `min_usd_30d`, `bps`): Start at 20%, Build at 10% once your rolling
+30-day provider cost reaches $100, Scale at 7% at $1,000. Without a bearer
+the list is priced at Start; send `Authorization: Bearer <token>` and it is
+priced at your tier, reported as `tier` (`name`, `bps`, `usd_30d`, and
+`next`, the following rung or null). `GET /v1/account` returns the same
+`tier`. Each request is held and settled at the tier you are on when it
+starts; a per-model promotion applies when it is lower than your tier, and a
+stored key (below) pays the BYOK fee instead of any markup.
 
 Some models cost more in some situations; the fields say which:
 
@@ -189,7 +254,7 @@ Some models cost more in some situations; the fields say which:
 Store your own provider key once, per provider, and calls on that provider
 run on your key upstream. You are then billed **5% of the provider's list
 price** as a fee (`BYOK_FEE_BPS`, reported as `byok_fee_bps` by `GET
-/v1/account` and in the discovery manifest) instead of cost plus the 30%
+/v1/account` and in the discovery manifest) instead of cost plus the
 markup. Everything else is unchanged: the fee is still held before the call
 and settled from real usage.
 
