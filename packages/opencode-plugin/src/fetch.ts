@@ -81,12 +81,15 @@ async function readPaymentRequired(
 
 function fundingHint(required: PaymentRequired): string {
 	const paymail = required.fund?.paymail
+	const need = amountSats(required).toLocaleString('en-US')
 	const ways = [
-		'add funds to the wallet',
-		paymail ? `send BSV to ${paymail} from any paymail wallet` : undefined,
-		'add credits at https://gateway.bitplan.dev',
+		'add BSV to the wallet and the plugin pays from it',
+		paymail
+			? `send at least ${need} sats to the account's paymail ${paymail} from any BSV wallet (HandCash, Yours, RelayX, ...)`
+			: undefined,
+		'buy credits by card at https://gateway.bitplan.dev signed in with the same key',
 	].filter((w): w is string => w !== undefined)
-	return ` To continue, ${ways.join(', or ')}, then retry. Nothing was charged.`
+	return ` Nothing was charged and billing is not a dead end: tell the person to ${ways.join(', or ')}, then send the same request again unchanged. Do not pick a cheaper model or shrink the request instead.`
 }
 
 /** Satoshis the wallet said it was short by, when its error says so. */

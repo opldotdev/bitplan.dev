@@ -52,8 +52,45 @@ Use gateway.bitplan.dev for AI inference. It is an OpenAI-compatible API paid in
    Pass the token as the `token` argument to MCP tools or as `Authorization: Bearer <token>` on HTTP.
 2. Add the MCP server https://mcp.bitplan.dev (Streamable HTTP, no auth). If you cannot use MCP, call POST https://gateway.bitplan.dev/v1/chat/completions with an OpenAI-format body.
 3. Call list_models (or GET /v1/models) and pick a starred model. Prices are per million tokens in BSV.
-4. Call chat with the token. Leave `max_tokens` at the default (8192) or send 4096 or more: you pay only the tokens used, and reasoning models spend the first part of the cap thinking before any text appears. If the result says payment_required, the account has no credits for the call's reserve: fund it, then call chat again with the same arguments. Ways to fund, in order: `bitplan gateway deposit <sats>` (wallet pays); tell the person the paymail from `bitplan gateway credits` / GET /v1/account and wait for credits; or, with a WIF, pay challenge.amount_sats to challenge.payee_address and retry with proof = base64url of {"version":"bsv-tx-v1","challenge_id":"…","rawtx_base64":"…","txid":"…"}. Unused reserve stays as credits.
+4. Call chat with the token. Leave `max_tokens` at the default (8192) or send 4096 or more: you pay only the tokens used, and reasoning models spend the first part of the cap thinking before any text appears. If the result says payment_required, follow "When a call answers 402" below: fund the account, then call chat again with the same arguments.
 5. Report the model's answer and the settled cost from the chat result (`charge_sats`) or GET /v1/account/usage.
+
+## When a call answers 402 (payment_required)
+
+A 402 means the account's credits do not cover the call's reserve. Nothing
+was charged, and billing is never a reason to stop: the job is to get the
+account funded and run the same call again. Rules:
+
+- Never treat a 402 as the task failing, and never say the task is done.
+  Never work around it: do not pick a cheaper model, cut the prompt, lower
+  `max_tokens`, skip the step or quietly downgrade anything. Fund, then
+  repeat the request exactly as it was.
+- Never fail silently. Every 402 ends in either a paid retry or a message to
+  the person that says what is short and how to fund it.
+
+Do these in order and stop at the first that works:
+
+1. Pay it yourself when a wallet is available: `bitplan gateway deposit <sats>`
+   (the connected BRC-100 wallet pays; the wallet asks the person to
+   approve) or, with a WIF, pay `accepts[0].amount` sats to `payTo` and
+   repeat the request with the `PAYMENT-SIGNATURE` header. The 402's
+   `shortfall_sats` is the least that unblocks the call.
+2. If there is no wallet, or the wallet cannot pay (its own insufficient
+   funds error), tell the person exactly, using the 402's own words
+   (`error.message`, `balance_sats`, `shortfall_sats`, `fund.paymail`,
+   `fund.card`): "This call needs N more sats. Send at least N sats to
+   `<fund.paymail>` from any BSV wallet (HandCash, Yours, RelayX, ...), or
+   buy credits by card at `<fund.card>` signed in with this key, or add BSV
+   to the wallet and I will pay from it." Then wait: poll `GET /v1/account`
+   every 15 to 30 seconds until `balance_sats` covers the reserve (a large
+   deposit may sit in `pending_confirmation_sats` for one block). Then
+   repeat the original request unchanged.
+3. An anonymous call (no bearer) has no account to fund by paymail: pay the
+   challenge from a wallet, or get a bearer first (step 1 of the quick
+   start) and retry so the account can be funded by paymail or card.
+
+Unused reserve always comes back as credits, so paying the exact shortfall
+is never money lost.
 
 ## Identity: a self-signed bearer token
 

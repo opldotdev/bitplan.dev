@@ -249,7 +249,15 @@ export async function gatewayDepositCommand(
 		)
 		return
 	}
-	const proof = await payChallenge(wallet, required, accepted)
+	let proof: string
+	try {
+		proof = await payChallenge(wallet, required, accepted)
+	} catch (error) {
+		const paymail = (required as { fund?: { paymail?: string } }).fund?.paymail
+		throw new CliError(
+			`The wallet could not pay ${formatBsv(amount)} (${amount.toLocaleString('en-US')} sats): ${errorMessage(error).split(/[.\n]/)[0]}. Nothing was charged. Add BSV to the wallet and run this again${paymail ? `, or send at least ${amount.toLocaleString('en-US')} sats to the account's paymail ${paymail} from any BSV wallet` : ''}, or buy credits by card at ${origin} signed in with the same key.`,
+		)
+	}
 	const second = await gatewayFetch(origin, '/v1/deposit', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
