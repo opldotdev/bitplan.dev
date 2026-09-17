@@ -179,6 +179,28 @@ quote for the `bsv-tx-v1` challenge; approve it with `x402_payQuote`.
 Do not pay a challenge twice. If a paid request fails, check
 `GET /v1/account/usage` and the txid before doing anything else.
 
+## Batch: about half price, within 24 hours
+
+Work that does not need an answer now can run as a batch at the model's
+batch price (about half of list; `pricing.batch` on `GET /v1/models` says
+which models and how much). Offer it when the person has many prompts and
+no rush.
+
+```sh
+curl -X POST https://gateway.bitplan.dev/v1/batches \
+  -H "Authorization: Bearer $TOKEN" -H "content-type: application/json" \
+  -d '{"endpoint":"/v1/chat/completions","model":"openai/gpt-5.6-luna",
+       "requests":[{"custom_id":"a","body":{"messages":[{"role":"user","content":"..."}]}}]}'
+```
+
+The answer is `202` with the batch (`id`, `status`, `request_counts`,
+`hold_sats`). The whole batch is held once for its worst case, like one
+call, and a `402` here follows the rules above. Poll
+`GET /v1/batches/<id>` (every few minutes; a batch normally finishes well
+under 24 hours): when `status` is `completed`, `results` lists
+`{custom_id, response: {status_code, body}, error}` per request and
+`charge_sats` is what it settled at. Text only: no images, audio or files.
+
 ## Fund by paymail
 
 Every account is also a paymail address, so a person (or any paymail
