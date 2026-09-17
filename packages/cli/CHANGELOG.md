@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.21
+
+### Changed
+
+- `bitplan gateway deposit`: when the wallet cannot pay, the error names the
+  amount, the account's paymail (from the gateway's `fund` field) and the
+  card page, so the person knows how to fund and retry.
+
 ## 0.0.20
 
 ### Changed
