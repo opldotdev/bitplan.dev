@@ -12,9 +12,10 @@ import {
 import { SAMPLE } from './models.test.js'
 import {
 	agedToken,
+	CHALLENGE,
 	createStubFetch,
 	createStubWallet,
-	decodeProof,
+	decodePayload,
 	freshToken,
 	json,
 	ORIGIN,
@@ -263,9 +264,11 @@ describe('hooks', () => {
 			expect(r.headers.get('authorization')).toBe(`Bearer ${written.key}`)
 			expect(r.headers.get('x-gateway-deposit')).toBe('exact')
 		}
-		expect(
-			decodeProof(net.requests[1]?.headers.get('x402-proof') ?? '').txid,
-		).toBe(stub.txid())
+		const payload = decodePayload(
+			net.requests[1]?.headers.get('payment-signature') ?? '',
+		)
+		expect(payload.x402Version).toBe(2)
+		expect(payload.accepted.extra.challengeId).toBe(CHALLENGE.challenge_id)
 		expect(stub.calls.createAction).toHaveLength(1)
 	})
 

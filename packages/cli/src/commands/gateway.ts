@@ -19,13 +19,25 @@ export interface GatewayOptions {
 	gatewayUrl?: string
 }
 
-interface Challenge {
-	version: 'bsv-tx-v1'
-	challenge_id: string
-	amount_sats: number
-	payee_locking_script_hex: string
-	payee_address: string
-	expires_at: string
+/** The CAIP-2 id the gateway uses for BSV (bip122, genesis block hash). */
+const BSV_NETWORK = 'bip122:000000000019d6689c085ae165831e93'
+
+/** One entry of an x402 (protocol version 2) PaymentRequired `accepts` list. */
+interface PaymentRequirements {
+	scheme: string
+	network: string
+	/** satoshis */
+	amount: string
+	asset: string
+	payTo: string
+	maxTimeoutSeconds: number
+	extra: { challengeId: string; lockingScript: string; expiresAt?: string }
+}
+
+interface PaymentRequired {
+	x402Version: number
+	resource?: { url?: string; description?: string; mimeType?: string }
+	accepts: PaymentRequirements[]
 }
 
 interface Account {
@@ -90,7 +102,7 @@ async function gatewayFetch(
 ): Promise<Response> {
 	const headers = new Headers(init.headers)
 	if (init.token) headers.set('authorization', `Bearer ${init.token}`)
-	if (init.proof) headers.set('x402-proof', init.proof)
+	if (init.proof) headers.set('payment-signature', init.proof)
 	return fetch(`${origin}${path}`, {
 		...init,
 		headers,
@@ -107,17 +119,42 @@ async function failure(res: Response, what: string): Promise<CliError> {
 	)
 }
 
-/** Pay a challenge from the wallet and return the X402-Proof header value. */
+/**
+ * The x402 requirements of a 402: the PAYMENT-REQUIRED header (base64 JSON),
+ * or the same object in the body. Returns the exact-on-BSV entry.
+ */
+async function readPaymentRequired(
+	res: Response,
+): Promise<{ required: PaymentRequired; accepted: PaymentRequirements }> {
+	const header = res.headers.get('payment-required')
+	let required: PaymentRequired | undefined
+	if (header) {
+		required = JSON.parse(Utils.toUTF8(Utils.toArray(header, 'base64'))) as PaymentRequired
+	} else {
+		const body = (await res.json().catch(() => ({}))) as Partial<PaymentRequired>
+		if (body.x402Version === 2 && Array.isArray(body.accepts)) required = body as PaymentRequired
+	}
+	if (!required) throw new CliError('The gateway answered 402 without x402 requirements.')
+	const accepted = required.accepts.find(
+		(a) => a.scheme === 'exact' && a.network === BSV_NETWORK && typeof a.extra?.lockingScript === 'string',
+	)
+	if (!accepted) throw new CliError('The gateway offered no exact-on-BSV payment option.')
+	return { required, accepted }
+}
+
+/** Pay the accepted requirements from the wallet and return the PAYMENT-SIGNATURE header value. */
 export async function payChallenge(
 	wallet: WalletInterface,
-	challenge: Challenge,
+	required: PaymentRequired,
+	accepted: PaymentRequirements,
 ): Promise<string> {
+	const sats = Number(accepted.amount)
 	const action = await wallet.createAction({
-		description: `gateway.bitplan.dev credits: ${formatBsv(challenge.amount_sats)}`,
+		description: `gateway.bitplan.dev credits: ${formatBsv(sats)}`,
 		outputs: [
 			{
-				lockingScript: challenge.payee_locking_script_hex,
-				satoshis: challenge.amount_sats,
+				lockingScript: accepted.extra.lockingScript,
+				satoshis: sats,
 				outputDescription: 'gateway.bitplan.dev credits',
 			},
 		],
@@ -125,16 +162,13 @@ export async function payChallenge(
 	})
 	if (!action.tx) throw new CliError('The wallet did not return the transaction.')
 	const tx = Transaction.fromAtomicBEEF(action.tx)
-	const proof = JSON.stringify({
-		version: 'bsv-tx-v1',
-		challenge_id: challenge.challenge_id,
-		rawtx_base64: Utils.toBase64(tx.toBinary()),
-		txid: tx.id('hex'),
+	const payload = JSON.stringify({
+		x402Version: 2,
+		...(required.resource ? { resource: required.resource } : {}),
+		accepted,
+		payload: { transaction: Utils.toBase64(tx.toBinary()) },
 	})
-	return Utils.toBase64(Utils.toArray(proof, 'utf8'))
-		.replaceAll('+', '-')
-		.replaceAll('/', '_')
-		.replace(/=+$/, '')
+	return Utils.toBase64(Utils.toArray(payload, 'utf8'))
 }
 
 async function session(
@@ -207,14 +241,15 @@ export async function gatewayDepositCommand(
 		token,
 	})
 	if (first.status !== 402) throw await failure(first, 'Requesting a deposit')
-	const { challenge } = (await first.json()) as { challenge: Challenge }
+	const { required, accepted } = await readPaymentRequired(first)
+	const amount = Number(accepted.amount)
 	if (!options.yes) {
 		console.error(
-			`Deposit ${formatBsv(challenge.amount_sats)} (${challenge.amount_sats.toLocaleString('en-US')} sats) to ${challenge.payee_address}? Re-run with --yes to approve. The wallet will still ask.`,
+			`Deposit ${formatBsv(amount)} (${amount.toLocaleString('en-US')} sats) to ${accepted.payTo}? Re-run with --yes to approve. The wallet will still ask.`,
 		)
 		return
 	}
-	const proof = await payChallenge(wallet, challenge)
+	const proof = await payChallenge(wallet, required, accepted)
 	const second = await gatewayFetch(origin, '/v1/deposit', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },

@@ -1,6 +1,8 @@
 /**
  * gateway.bitplan.dev protocol pieces: the wallet-signed bearer token and the
- * bsv-tx-v1 payment proof. `mintGatewayToken` and `payChallenge` are the same
+ * x402 (protocol version 2) payment: PAYMENT-REQUIRED on the 402,
+ * PAYMENT-SIGNATURE on the retry, scheme `exact` on BSV with the signed raw
+ * transaction as the payload. `mintGatewayToken` and `payChallenge` are the same
  * code as packages/cli/src/commands/gateway.ts (the `bitplan gateway` command);
  * the CLI package ships only a bin, so they are extracted here rather than
  * imported. Keep the two copies identical.
@@ -16,20 +18,38 @@ export const TOKEN_TTL_MS = 24 * 60 * 60 * 1000
 
 const TOKEN_PROTOCOL: [1, string] = [1, 'bitcoin auth']
 
-export interface Challenge {
-	version: 'bsv-tx-v1'
-	challenge_id: string
-	amount_sats: number
-	payee_locking_script_hex: string
-	payee_address: string
-	expires_at: string
+/** The CAIP-2 id the gateway uses for BSV (bip122, genesis block hash). */
+export const BSV_NETWORK = 'bip122:000000000019d6689c085ae165831e93'
+
+/** One entry of an x402 PaymentRequired `accepts` list, as the gateway sends it. */
+export interface PaymentRequirements {
+	scheme: string
+	network: string
+	/** satoshis */
+	amount: string
+	asset: string
+	payTo: string
+	maxTimeoutSeconds: number
+	extra: {
+		challengeId: string
+		lockingScript: string
+		expiresAt?: string
+		payUrl?: string
+	}
 }
 
-/** The 402 body the gateway sends; `fund` is present for identified callers. */
+/** What the plugin needs from a 402: the requirements it will pay and, for identified callers, `fund`. */
 export interface PaymentRequired {
+	x402Version: number
+	resource?: { url?: string; description?: string; mimeType?: string }
+	accepted: PaymentRequirements
 	error?: { type?: string; message?: string }
-	challenge: Challenge
 	fund?: { paymail?: string; note?: string }
+}
+
+/** Satoshis the requirements ask for. */
+export function amountSats(required: PaymentRequired): number {
+	return Number(required.accepted.amount)
 }
 
 /** Require TLS except for the local wallet/development loopback endpoints. */
@@ -119,17 +139,19 @@ export function formatBsv(sats: number): string {
 	return `${bsv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: digits })} BSV`
 }
 
-/** Pay a challenge from the wallet and return the X402-Proof header value. */
+/** Pay the accepted requirements from the wallet and return the PAYMENT-SIGNATURE header value. */
 export async function payChallenge(
 	wallet: WalletInterface,
-	challenge: Challenge,
+	required: PaymentRequired,
 ): Promise<string> {
+	const { accepted } = required
+	const sats = amountSats(required)
 	const action = await wallet.createAction({
-		description: `gateway.bitplan.dev credits: ${formatBsv(challenge.amount_sats)}`,
+		description: `gateway.bitplan.dev credits: ${formatBsv(sats)}`,
 		outputs: [
 			{
-				lockingScript: challenge.payee_locking_script_hex,
-				satoshis: challenge.amount_sats,
+				lockingScript: accepted.extra.lockingScript,
+				satoshis: sats,
 				outputDescription: 'gateway.bitplan.dev credits',
 			},
 		],
@@ -138,47 +160,71 @@ export async function payChallenge(
 	if (!action.tx)
 		throw new GatewayError('The wallet did not return the transaction.')
 	const tx = Transaction.fromAtomicBEEF(action.tx)
-	const proof = JSON.stringify({
-		version: 'bsv-tx-v1',
-		challenge_id: challenge.challenge_id,
-		rawtx_base64: Utils.toBase64(tx.toBinary()),
-		txid: tx.id('hex'),
+	const payload = JSON.stringify({
+		x402Version: 2,
+		...(required.resource ? { resource: required.resource } : {}),
+		accepted,
+		payload: { transaction: Utils.toBase64(tx.toBinary()) },
 	})
-	return Utils.toBase64(Utils.toArray(proof, 'utf8'))
-		.replaceAll('+', '-')
-		.replaceAll('/', '_')
-		.replace(/=+$/, '')
+	return Utils.toBase64(Utils.toArray(payload, 'utf8'))
 }
 
-/** Validate a 402 body. Returns null when it is not a bsv-tx-v1 challenge. */
-export function parsePaymentRequired(body: unknown): PaymentRequired | null {
-	if (!body || typeof body !== 'object') return null
-	const challenge = (body as { challenge?: unknown }).challenge
-	if (!challenge || typeof challenge !== 'object') return null
-	const c = challenge as Record<string, unknown>
+function requirementsOf(value: unknown): PaymentRequirements | null {
+	if (!value || typeof value !== 'object') return null
+	const a = value as Record<string, unknown>
+	const extra = a.extra as Record<string, unknown> | undefined
 	if (
-		c.version !== 'bsv-tx-v1' ||
-		typeof c.challenge_id !== 'string' ||
-		typeof c.amount_sats !== 'number' ||
-		!Number.isSafeInteger(c.amount_sats) ||
-		c.amount_sats <= 0 ||
-		typeof c.payee_locking_script_hex !== 'string' ||
-		typeof c.payee_address !== 'string' ||
-		typeof c.expires_at !== 'string'
+		a.scheme !== 'exact' ||
+		a.network !== BSV_NETWORK ||
+		typeof a.amount !== 'string' ||
+		!/^[1-9]\d*$/.test(a.amount) ||
+		typeof a.payTo !== 'string' ||
+		typeof extra?.challengeId !== 'string' ||
+		typeof extra?.lockingScript !== 'string'
 	) {
 		return null
 	}
-	const record = body as PaymentRequired
 	return {
-		error: record.error,
-		challenge: {
-			version: 'bsv-tx-v1',
-			challenge_id: c.challenge_id,
-			amount_sats: c.amount_sats,
-			payee_locking_script_hex: c.payee_locking_script_hex,
-			payee_address: c.payee_address,
-			expires_at: c.expires_at,
+		scheme: 'exact',
+		network: BSV_NETWORK,
+		amount: a.amount,
+		asset: typeof a.asset === 'string' ? a.asset : 'BSV',
+		payTo: a.payTo,
+		maxTimeoutSeconds:
+			typeof a.maxTimeoutSeconds === 'number' ? a.maxTimeoutSeconds : 0,
+		extra: {
+			challengeId: extra.challengeId,
+			lockingScript: extra.lockingScript,
+			...(typeof extra.expiresAt === 'string'
+				? { expiresAt: extra.expiresAt }
+				: {}),
+			...(typeof extra.payUrl === 'string' ? { payUrl: extra.payUrl } : {}),
 		},
-		fund: record.fund,
+	}
+}
+
+/**
+ * Validate an x402 PaymentRequired (from the PAYMENT-REQUIRED header or the
+ * 402 body). Returns null when it offers no exact-on-BSV requirements.
+ * `fund` comes from the body when one is given.
+ */
+export function parsePaymentRequired(
+	required: unknown,
+	body?: unknown,
+): PaymentRequired | null {
+	if (!required || typeof required !== 'object') return null
+	const r = required as Record<string, unknown>
+	if (r.x402Version !== 2 || !Array.isArray(r.accepts)) return null
+	const accepted = r.accepts.map(requirementsOf).find((a) => a !== null)
+	if (!accepted) return null
+	const b = (body ?? required) as Record<string, unknown>
+	return {
+		x402Version: 2,
+		...(r.resource && typeof r.resource === 'object'
+			? { resource: r.resource as PaymentRequired['resource'] }
+			: {}),
+		accepted,
+		error: b.error as PaymentRequired['error'],
+		fund: b.fund as PaymentRequired['fund'],
 	}
 }

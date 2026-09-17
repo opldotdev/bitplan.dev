@@ -5,9 +5,10 @@
  * the wallet, then repeat the identical request once with the proof.
  */
 
-import type { WalletInterface } from '@bsv/sdk'
+import { Utils, type WalletInterface } from '@bsv/sdk'
 import { errorMessage, GatewayError } from './errors.js'
 import {
+	amountSats,
 	formatBsv,
 	type PaymentRequired,
 	parsePaymentRequired,
@@ -49,6 +50,11 @@ function isReplayable(body: BodyInit | null | undefined): boolean {
 	return false
 }
 
+/**
+ * The x402 PaymentRequired of a 402: the PAYMENT-REQUIRED header (base64
+ * JSON) when present, else the same object in the body. The body also
+ * carries `fund` for identified callers, so it is read either way.
+ */
 async function readPaymentRequired(
 	response: Response,
 ): Promise<PaymentRequired | null> {
@@ -56,7 +62,19 @@ async function readPaymentRequired(
 	try {
 		body = await response.json()
 	} catch {
-		return null
+		body = undefined
+	}
+	const header = response.headers.get('payment-required')
+	if (header) {
+		try {
+			const required: unknown = JSON.parse(
+				Utils.toUTF8(Utils.toArray(header, 'base64')),
+			)
+			const parsed = parsePaymentRequired(required, body)
+			if (parsed) return parsed
+		} catch {
+			// fall through to the body
+		}
 	}
 	return parsePaymentRequired(body)
 }
@@ -118,33 +136,33 @@ export function createGatewayFetch(options: GatewayFetchOptions): FetchLike {
 		const required = await readPaymentRequired(first)
 		if (!required) {
 			throw new GatewayError(
-				'The gateway answered 402 without a bsv-tx-v1 challenge; nothing was paid.',
+				'The gateway answered 402 without x402 requirements the plugin can pay (exact on BSV); nothing was paid.',
 			)
 		}
 		if (!isReplayable(body)) {
 			throw new GatewayError(
-				`The gateway asks for ${formatBsv(required.challenge.amount_sats)} but this request body cannot be sent twice; nothing was paid.${fundingHint(required)}`,
+				`The gateway asks for ${formatBsv(amountSats(required))} but this request body cannot be sent twice; nothing was paid.${fundingHint(required)}`,
 			)
 		}
 
-		const { challenge } = required
+		const { accepted } = required
 		log('info', 'Paying a gateway challenge from the wallet.', {
-			challengeId: challenge.challenge_id,
-			amountSats: challenge.amount_sats,
-			payee: challenge.payee_address,
+			challengeId: accepted.extra.challengeId,
+			amountSats: amountSats(required),
+			payee: accepted.payTo,
 		})
-		let proof: string
+		let signature: string
 		try {
 			const wallet = await options.wallet()
-			proof = await payChallenge(wallet, challenge)
+			signature = await payChallenge(wallet, required)
 		} catch (error) {
 			throw new GatewayError(
-				`${walletRefusal(error, challenge.amount_sats)}${fundingHint(required)}`,
+				`${walletRefusal(error, amountSats(required))}${fundingHint(required)}`,
 			)
 		}
 
 		const retryHeaders = new Headers(headers)
-		retryHeaders.set('x402-proof', proof)
+		retryHeaders.set('payment-signature', signature)
 		const second = await send(request, {
 			...init,
 			method:
@@ -155,7 +173,7 @@ export function createGatewayFetch(options: GatewayFetchOptions): FetchLike {
 		if (second.status === 402) {
 			const again = await readPaymentRequired(second.clone())
 			throw new GatewayError(
-				`The gateway still answered 402 after the payment for challenge ${challenge.challenge_id} was sent${again ? ` (it now asks for ${formatBsv(again.challenge.amount_sats)})` : ''}. Check GET /v1/account/usage before paying again.`,
+				`The gateway still answered 402 after the payment for challenge ${accepted.extra.challengeId} was sent${again ? ` (it now asks for ${formatBsv(amountSats(again))})` : ''}. Check GET /v1/account/usage before paying again.`,
 			)
 		}
 		return second

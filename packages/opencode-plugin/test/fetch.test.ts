@@ -5,7 +5,7 @@ import {
 	CHALLENGE,
 	createStubFetch,
 	createStubWallet,
-	decodeProof,
+	decodePayload,
 	json,
 	ORIGIN,
 	paymentRequired,
@@ -83,7 +83,7 @@ describe('gateway fetch', () => {
 		])
 	})
 
-	test('pays a 402 from the wallet and retries the identical request once with X402-Proof', async () => {
+	test('pays a 402 from the wallet and retries the identical request once with PAYMENT-SIGNATURE', async () => {
 		const h = build([paymentRequired(), json(200, { id: 'chatcmpl-2' })])
 		const res = await h.gatewayFetch(URL_CHAT, post(BODY))
 		expect(res.status).toBe(200)
@@ -98,16 +98,32 @@ describe('gateway fetch', () => {
 
 		expect(h.net.requests).toHaveLength(2)
 		const [first, second] = h.net.requests
-		expect(first?.headers.has('x402-proof')).toBe(false)
+		expect(first?.headers.has('payment-signature')).toBe(false)
 		expect(second?.url).toBe(first?.url)
 		expect(second?.method).toBe('POST')
 		expect(second?.body).toBe(BODY)
 		expect(second?.headers.get('authorization')).toBe('Bearer tok-1')
 		expect(second?.headers.get('x-gateway-deposit')).toBe('exact')
-		const proof = decodeProof(second?.headers.get('x402-proof') ?? '')
-		expect(proof.version).toBe('bsv-tx-v1')
-		expect(proof.challenge_id).toBe(CHALLENGE.challenge_id)
-		expect(proof.txid).toBe(h.stub.txid())
+		expect(second?.headers.has('x402-proof')).toBe(false)
+		const payload = decodePayload(
+			second?.headers.get('payment-signature') ?? '',
+		)
+		expect(payload.x402Version).toBe(2)
+		expect(payload.accepted.extra.challengeId).toBe(CHALLENGE.challenge_id)
+		expect(payload.accepted.amount).toBe(String(CHALLENGE.amount_sats))
+		expect(
+			Buffer.from(payload.payload.transaction, 'base64').length,
+		).toBeGreaterThan(10)
+	})
+
+	test('reads the requirements from the body when the header is missing', async () => {
+		const h = build([
+			paymentRequired({}, { header: false }),
+			json(200, { id: 'chatcmpl-3' }),
+		])
+		const res = await h.gatewayFetch(URL_CHAT, post(BODY))
+		expect(res.status).toBe(200)
+		expect(h.stub.calls.createAction).toHaveLength(1)
 	})
 
 	test('retries only once: a second 402 is an error, not a second payment', async () => {
@@ -139,10 +155,10 @@ describe('gateway fetch', () => {
 		expect(h.net.requests).toHaveLength(1)
 	})
 
-	test('does not pay a 402 that carries no bsv-tx-v1 challenge', async () => {
+	test('does not pay a 402 that carries no x402 requirements it can settle', async () => {
 		const h = build([json(402, { error: { message: 'nope' } })])
 		await expect(h.gatewayFetch(URL_CHAT, post(BODY))).rejects.toThrow(
-			/without a bsv-tx-v1 challenge/,
+			/without x402 requirements/,
 		)
 		expect(h.stub.calls.createAction).toHaveLength(0)
 	})

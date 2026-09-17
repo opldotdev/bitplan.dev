@@ -10,9 +10,11 @@ import {
 import {
 	CHALLENGE,
 	createStubWallet,
-	decodeProof,
+	decodePayload,
 	freshToken,
 	ORIGIN,
+	PAYMENT_REQUIRED,
+	REQUIREMENTS,
 } from './stubs.js'
 
 describe('gateway token', () => {
@@ -69,34 +71,61 @@ describe('gateway origin', () => {
 })
 
 describe('402 challenge', () => {
-	test('parsePaymentRequired accepts the documented body and keeps the funding hint', () => {
-		const parsed = parsePaymentRequired({
+	test('parsePaymentRequired accepts the x402 PaymentRequired and keeps the funding hint from the body', () => {
+		const parsed = parsePaymentRequired(PAYMENT_REQUIRED, {
 			error: { type: 'payment_required', message: 'm' },
-			challenge: CHALLENGE,
-			fund: { paymail: 'a@gateway.bitplan.dev', note: 'n' },
+			fund: { paymail: 'a@bitplan.dev', note: 'n' },
 		})
-		expect(parsed?.challenge).toEqual(CHALLENGE)
-		expect(parsed?.fund?.paymail).toBe('a@gateway.bitplan.dev')
+		expect(parsed?.accepted).toEqual(REQUIREMENTS)
+		expect(parsed?.resource?.url).toBe(PAYMENT_REQUIRED.resource.url)
+		expect(parsed?.fund?.paymail).toBe('a@bitplan.dev')
+		// the body alone works too
+		expect(
+			parsePaymentRequired({
+				...PAYMENT_REQUIRED,
+				fund: { paymail: 'b@bitplan.dev' },
+			})?.fund?.paymail,
+		).toBe('b@bitplan.dev')
 	})
 
-	test('parsePaymentRequired rejects other versions and malformed amounts', () => {
+	test('parsePaymentRequired rejects other versions, schemes and malformed amounts', () => {
 		expect(parsePaymentRequired(null)).toBeNull()
 		expect(parsePaymentRequired({ error: {} })).toBeNull()
 		expect(
-			parsePaymentRequired({ challenge: { ...CHALLENGE, version: 'v2' } }),
+			parsePaymentRequired({ ...PAYMENT_REQUIRED, x402Version: 1 }),
 		).toBeNull()
 		expect(
-			parsePaymentRequired({ challenge: { ...CHALLENGE, amount_sats: 0 } }),
+			parsePaymentRequired({
+				...PAYMENT_REQUIRED,
+				accepts: [{ ...REQUIREMENTS, scheme: 'upto' }],
+			}),
 		).toBeNull()
 		expect(
-			parsePaymentRequired({ challenge: { ...CHALLENGE, amount_sats: '5' } }),
+			parsePaymentRequired({
+				...PAYMENT_REQUIRED,
+				accepts: [{ ...REQUIREMENTS, network: 'eip155:8453' }],
+			}),
+		).toBeNull()
+		expect(
+			parsePaymentRequired({
+				...PAYMENT_REQUIRED,
+				accepts: [{ ...REQUIREMENTS, amount: '0' }],
+			}),
+		).toBeNull()
+		expect(
+			parsePaymentRequired({
+				...PAYMENT_REQUIRED,
+				accepts: [{ ...REQUIREMENTS, amount: 5 }],
+			}),
 		).toBeNull()
 	})
 
-	test('payChallenge asks the wallet for exactly the payee output and returns a base64url proof', async () => {
+	test('payChallenge asks the wallet for exactly the payee output and returns a base64 PaymentPayload', async () => {
 		const stub = createStubWallet()
-		const proof = await payChallenge(stub.wallet, CHALLENGE)
-		expect(proof).toMatch(/^[A-Za-z0-9_-]+$/)
+		const required = parsePaymentRequired(PAYMENT_REQUIRED)
+		if (!required) throw new Error('unparsed')
+		const signature = await payChallenge(stub.wallet, required)
+		expect(signature).toMatch(/^[A-Za-z0-9+/]+=*$/)
 		expect(stub.calls.createAction).toHaveLength(1)
 		expect(stub.calls.createAction[0]?.outputs).toEqual([
 			{
@@ -105,12 +134,11 @@ describe('402 challenge', () => {
 				outputDescription: 'gateway.bitplan.dev credits',
 			},
 		])
-		const decoded = decodeProof(proof)
-		expect(decoded.version).toBe('bsv-tx-v1')
-		expect(decoded.challenge_id).toBe(CHALLENGE.challenge_id)
-		expect(decoded.txid).toBe(stub.txid())
-		expect(Buffer.from(decoded.rawtx_base64, 'base64').length).toBeGreaterThan(
-			10,
-		)
+		const decoded = decodePayload(signature)
+		expect(decoded.x402Version).toBe(2)
+		expect(decoded.accepted).toEqual(REQUIREMENTS)
+		expect(
+			Buffer.from(decoded.payload.transaction, 'base64').length,
+		).toBeGreaterThan(10)
 	})
 })

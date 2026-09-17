@@ -145,22 +145,70 @@ export function json(status: number, body: unknown): () => Response {
 		})
 }
 
-export function paymentRequired(
-	extra: Record<string, unknown> = {},
-): () => Response {
-	return json(402, {
-		error: { type: 'payment_required', message: 'Deposit 2000 sats.' },
-		challenge: CHALLENGE,
-		...extra,
-	})
+/** The x402 v2 requirements the gateway derives from CHALLENGE. */
+export const REQUIREMENTS = {
+	scheme: 'exact',
+	network: 'bip122:000000000019d6689c085ae165831e93',
+	amount: String(CHALLENGE.amount_sats),
+	asset: 'BSV',
+	payTo: CHALLENGE.payee_address,
+	maxTimeoutSeconds: 899,
+	extra: {
+		challengeId: CHALLENGE.challenge_id,
+		lockingScript: CHALLENGE.payee_locking_script_hex,
+		expiresAt: CHALLENGE.expires_at,
+		payUrl: `${ORIGIN}/v1/chat/completions`,
+	},
 }
 
-export function decodeProof(header: string): {
-	version: string
-	challenge_id: string
-	rawtx_base64: string
-	txid: string
+export const PAYMENT_REQUIRED = {
+	x402Version: 2,
+	error: 'PAYMENT-SIGNATURE header is required',
+	resource: {
+		url: `${ORIGIN}/v1/chat/completions`,
+		description: 'POST /v1/chat/completions',
+		mimeType: 'application/json',
+	},
+	accepts: [REQUIREMENTS],
+}
+
+/**
+ * A 402 as the gateway sends it: the PaymentRequired base64 in the
+ * PAYMENT-REQUIRED header, and repeated in the body with the legacy
+ * `challenge` and any `extra` (such as `fund`).
+ */
+export function paymentRequired(
+	extra: Record<string, unknown> = {},
+	options: { header?: boolean } = {},
+): () => Response {
+	const { error: _e, ...fields } = PAYMENT_REQUIRED
+	const body = {
+		error: { type: 'payment_required', message: 'Pay 2000 sats.' },
+		...fields,
+		challenge: CHALLENGE,
+		...extra,
+	}
+	return () =>
+		new Response(JSON.stringify(body), {
+			status: 402,
+			headers: {
+				'content-type': 'application/json',
+				...(options.header === false
+					? {}
+					: {
+							'payment-required': Buffer.from(
+								JSON.stringify(PAYMENT_REQUIRED),
+							).toString('base64'),
+						}),
+			},
+		})
+}
+
+/** Decodes a PAYMENT-SIGNATURE header value (base64 JSON PaymentPayload). */
+export function decodePayload(header: string): {
+	x402Version: number
+	accepted: typeof REQUIREMENTS
+	payload: { transaction: string }
 } {
-	const b64 = header.replaceAll('-', '+').replaceAll('_', '/')
-	return JSON.parse(Buffer.from(b64, 'base64').toString('utf8'))
+	return JSON.parse(Buffer.from(header, 'base64').toString('utf8'))
 }
