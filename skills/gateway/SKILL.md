@@ -263,6 +263,18 @@ prompt is billed and the empty output is not, the response carries an
 cannot cover the hold for concurrent calls, add credits rather than
 shrinking `max_tokens`.
 
+## Let the gateway pick the model: `"model": "auto"`
+
+Send `"model": "auto"` on `/v1/chat/completions` (bearer required) and the
+gateway classifies the request with the evaluation model in under a
+second (what kind of work, how hard, whether the strongest model is worth
+it) and runs it on the matching model: a fast model for easy work, a
+mid-tier one for moderate, a frontier model for hard. The response's
+`model` field and the `x-gateway-routed-model` header say which ran;
+`x-gateway-route` shows the decision. The classification's cost (a fraction
+of a cent) is billed with the call. Name a model yourself whenever you
+know what you want; `auto` is for agents that do not.
+
 ## Evaluate: classify, score, verify
 
 `POST /v1/evaluate` answers typed questions about a `state` (text or JSON)
