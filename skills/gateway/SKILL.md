@@ -278,8 +278,10 @@ the best one runs the call. `/v1/models` carries each model's `benchmarks`
 (`intelligence_index`, `coding_index`, `math_index`, `tokens_per_second`,
 `time_to_first_token_seconds`, from Artificial Analysis) when known. The response's `model` field
 and the `x-gateway-routed-model` header say which ran; `x-gateway-route`
-shows the scores and the top three. The classification's cost (a fraction
-of a cent) is billed with the call. Name a model yourself whenever you
+shows the scores and the top three. The router bills a flat fee per routed
+call (`routing_sats_per_call` on the `bitplan/auto` row of `/v1/models`,
+about 150 sats), on top of the routed model's own price, on every
+credential. Name a model yourself whenever you
 know what you want; the router is for agents that do not.
 
 ## Web search inside a call
