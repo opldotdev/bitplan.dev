@@ -278,10 +278,17 @@ the best one runs the call. `/v1/models` carries each model's `benchmarks`
 (`intelligence_index`, `coding_index`, `math_index`, `tokens_per_second`,
 `time_to_first_token_seconds`, from Artificial Analysis) when known. The response's `model` field
 and the `x-gateway-routed-model` header say which ran; `x-gateway-route`
-shows the scores and the top three. The router bills a flat fee per routed
-call (`routing_sats_per_call` on the `bitplan/auto` row of `/v1/models`,
-about 150 sats), on top of the routed model's own price, on every
-credential. Name a model yourself whenever you
+shows the scores and the top three. An image request sent to chat with
+`auto` is not routed to a language model: the reply is one sentence
+pointing at `POST /v1/images/generations`, with header
+`x-gateway-suggest: images` and nothing charged. On that endpoint
+`"model": "auto"` picks the best image model for its price (Artificial
+Analysis Image Arena Elo; `x-gateway-routed-model` names it), and the same
+routing fee applies. The router bills a fee per routed call
+on top of the routed model's own price, on every credential: by default 10%
+of the routed model's charge, at least 2,000 sats and at most 200,000 (the
+`bitplan/auto` row of `/v1/models` carries it as `routing_fee`;
+`routing_sats_per_call` is the floor). Name a model yourself whenever you
 know what you want; the router is for agents that do not.
 
 ## Web search inside a call
