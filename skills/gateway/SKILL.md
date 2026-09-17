@@ -265,15 +265,20 @@ shrinking `max_tokens`.
 
 ## Let the gateway pick the model: `"model": "auto"`
 
-Send `"model": "auto"` on `/v1/chat/completions` (bearer required) and the
-gateway classifies the request with the evaluation model in under a
-second (what kind of work, how hard, whether the strongest model is worth
-it) and runs it on the matching model: a fast model for easy work, a
-mid-tier one for moderate, a frontier model for hard. The response's
-`model` field and the `x-gateway-routed-model` header say which ran;
-`x-gateway-route` shows the decision. The classification's cost (a fraction
+Send `"model": "auto"` (or `bitplan/auto`, listed on `/v1/models` as the
+Jev Model Router) on `/v1/chat/completions` with a bearer. One evaluation
+call on `typesafe-ai/jev` scores the request on several axes at once: the
+kind of work (chat, writing, coding, math, research), a five-level
+difficulty, whether the strongest model is worth its cost, whether
+creativity or exact correctness matters, and whether a quick reply is
+expected. Those scores, plus facts read off the request (prompt size,
+images, tools, output cap), rank a candidate set of models on their
+strengths for that work, speed, live price, context window and vision and
+tool support; the best one runs the call. The response's `model` field
+and the `x-gateway-routed-model` header say which ran; `x-gateway-route`
+shows the scores and the top three. The classification's cost (a fraction
 of a cent) is billed with the call. Name a model yourself whenever you
-know what you want; `auto` is for agents that do not.
+know what you want; the router is for agents that do not.
 
 ## Evaluate: classify, score, verify
 
