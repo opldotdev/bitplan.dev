@@ -370,6 +370,16 @@ Some models cost more in some situations; the fields say which:
 
 ## Bring your own key
 
+Keys come in two kinds. A lab key (`anthropic`, `openai`, `google`,
+`spacexai`, `deepseek`, `mistral`, `moonshotai`, `alibaba`, `zai`,
+`minimax`, `meta`: the model id's prefix) is passed to Vercel AI Gateway per
+request as request-scoped BYOK: the lab bills you directly for its models
+and the gateway bills its fee, but only on calls that the provider metadata
+shows ran on your key; a call Vercel had to serve with its own credentials
+is billed at list price. A `vercel` key (or `opencode`, `opencode-go`)
+covers every model that provider serves. `GET /.well-known/x402-info`
+lists the providers with `kind: "lab"` or `"gateway"`.
+
 Store your own provider key once, per provider, and calls on that provider
 run on your key upstream. You are then billed **5% of the provider's list
 price** as a fee (`BYOK_FEE_BPS`, reported as `byok_fee_bps` by `GET
