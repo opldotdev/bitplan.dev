@@ -271,10 +271,13 @@ call on `typesafe-ai/jev` scores the request on several axes at once: the
 kind of work (chat, writing, coding, math, research), a five-level
 difficulty, whether the strongest model is worth its cost, whether
 creativity or exact correctness matters, and whether a quick reply is
-expected. Those scores, plus facts read off the request (prompt size,
-images, tools, output cap), rank a candidate set of models on their
-strengths for that work, speed, live price, context window and vision and
-tool support; the best one runs the call. The response's `model` field
+expected, and it picks from a shortlist of candidates described by their
+Artificial Analysis benchmarks (intelligence, coding and math indices,
+measured speed) and list price. Those scores, its pick and facts read off
+the request (prompt size, images, tools, output cap) rank the candidates;
+the best one runs the call. `/v1/models` carries each model's `benchmarks`
+(`intelligence_index`, `coding_index`, `math_index`, `tokens_per_second`,
+`time_to_first_token_seconds`, from Artificial Analysis) when known. The response's `model` field
 and the `x-gateway-routed-model` header say which ran; `x-gateway-route`
 shows the scores and the top three. The classification's cost (a fraction
 of a cent) is billed with the call. Name a model yourself whenever you
