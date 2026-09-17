@@ -1,0 +1,4 @@
+{
+  "jsPlugins": ["@shadcn/lint"],
+  "rules": {}
+}
