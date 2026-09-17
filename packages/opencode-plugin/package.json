@@ -1,6 +1,6 @@
 {
 	"name": "opencode-plugin-bitplan",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "OpenCode provider plugin for gateway.bitplan.dev: models paid from a BRC-100 wallet over HTTP 402.",
 	"license": "MIT",
 	"homepage": "https://gateway.bitplan.dev",

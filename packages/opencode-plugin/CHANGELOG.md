@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.4
+
+- A 402 the wallet cannot pay now says how to continue: the exact amount,
+  the account's paymail from the gateway's `fund` field, and the card page,
+  with a note not to pick a cheaper model or shrink the request instead.
+
 ## 0.0.3
 
 - Pays the gateway's 402 with x402 protocol version 2: the requirements are
