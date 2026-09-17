@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.3
+
+- Pays the gateway's 402 with x402 protocol version 2: the requirements are
+  read from the `PAYMENT-REQUIRED` header (or the body) and the signed
+  transaction goes back in `PAYMENT-SIGNATURE`; the legacy `X402-Proof`
+  header is no longer sent.
+
 ## 0.0.2
 
 - Default output limit lowered from 32,000 to 8,192 tokens so the gateway's
