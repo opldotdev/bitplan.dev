@@ -107,9 +107,13 @@ Any authenticated call that the balance cannot cover, and every call to
 The minimum deposit is 0.25 BSV (25,000,000 sats); `POST /v1/deposit` accepts a
 larger `sats` value. Pay `amount_sats` to `payee_address` in a transaction the
 gateway will broadcast, then send the **identical** request again with the
-header `X402-Proof: base64url({"version":"bsv-tx-v1","challenge_id","rawtx_base64","txid"})`.
-The challenge is bound to that exact request (method, path, body) and to the
-signing key, and expires after 15 minutes.
+x402 header `PAYMENT-SIGNATURE: base64({"x402Version":2,"accepted":<the accepts[0] object from the 402>,"payload":{"transaction":"<signed raw tx, base64>"}})`.
+The 402 is x402 protocol version 2: the `PAYMENT-REQUIRED` response header
+(and the body) carry `{"x402Version":2,"resource":{"url"},"accepts":[{"scheme":"exact","network":"bip122:000000000019d6689c085ae165831e93","amount":"<sats>","asset":"BSV","payTo":"<address>","maxTimeoutSeconds","extra":{"challengeId","lockingScript"}}]}`,
+and a paid response carries `PAYMENT-RESPONSE` with `{"success":true,"transaction":"<txid>","network","payer","amount"}`.
+The legacy header `X402-Proof: base64url({"version":"bsv-tx-v1","challenge_id","rawtx_base64","txid"})`
+still works. The challenge is bound to that exact request (method, path,
+body) and to the signing key, and expires after 15 minutes.
 
 With a WIF, the bundled script builds the transaction from the key's UTXOs and
 prints the header value without broadcasting:
@@ -121,7 +125,7 @@ CHALLENGE=$(curl -s https://gateway.bitplan.dev/v1/deposit \
 PROOF=$(printf '%s' "$CHALLENGE" | bun "$SKILL_DIR/scripts/pay.ts" --wif "$WIF")
 curl -s https://gateway.bitplan.dev/v1/deposit \
   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -H "X402-Proof: $PROOF" -d '{"sats":25000000}'
+  -H "X402-Proof: $PROOF" -d '{"sats":25000000}'   # legacy header; PAYMENT-SIGNATURE is the x402 form
 ```
 
 The response reports `credited: true` when the balance is usable now, or
@@ -258,6 +262,33 @@ prompt is billed and the empty output is not, the response carries an
 `max_tokens`, not a smaller one. When the balance
 cannot cover the hold for concurrent calls, add credits rather than
 shrinking `max_tokens`.
+
+## Evaluate: classify, score, verify
+
+`POST /v1/evaluate` answers typed questions about a `state` (text or JSON)
+with an evaluation model, `typesafe-ai/jev` by default: sub-second, priced
+on input tokens only (a fraction of a cent), answers with probabilities.
+Use it instead of a chat call when you need a label, a grade or a yes/no,
+for routing work to the right model, or to verify a claim.
+
+```sh
+curl -s https://gateway.bitplan.dev/v1/evaluate \
+  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"state":"fix the failing test in auth.ts and explain what was wrong",
+       "questions":{
+         "intent":{"type":"choice","instructions":"What kind of task is this?",
+                   "criteria":{"coding":"code changes","writing":"prose","math":"calculation","chat":"small talk"}},
+         "difficulty":{"type":"score","instructions":"How hard is it?","criteria":["trivial","easy","moderate","hard","expert"]},
+         "urgent":{"type":"boolean","instructions":"Does the user sound blocked right now?"}}}'
+```
+
+Answers: `{"answers":{"intent":{"type":"choice","choice":"coding","probabilities":{...}},
+"difficulty":{"type":"score","score":1.6,"probabilities":{...}},"urgent":{"type":"boolean","probability":0.29}},
+"usage":{"input_tokens":460,"output_tokens":87}}`. `choice` criteria map option
+names to what they mean; `score` criteria are rubric levels, lowest first,
+and the score is an index into them; `boolean` returns a probability. Many
+questions run in one call. The MCP tool is `evaluate`. Evaluation models
+show `type: "evaluation"` on `/v1/models` and refuse chat completions.
 
 ## Prices
 
