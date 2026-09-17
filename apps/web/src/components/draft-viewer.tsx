@@ -815,7 +815,6 @@ function EncryptedView({
   );
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: viewer composes separate link, wallet, and hosted-capability flows without conflating their permissions
 function DecryptedView({
   openedWithLink,
   plaintext,

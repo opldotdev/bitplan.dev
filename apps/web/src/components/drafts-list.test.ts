@@ -15,7 +15,16 @@ import { mergeCatalogPlans } from "@/lib/drafts";
 import { EnvelopeAccessError, EnvelopeError } from "@/lib/envelope";
 
 test("plan switcher searches visible titles and repositories, not loading status", () => {
-  const row = { plan: { origin: "h_test", title: "Brand New Plan", repoOrg: "opl", repoName: "bitplan", description: null }, detail: { status: "loading" } } as Parameters<typeof matchesPlanQuery>[0];
+  const row = {
+    detail: { status: "loading" },
+    plan: {
+      description: null,
+      origin: "h_test",
+      repoName: "bitplan",
+      repoOrg: "opl",
+      title: "Brand New Plan",
+    },
+  } as Parameters<typeof matchesPlanQuery>[0];
   expect(matchesPlanQuery(row, " brand NEW ")).toBe(true);
   expect(matchesPlanQuery(row, "opl bitplan")).toBe(true);
   expect(matchesPlanQuery(row, "loading")).toBe(false);

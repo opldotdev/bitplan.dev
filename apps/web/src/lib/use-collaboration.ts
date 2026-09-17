@@ -471,11 +471,19 @@ export function useCollaboration(target: DocumentTarget) {
         }
       }
     }
-    heartbeat().catch(fail);
-    const timer = setInterval(heartbeat, 15_000);
+    // Hidden tabs stop heartbeating so an idle browser never keeps a room hot.
+    function visibleHeartbeat() {
+      if (document.visibilityState === "visible") {
+        heartbeat().catch(fail);
+      }
+    }
+    visibleHeartbeat();
+    const timer = setInterval(visibleHeartbeat, 60_000);
+    document.addEventListener("visibilitychange", visibleHeartbeat);
     return () => {
       active = false;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", visibleHeartbeat);
       stopChanges?.();
       stopInfo();
       stopProfiles();
@@ -719,7 +727,7 @@ export function useCollaboration(target: DocumentTarget) {
   ) {
     const c = connectionRef.current;
     // biome-ignore lint/suspicious/noUnnecessaryConditions: cursor events can outlive the connection
-    if (!c || (!(click || force) && Date.now() - lastCursor.current < 250)) {
+    if (!c || (!(click || force) && Date.now() - lastCursor.current < 500)) {
       return;
     }
     lastCursor.current = Date.now();

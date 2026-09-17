@@ -90,8 +90,8 @@ export default function SharingPage() {
       <p>
         The CLI can sync a snapshot of your contacts and teams, encrypted only
         for its connected wallet. In the Publish sidebar, the owner can choose
-        Private copy and unlock contacts using that same identity. Your book is not included in the plan,
-        its annotations, or its collaboration room.
+        Private copy and unlock contacts using that same identity. Your book is
+        not included in the plan, its annotations, or its collaboration room.
       </p>
       <div className="not-typeset">
         <CommandCopy command="bunx bitplan contacts sync --yes" />
@@ -107,10 +107,10 @@ export default function SharingPage() {
         Select a team, then adjust individual recipients. Only selected public
         keys enter the sharing handoff; private contact labels and team names do
         not. Initials identify contacts without claiming a roster character or
-        verified live presence. Contributors see the current recipients read-only;
-        they cannot change the document's access. Direct
-        creation of a private live copy is not wired yet: the sidebar still hands off
-        to your agent and does not re-encrypt an existing room.
+        verified live presence. Contributors see the current recipients
+        read-only; they cannot change the document's access. Direct creation of
+        a private live copy is not wired yet: the sidebar still hands off to
+        your agent and does not re-encrypt an existing room.
       </p>
       <p>
         Ask for their BRC-100 public identity key and verify it with them. Never

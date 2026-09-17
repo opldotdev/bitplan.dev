@@ -20,17 +20,6 @@ const securityHeaders = [
 ] as const;
 
 const nextConfig: NextConfig = {
-  // Paymail discovery for name@bitplan.dev is served by the gateway. The SRV
-  // record _bsvalias._tcp.bitplan.dev already points there; this covers
-  // clients that skip SRV and fetch the well-known path on the apex.
-  async rewrites() {
-    return [
-      {
-        destination: "https://gateway.bitplan.dev/.well-known/bsvalias",
-        source: "/.well-known/bsvalias",
-      },
-    ];
-  },
   async headers() {
     return [
       {
@@ -80,6 +69,17 @@ const nextConfig: NextConfig = {
     "/**": ["./assets/og/**"],
   },
   poweredByHeader: false,
+  // Paymail discovery for name@bitplan.dev is served by the gateway. The SRV
+  // record _bsvalias._tcp.bitplan.dev already points there; this covers
+  // clients that skip SRV and fetch the well-known path on the apex.
+  async rewrites() {
+    return [
+      {
+        destination: "https://gateway.bitplan.dev/.well-known/bsvalias",
+        source: "/.well-known/bsvalias",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

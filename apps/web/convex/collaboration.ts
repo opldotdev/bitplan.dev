@@ -22,7 +22,7 @@ const CIPHERTEXT = /^[A-Za-z0-9_-]{16}\.[A-Za-z0-9+/]+=*$/;
 const OPERATION_KEY = /^[a-zA-Z0-9_-]{1,128}$/;
 const limiter = new RateLimiter(components.rateLimiter, {
   create: { capacity: 5, kind: "token bucket", period: MINUTE, rate: 20 },
-  cursor: { capacity: 10, kind: "token bucket", period: MINUTE, rate: 300 },
+  cursor: { capacity: 10, kind: "token bucket", period: MINUTE, rate: 150 },
   join: { capacity: 20, kind: "token bucket", period: MINUTE, rate: 60 },
   write: { capacity: 20, kind: "token bucket", period: MINUTE, rate: 120 },
 });
@@ -462,7 +462,7 @@ export const heartbeat = mutation({
       args.roomId,
       session._id,
       session._id,
-      15_000
+      60_000
     );
   },
   returns: v.object({ roomToken: v.string(), sessionToken: v.string() }),

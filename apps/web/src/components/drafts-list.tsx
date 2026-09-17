@@ -164,8 +164,17 @@ function rowDateLabel(row: ViewRow): string {
 
 export function matchesPlanQuery(row: ViewRow, query: string): boolean {
   const meta = row.detail?.status === "ok" ? row.detail.meta : row.plan;
-  return [row.plan.origin, meta.title, meta.description, meta.repoOrg, meta.repoName]
-    .filter(Boolean).join(" ").toLowerCase().includes(query.trim().toLowerCase());
+  return [
+    row.plan.origin,
+    meta.title,
+    meta.description,
+    meta.repoOrg,
+    meta.repoName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(query.trim().toLowerCase());
 }
 
 export function buildRows(
@@ -571,9 +580,7 @@ export function LoadedDrafts({
   const visible = buildRows(
     applyPlanFilter(plans, options ? filter : "all"),
     details
-  ).filter((row) =>
-    matchesPlanQuery(row, query)
-  );
+  ).filter((row) => matchesPlanQuery(row, query));
 
   return (
     <div className="space-y-4">
