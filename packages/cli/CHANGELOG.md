@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.20
+
+### Changed
+
+- `bitplan gateway deposit` pays the gateway's 402 with x402 protocol
+  version 2: it reads the requirements from the `PAYMENT-REQUIRED` header
+  (or the body) and sends the signed transaction in `PAYMENT-SIGNATURE`
+  instead of the legacy `X402-Proof` header.
+
 ## 0.0.19
 
 ### Added
