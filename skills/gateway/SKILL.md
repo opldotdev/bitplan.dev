@@ -23,6 +23,9 @@ Base URL: `https://gateway.bitplan.dev`. Discovery: `GET /.well-known/x402-info`
 | --- | --- | --- |
 | `GET /v1/models` | none | model list with prices |
 | `POST /v1/chat/completions` | bearer | OpenAI chat completions, JSON or `stream: true` |
+| `POST /v1/messages` | bearer | Anthropic Messages API over the same metering: `ANTHROPIC_BASE_URL=https://gateway.bitplan.dev ANTHROPIC_AUTH_TOKEN=<bearer>` makes Claude Code and Anthropic SDKs work; bare `claude-*` ids map to `anthropic/<id>` when listed |
+| `POST /v1/messages/count_tokens` | none | Anthropic token count, a free bytes/4 estimate |
+| `POST /v1/responses` | bearer | OpenAI Responses API over the same metering, for Codex CLI: `[model_providers.bitplan]` with `base_url = "https://gateway.bitplan.dev/v1"` and `env_key = "BITPLAN_TOKEN"`; stateless (`previous_response_id` is a 400), function tools only |
 | `GET /v1/account` | bearer | balance in sats |
 | `POST /v1/deposit` `{"sats": N}` | bearer | top up; always answers 402 until paid |
 | `POST /v1/credits/checkout` `{"usd": 5}` | bearer | buy credits by card: returns a Stripe Checkout URL for a person to open; poll `GET /v1/credits/checkout/:id` until `credited` |
@@ -195,20 +198,66 @@ The same anonymous flow works on the HTTP API: a request with no
 ```sh
 curl https://gateway.bitplan.dev/v1/chat/completions \
   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"model":"spacexai/grok-4.6","messages":[{"role":"user","content":"hello"}],"max_tokens":400}'
+  -d '{"model":"spacexai/grok-4.6","messages":[{"role":"user","content":"hello"}],"max_tokens":4096}'
 ```
 
 Any OpenAI SDK works: set `baseURL` to `https://gateway.bitplan.dev/v1` and
 `apiKey` to the session token. Streaming with `stream: true` returns
 standard SSE.
 
+Any Anthropic SDK works too, through `POST /v1/messages`: set
+`ANTHROPIC_BASE_URL=https://gateway.bitplan.dev` and
+`ANTHROPIC_AUTH_TOKEN=<session token>` (sent as `Authorization: Bearer`).
+For Claude Code add `ANTHROPIC_MODEL=anthropic/claude-fable-5.1` (or pin
+`ANTHROPIC_DEFAULT_SONNET_MODEL` / `_OPUS_MODEL` / `_HAIKU_MODEL` to catalog
+ids) and run `claude`. Errors are `{"type":"error","error":{"type","message"}}`;
+a 402 keeps the `challenge` body with `type: "error"` alongside, so pay it as
+usual and retry.
+
+OpenAI Codex CLI works through `POST /v1/responses` (the Responses API,
+the only wire format Codex custom providers speak). In `~/.codex/config.toml`:
+
+```toml
+[model_providers.bitplan]
+name = "BitPlan Gateway"
+base_url = "https://gateway.bitplan.dev/v1"
+env_key = "BITPLAN_TOKEN"
+```
+
+and in `~/.codex/bitplan.config.toml` (before Codex 0.134: the same keys
+under `[profiles.bitplan]` in `config.toml`):
+
+```toml
+model_provider = "bitplan"
+model = "anthropic/claude-fable-5.1"
+web_search = "disabled"
+```
+
+Then `export BITPLAN_TOKEN=$(bitplan gateway token)` and
+`codex --profile bitplan`. `env_key` is sent as `Authorization: Bearer`; no
+extra headers are needed. Use catalog ids from `/v1/models`. The gateway
+stores nothing, so `previous_response_id` answers 400 and history travels
+in `input`; hosted tools (`web_search`, `file_search`, `computer`) answer
+400 naming the tool; `reasoning`, `include` and `store` are dropped. Errors
+are OpenAI-shaped `{"error":{"message","type","param","code"}}`; a 402
+keeps the `challenge` body.
+
 Response headers: `x-gateway-request-id`, and on JSON responses
 `x-gateway-charge-sats` and `x-gateway-balance-sats`.
 
-Send `max_tokens`. The gateway holds funds before each call sized by the
-request bytes plus `max_tokens` (default 8192) and settles to the real usage
-afterwards; a small `max_tokens` keeps the hold small so concurrent calls fit
-in the balance.
+Send `max_tokens` of 4096 or more (default 8192). The gateway holds funds
+before each call sized by the prompt's tokens plus `max_tokens`, and settles
+to the real usage afterwards: a small `max_tokens` saves nothing, it only
+shrinks the hold. On a reasoning model (`reasoning: true` in `/v1/models`,
+such as `meta/muse-spark-1.3`) a small cap is worse than useless: the model
+spends the budget thinking, returns empty text, and the call is billed. The
+gateway answers 400 for `max_tokens` under `min_max_tokens` (1024) on those
+models. If a call still comes back empty with `finish_reason: "length"`, the
+prompt is billed and the empty output is not, the response carries an
+`x-gateway-hint` header saying so, and the retry needs a larger
+`max_tokens`, not a smaller one. When the balance
+cannot cover the hold for concurrent calls, add credits rather than
+shrinking `max_tokens`.
 
 ## Prices
 
@@ -297,7 +346,7 @@ curl -X PUT https://gateway.bitplan.dev/v1/account/byok \
 
 curl https://gateway.bitplan.dev/v1/chat/completions \
   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"model":"opencode-go/kimi-k3","messages":[{"role":"user","content":"hello"}],"max_tokens":400}'
+  -d '{"model":"opencode-go/kimi-k3","messages":[{"role":"user","content":"hello"}],"max_tokens":4096}'
 
 curl -X DELETE https://gateway.bitplan.dev/v1/account/byok \
   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
