@@ -280,6 +280,28 @@ shows the scores and the top three. The classification's cost (a fraction
 of a cent) is billed with the call. Name a model yourself whenever you
 know what you want; the router is for agents that do not.
 
+## Web search inside a call
+
+Add a server tool and the gateway searches the web for the model and feeds
+it the results in the same call; you get the final answer, billed with
+the call plus the search fee (about half a cent per search):
+
+```sh
+curl -s https://gateway.bitplan.dev/v1/chat/completions \
+  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"model":"anthropic/claude-sonnet-5","max_tokens":4096,
+       "tools":[{"type":"vercel:perplexity_search"}],
+       "messages":[{"role":"user","content":"What changed in Vercel AI Gateway this week? Cite sources."}]}'
+```
+
+Tool types: `vercel:perplexity_search`, `vercel:exa_search`,
+`vercel:parallel_search`, `vercel:tako_search` (each takes an optional
+`config` object with the provider's snake_case options). `tool_choice:
+"required"` forces a search first. The MCP `chat` tool takes `web_search:
+true`. Through `/v1/responses` the OpenAI `web_search` tool, and through
+`/v1/messages` Claude's `web_search` server tool, map to the same thing.
+Vercel AI Gateway models only.
+
 ## Evaluate: classify, score, verify
 
 `POST /v1/evaluate` answers typed questions about a `state` (text or JSON)
