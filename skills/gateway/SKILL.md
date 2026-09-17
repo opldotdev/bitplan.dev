@@ -29,7 +29,7 @@ Base URL: `https://gateway.bitplan.dev`. Discovery: `GET /.well-known/x402-info`
 | `GET /v1/account` | bearer | balance in sats |
 | `POST /v1/deposit` `{"sats": N}` | bearer | top up; always answers 402 until paid |
 | `POST /v1/credits/checkout` `{"usd": 5}` | bearer | buy credits by card: returns a Stripe Checkout URL for a person to open; poll `GET /v1/credits/checkout/:id` until `credited` |
-| `GET /v1/account/usage` | bearer | last 50 requests and ledger entries |
+| `GET /v1/account/usage` | bearer | recent requests and ledger entries (`?limit=` up to 1000, default 50) |
 | `PUT /v1/account/paymail` `{"handle": "name"}` | bearer | claim a human paymail handle (409 when taken) |
 | `DELETE /v1/account/paymail` | bearer | release the handle; the automatic alias remains |
 | `PUT /v1/account/byok` | bearer | store your own key for one provider, encrypted |
@@ -347,7 +347,7 @@ priced at your tier, reported as `tier` (`name`, `bps`, `usd_30d`, and
 `next`, the following rung or null). `GET /v1/account` returns the same
 `tier`. Each request is held and settled at the tier you are on when it
 starts; a per-model promotion applies when it is lower than your tier, and a
-stored key (below) pays the BYOK fee instead of any markup.
+call on a stored key (below) pays no markup: the lab bills you directly.
 
 Some models cost more in some situations; the fields say which:
 
@@ -383,11 +383,14 @@ covers every model that provider serves. `GET /.well-known/x402-info`
 lists the providers with `kind: "lab"` or `"gateway"`.
 
 Store your own provider key once, per provider, and calls on that provider
-run on your key upstream. You are then billed **5% of the provider's list
-price** as a fee (`BYOK_FEE_BPS`, reported as `byok_fee_bps` by `GET
-/v1/account` and in the discovery manifest) instead of cost plus the
-markup. Everything else is unchanged: the fee is still held before the call
-and settled from real usage.
+run on your key upstream. **The gateway charges nothing for the model**: the
+lab bills you at its own price (`byok_fee_bps` is 0 on `GET /v1/account` and
+in the discovery manifest). What the gateway adds around the call is billed
+at your tier markup from your BSV credits: the Jev router's classification
+when you send `model: "auto"`, server-side web search, and `POST
+/v1/evaluate`. Everything else is unchanged: holds are taken at list price
+until the routing metadata shows your key served the call, then settle to
+the add-ons only.
 
 | Provider id | Service | Model ids | Verified on `PUT` by |
 | --- | --- | --- | --- |
@@ -397,8 +400,8 @@ and settled from real usage.
 
 The gateway holds no key of its own for OpenCode, so `opencode/*` and
 `opencode-go/*` models only work with a stored key: `/v1/models` lists them
-with `byok_only: true` and `pricing.mode: "fee"` (the fee you pay, based on
-the Zen list price of the model, since Go has no marginal price), and a call
+with `byok_only: true` and `pricing.mode: "fee"` at 0 (you pay OpenCode, not
+us), and a call
 without a stored key, or with no bearer at all, answers `400 byok_required`.
 Only the OpenCode models served on the OpenAI chat/completions protocol are
 listed (GLM, Kimi, DeepSeek V4, MiniMax on Zen, the free Zen models); GPT,
