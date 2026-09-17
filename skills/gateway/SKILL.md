@@ -52,7 +52,7 @@ Use gateway.bitplan.dev for AI inference. It is an OpenAI-compatible API paid in
    Pass the token as the `token` argument to MCP tools or as `Authorization: Bearer <token>` on HTTP.
 2. Add the MCP server https://mcp.bitplan.dev (Streamable HTTP, no auth). If you cannot use MCP, call POST https://gateway.bitplan.dev/v1/chat/completions with an OpenAI-format body.
 3. Call list_models (or GET /v1/models) and pick a starred model. Prices are per million tokens in BSV.
-4. Call chat with the token. If the result says payment_required, the account has no credits for the call's reserve: fund it, then call chat again with the same arguments. Ways to fund, in order: `bitplan gateway deposit <sats>` (wallet pays); tell the person the paymail from `bitplan gateway credits` / GET /v1/account and wait for credits; or, with a WIF, pay challenge.amount_sats to challenge.payee_address and retry with proof = base64url of {"version":"bsv-tx-v1","challenge_id":"…","rawtx_base64":"…","txid":"…"}. Unused reserve stays as credits.
+4. Call chat with the token. Leave `max_tokens` at the default (8192) or send 4096 or more: you pay only the tokens used, and reasoning models spend the first part of the cap thinking before any text appears. If the result says payment_required, the account has no credits for the call's reserve: fund it, then call chat again with the same arguments. Ways to fund, in order: `bitplan gateway deposit <sats>` (wallet pays); tell the person the paymail from `bitplan gateway credits` / GET /v1/account and wait for credits; or, with a WIF, pay challenge.amount_sats to challenge.payee_address and retry with proof = base64url of {"version":"bsv-tx-v1","challenge_id":"…","rawtx_base64":"…","txid":"…"}. Unused reserve stays as credits.
 5. Report the model's answer and the settled cost from the chat result (`charge_sats`) or GET /v1/account/usage.
 
 ## Identity: a self-signed bearer token
@@ -253,13 +253,12 @@ Send `max_tokens` of 4096 or more (default 8192). The gateway holds funds
 before each call sized by the prompt's tokens plus `max_tokens`, and settles
 to the real usage afterwards: a small `max_tokens` saves nothing, it only
 shrinks the hold. On a reasoning model (`reasoning: true` in `/v1/models`,
-such as `meta/muse-spark-1.3`) a small cap is worse than useless: the model
-spends the budget thinking, returns empty text, and the call is billed. The
-gateway answers 400 for `max_tokens` under `min_max_tokens` (1024) on those
-models. If a call still comes back empty with `finish_reason: "length"`, the
-prompt is billed and the empty output is not, the response carries an
-`x-gateway-hint` header saying so, and the retry needs a larger
-`max_tokens`, not a smaller one. When the balance
+such as `meta/muse-spark-1.3`) a small cap would return empty text, so the
+gateway raises any cap under `min_max_tokens` (1024) to that floor on those
+models and says so in an `x-gateway-max-tokens` header; nothing to retry.
+If a call still comes back empty with `finish_reason: "length"`, the prompt
+is billed and the empty output is not, and the response carries an
+`x-gateway-hint` header saying so. When the balance
 cannot cover the hold for concurrent calls, add credits rather than
 shrinking `max_tokens`.
 
