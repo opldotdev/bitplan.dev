@@ -13,9 +13,9 @@ metadata:
 
 An OpenAI chat completions endpoint in front of every model on Vercel AI
 Gateway and OpenRouter. Identity is a Bitcoin key. Deposits arrive over HTTP
-402. Each call is deducted from the balance at provider cost plus 20% to
-start, 10% after $100 a month of provider cost and 7% after $1,000 (see
-Prices).
+402. Each call is deducted from the balance at provider cost plus 10% to
+start, 7% after $100 a month of provider cost and 5% after $1,000, and at
+least 2,000 sats a call (see Prices).
 
 Base URL: `https://gateway.bitplan.dev`. Discovery: `GET /.well-known/x402-info`.
 
@@ -386,8 +386,9 @@ per model; `featured: true` marks a promotion below your rate). Estimate
 a call as `input_tokens x sats_per_million_input / 1e6 + output_tokens x sats_per_million_output / 1e6`.
 
 The markup falls with volume. The top-level `tiers` array is the ladder
-(`name`, `min_usd_30d`, `bps`): Start at 20%, Build at 10% once your rolling
-30-day provider cost reaches $100, Scale at 7% at $1,000. Without a bearer
+(`name`, `min_usd_30d`, `bps`): Start at 10%, Build at 7% once your rolling
+30-day provider cost reaches $100, Scale at 5% at $1,000. `min_charge_sats`
+is the least a call on our keys is charged once it has run. Without a bearer
 the list is priced at Start; send `Authorization: Bearer <token>` and it is
 priced at your tier, reported as `tier` (`name`, `bps`, `usd_30d`, and
 `next`, the following rung or null). `GET /v1/account` returns the same
