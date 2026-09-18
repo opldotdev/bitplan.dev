@@ -39,9 +39,13 @@ Base URL: `https://gateway.bitplan.dev`. Discovery: `GET /.well-known/x402-info`
 
 Model ids: `vendor/model` routes to Vercel AI Gateway (for example
 `anthropic/claude-opus-4.8`, `spacexai/grok-4.6`); `openrouter/vendor/model`
-routes to OpenRouter; `opencode/<model>` and `opencode-go/<model>` route to
-OpenCode Zen and OpenCode Go and need your own key (see Bring your own key).
-Only ids returned by `/v1/models` are accepted.
+routes to OpenRouter; `cloudflare/@cf/author/model` routes to Cloudflare
+Workers AI through Cloudflare AI Gateway (listed on `/v1/models` when the
+operator has it configured); `opencode/<model>` and `opencode-go/<model>`
+route to OpenCode Zen and OpenCode Go and need your own key (see Bring your
+own key). Only ids returned by `/v1/models` are accepted. A request with no
+`model` runs on the Jev Model Router (`bitplan/auto`), which picks the model
+per request; name a model only when you need a specific one.
 
 ## Quick start for an agent
 
