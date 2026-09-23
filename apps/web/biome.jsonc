@@ -6,6 +6,9 @@
     "includes": [
       // Standalone publishable documents have their own upload-policy and behavior tests.
       "!!public/templates",
+      // Canonical copies live in skills/gateway/scripts; keep the published
+      // well-known tree byte-identical so $SKILL_DIR/scripts works.
+      "!!public/.well-known/agent-skills/gateway/scripts",
       "!src/components/ui",
       "!src/hooks/use-mobile.ts"
     ]

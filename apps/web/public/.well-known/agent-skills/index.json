@@ -13,7 +13,7 @@
       "type": "skill-md",
       "description": "Use gateway.bitplan.dev, an OpenAI-compatible inference API paid in BSV with no API keys.",
       "url": "https://bitplan.dev/.well-known/agent-skills/gateway/SKILL.md",
-      "digest": "sha256:a35a5dc3d549b11b96b166d7c9319460b97a624d6bde520076f02da00497b31f"
+      "digest": "sha256:7160993f41ca13161c3eeecb21d0d85daf700658bd4b3cc54e2699f1af2a53b0"
     }
   ]
 }

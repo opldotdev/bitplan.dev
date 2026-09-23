@@ -6,7 +6,7 @@ description: >
   gateway token, deposit BSV to the gateway, check a gateway balance or usage,
   pick a model by price, or explain how gateway.bitplan.dev works.
 metadata:
-  version: "0.1.1"
+  version: "0.1.2"
 ---
 
 # gateway.bitplan.dev
@@ -179,6 +179,7 @@ prints the header value without broadcasting:
 CHALLENGE=$(curl -s https://gateway.bitplan.dev/v1/deposit \
   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
   -d "{\"sats\":$N}")
+# --x402 needs the full 402 body (accepts[0]); challenge-only is the legacy proof
 SIG=$(printf '%s' "$CHALLENGE" | bun "$SKILL_DIR/scripts/pay.ts" --wif "$WIF" --x402)
 curl -s https://gateway.bitplan.dev/v1/deposit \
   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
@@ -483,10 +484,10 @@ run on your key upstream. The own-key fee is `byok_fee_bps` from
 is 0 the gateway adds nothing for the model: the lab bills you at its own
 price. What the gateway adds around the call is billed at your tier markup
 from your BSV credits: the Jev router's classification when you send
-`model: "auto"`, server-side web search, and `POST /v1/evaluate`.
-Everything else is unchanged: holds are taken at list price until the
-routing metadata shows your key served the call, then settle to the
-add-ons only.
+`model: "auto"`, server-side web search, `POST /v1/evaluate`, and the
+own-key fee when `byok_fee_bps` is above 0. Holds are taken at list price
+until the routing metadata shows your key served the call, then settle to
+those add-ons (and that fee only while it is nonzero).
 
 | Provider id | Service | Model ids | Verified on `PUT` by |
 | --- | --- | --- | --- |

@@ -117,6 +117,30 @@ describe("agent pages", () => {
     expect(canonicalGateway).not.toContain("0.5 BSV");
     expect(canonicalGateway).not.toContain("@gateway.bitplan.dev");
     expect(canonicalGateway).not.toContain("30%");
+    expect(canonicalGateway).toContain("$SKILL_DIR/scripts/token.ts");
+    expect(canonicalGateway).toContain("$SKILL_DIR/scripts/pay.ts");
+    expect(canonicalGateway).toContain("when `byok_fee_bps` is above 0");
+    const gatewayScripts = ["token.ts", "pay.ts", "package.json"] as const;
+    const publishedScripts = await Promise.all(
+      gatewayScripts.map((name) =>
+        readFile(
+          new URL(`agent-skills/gateway/scripts/${name}`, publicRoot),
+          "utf8"
+        )
+      )
+    );
+    const canonicalScripts = await Promise.all(
+      gatewayScripts.map((name) =>
+        readFile(
+          new URL(
+            `../../../../skills/gateway/scripts/${name}`,
+            import.meta.url
+          ),
+          "utf8"
+        )
+      )
+    );
+    expect(publishedScripts).toEqual(canonicalScripts);
     expect(catalog.entries).toHaveLength(2);
     expect(
       catalog.entries.every(
