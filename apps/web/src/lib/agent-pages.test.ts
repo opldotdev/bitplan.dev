@@ -116,7 +116,7 @@ describe("agent pages", () => {
     expect(canonicalGateway).toContain("byok_fee_bps");
     expect(canonicalGateway).not.toContain("0.5 BSV");
     expect(canonicalGateway).not.toContain("@gateway.bitplan.dev");
-    expect(canonicalGateway).not.toMatch(/\b30%\b/);
+    expect(canonicalGateway).not.toContain("30%");
     expect(catalog.entries).toHaveLength(2);
     expect(
       catalog.entries.every(

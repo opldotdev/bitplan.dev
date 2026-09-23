@@ -14,18 +14,18 @@
  * come from the P2PKH address of the WIF; UTXOs are read from WhatsOnChain.
  * Run `bun install` in this directory once.
  */
-import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction } from "@bsv/sdk"
+import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction } from '@bsv/sdk'
 
-const WOC = "https://api.whatsonchain.com/v1/bsv/main"
+const WOC = 'https://api.whatsonchain.com/v1/bsv/main'
 const FEE_SATS_PER_KB = 50
-const BSV_NETWORK = "bip122:000000000019d6689c085ae165831e93"
+const BSV_NETWORK = 'bip122:000000000019d6689c085ae165831e93'
 
 function flag(name: string): string | undefined {
 	const argv = process.argv.slice(2)
 	const i = argv.indexOf(`--${name}`)
 	if (i === -1) return undefined
 	const value = argv[i + 1]
-	if (value === undefined || value.startsWith("--"))
+	if (value === undefined || value.startsWith('--'))
 		throw new Error(`--${name} requires a value`)
 	return value
 }
@@ -67,23 +67,23 @@ interface Body {
 
 async function readBody(): Promise<{ raw: Body; challenge: Challenge }> {
 	const text =
-		flag("challenge") ?? (await new Response(Bun.stdin.stream()).text())
+		flag('challenge') ?? (await new Response(Bun.stdin.stream()).text())
 	const parsed = JSON.parse(text) as Body & Challenge
 	const c = parsed.challenge ?? parsed
-	if (c.version !== "bsv-tx-v1")
-		throw new Error("unsupported challenge version")
+	if (c.version !== 'bsv-tx-v1')
+		throw new Error('unsupported challenge version')
 	if (!Number.isSafeInteger(c.amount_sats) || c.amount_sats <= 0)
-		throw new Error("bad amount_sats")
+		throw new Error('bad amount_sats')
 	if (!/^[0-9a-f]+$/i.test(c.payee_locking_script_hex))
-		throw new Error("bad payee_locking_script_hex")
+		throw new Error('bad payee_locking_script_hex')
 	if (Date.parse(c.expires_at) < Date.now())
-		throw new Error("challenge expired; request a new one")
+		throw new Error('challenge expired; request a new one')
 	if (
 		c.payee_address &&
 		new P2PKH().lock(c.payee_address).toHex() !==
 			c.payee_locking_script_hex.toLowerCase()
 	) {
-		throw new Error("payee_address does not match payee_locking_script_hex")
+		throw new Error('payee_address does not match payee_locking_script_hex')
 	}
 	return { raw: parsed, challenge: c }
 }
@@ -91,18 +91,18 @@ async function readBody(): Promise<{ raw: Body; challenge: Challenge }> {
 function acceptedOf(raw: Body, challenge: Challenge): Accepted {
 	const a = Array.isArray(raw.accepts) ? raw.accepts[0] : undefined
 	if (
-		a?.scheme === "exact" &&
-		typeof a.extra?.lockingScript === "string" &&
-		typeof a.amount === "string"
+		a?.scheme === 'exact' &&
+		typeof a.extra?.lockingScript === 'string' &&
+		typeof a.amount === 'string'
 	) {
 		return a
 	}
 	return {
-		scheme: "exact",
+		scheme: 'exact',
 		network: BSV_NETWORK,
 		amount: String(challenge.amount_sats),
-		asset: "BSV",
-		payTo: challenge.payee_address ?? "",
+		asset: 'BSV',
+		payTo: challenge.payee_address ?? '',
 		extra: {
 			challengeId: challenge.challenge_id,
 			lockingScript: challenge.payee_locking_script_hex,
@@ -110,8 +110,8 @@ function acceptedOf(raw: Body, challenge: Challenge): Accepted {
 	}
 }
 
-const wif = flag("wif")
-if (!wif) throw new Error("--wif is required")
+const wif = flag('wif')
+if (!wif) throw new Error('--wif is required')
 const key = PrivateKey.fromWif(wif)
 const address = key.toAddress()
 const { raw, challenge } = await readBody()
@@ -127,7 +127,7 @@ utxos.sort((a, b) => b.value - a.value)
 
 const tx = new Transaction()
 tx.addOutput({
-	lockingScript: (await import("@bsv/sdk")).LockingScript.fromHex(
+	lockingScript: (await import('@bsv/sdk')).LockingScript.fromHex(
 		challenge.payee_locking_script_hex,
 	),
 	satoshis: challenge.amount_sats,
@@ -156,8 +156,8 @@ if (total < challenge.amount_sats) {
 await tx.fee(new SatoshisPerKilobyte(FEE_SATS_PER_KB))
 await tx.sign()
 
-const rawtx = Buffer.from(tx.toBinary()).toString("base64")
-if (hasFlag("x402")) {
+const rawtx = Buffer.from(tx.toBinary()).toString('base64')
+if (hasFlag('x402')) {
 	const payload = {
 		x402Version: 2,
 		...(raw.resource ? { resource: raw.resource } : {}),
@@ -165,16 +165,16 @@ if (hasFlag("x402")) {
 		payload: { transaction: rawtx },
 	}
 	process.stdout.write(
-		`${Buffer.from(JSON.stringify(payload)).toString("base64")}\n`,
+		`${Buffer.from(JSON.stringify(payload)).toString('base64')}\n`,
 	)
 } else {
 	const proof = {
-		version: "bsv-tx-v1",
+		version: 'bsv-tx-v1',
 		challenge_id: challenge.challenge_id,
 		rawtx_base64: rawtx,
-		txid: tx.id("hex"),
+		txid: tx.id('hex'),
 	}
 	process.stdout.write(
-		`${Buffer.from(JSON.stringify(proof)).toString("base64url")}\n`,
+		`${Buffer.from(JSON.stringify(proof)).toString('base64url')}\n`,
 	)
 }
