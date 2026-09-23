@@ -1,11 +1,14 @@
 #!/usr/bin/env bun
 /**
- * Build the payment for a gateway.bitplan.dev `bsv-tx-v1` challenge and print
- * the X402-Proof header value. Nothing is broadcast; the gateway broadcasts
- * when it receives the proof. Never prints the key.
+ * Build the payment for a gateway.bitplan.dev 402 and print the header value.
+ * Nothing is broadcast; the gateway broadcasts when it receives the proof.
+ * Never prints the key.
  *
- *   printf '%s' "$CHALLENGE_JSON" | bun pay.ts --wif <WIF>
- *   bun pay.ts --wif <WIF> --challenge '<json>'
+ *   printf '%s' "$CHALLENGE_JSON" | bun pay.ts --wif <WIF> --x402
+ *   bun pay.ts --wif <WIF> --x402 --challenge '<json>'
+ *
+ * `--x402` prints the x402 v2 `PAYMENT-SIGNATURE` value (base64 JSON).
+ * Without it, the script prints the legacy `X402-Proof` value.
  *
  * The JSON may be the whole 402 body or just the `challenge` object. Funds
  * come from the P2PKH address of the WIF; UTXOs are read from WhatsOnChain.
@@ -15,6 +18,7 @@ import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction } from "@bsv/sdk"
 
 const WOC = "https://api.whatsonchain.com/v1/bsv/main"
 const FEE_SATS_PER_KB = 50
+const BSV_NETWORK = "bip122:000000000019d6689c085ae165831e93"
 
 function flag(name: string): string | undefined {
 	const argv = process.argv.slice(2)
@@ -26,6 +30,10 @@ function flag(name: string): string | undefined {
 	return value
 }
 
+function hasFlag(name: string): boolean {
+	return process.argv.slice(2).includes(`--${name}`)
+}
+
 interface Challenge {
 	version: string
 	challenge_id: string
@@ -35,10 +43,32 @@ interface Challenge {
 	expires_at: string
 }
 
-async function readChallenge(): Promise<Challenge> {
-	const raw =
+interface Accepted {
+	scheme: string
+	network: string
+	amount: string
+	asset: string
+	payTo: string
+	maxTimeoutSeconds?: number
+	extra: {
+		challengeId: string
+		lockingScript: string
+		expiresAt?: string
+		payUrl?: string
+	}
+}
+
+interface Body {
+	challenge?: Challenge
+	x402Version?: number
+	resource?: { url?: string; description?: string; mimeType?: string }
+	accepts?: Accepted[]
+}
+
+async function readBody(): Promise<{ raw: Body; challenge: Challenge }> {
+	const text =
 		flag("challenge") ?? (await new Response(Bun.stdin.stream()).text())
-	const parsed = JSON.parse(raw) as { challenge?: Challenge } & Challenge
+	const parsed = JSON.parse(text) as Body & Challenge
 	const c = parsed.challenge ?? parsed
 	if (c.version !== "bsv-tx-v1")
 		throw new Error("unsupported challenge version")
@@ -55,14 +85,36 @@ async function readChallenge(): Promise<Challenge> {
 	) {
 		throw new Error("payee_address does not match payee_locking_script_hex")
 	}
-	return c
+	return { raw: parsed, challenge: c }
+}
+
+function acceptedOf(raw: Body, challenge: Challenge): Accepted {
+	const a = Array.isArray(raw.accepts) ? raw.accepts[0] : undefined
+	if (
+		a?.scheme === "exact" &&
+		typeof a.extra?.lockingScript === "string" &&
+		typeof a.amount === "string"
+	) {
+		return a
+	}
+	return {
+		scheme: "exact",
+		network: BSV_NETWORK,
+		amount: String(challenge.amount_sats),
+		asset: "BSV",
+		payTo: challenge.payee_address ?? "",
+		extra: {
+			challengeId: challenge.challenge_id,
+			lockingScript: challenge.payee_locking_script_hex,
+		},
+	}
 }
 
 const wif = flag("wif")
 if (!wif) throw new Error("--wif is required")
 const key = PrivateKey.fromWif(wif)
 const address = key.toAddress()
-const challenge = await readChallenge()
+const { raw, challenge } = await readBody()
 
 const utxoRes = await fetch(`${WOC}/address/${address}/unspent`)
 if (!utxoRes.ok) throw new Error(`whatsonchain unspent ${utxoRes.status}`)
@@ -104,12 +156,25 @@ if (total < challenge.amount_sats) {
 await tx.fee(new SatoshisPerKilobyte(FEE_SATS_PER_KB))
 await tx.sign()
 
-const proof = {
-	version: "bsv-tx-v1",
-	challenge_id: challenge.challenge_id,
-	rawtx_base64: Buffer.from(tx.toBinary()).toString("base64"),
-	txid: tx.id("hex"),
+const rawtx = Buffer.from(tx.toBinary()).toString("base64")
+if (hasFlag("x402")) {
+	const payload = {
+		x402Version: 2,
+		...(raw.resource ? { resource: raw.resource } : {}),
+		accepted: acceptedOf(raw, challenge),
+		payload: { transaction: rawtx },
+	}
+	process.stdout.write(
+		`${Buffer.from(JSON.stringify(payload)).toString("base64")}\n`,
+	)
+} else {
+	const proof = {
+		version: "bsv-tx-v1",
+		challenge_id: challenge.challenge_id,
+		rawtx_base64: rawtx,
+		txid: tx.id("hex"),
+	}
+	process.stdout.write(
+		`${Buffer.from(JSON.stringify(proof)).toString("base64url")}\n`,
+	)
 }
-process.stdout.write(
-	`${Buffer.from(JSON.stringify(proof)).toString("base64url")}\n`,
-)

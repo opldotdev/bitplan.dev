@@ -7,6 +7,13 @@
       "description": "Create, review, host, publish, update, fetch, and share encrypted HTML plans with a BRC-100 wallet.",
       "url": "https://bitplan.dev/.well-known/agent-skills/bitplan/SKILL.md",
       "digest": "sha256:bec609c5053fdc5f8c2ed4bd3a58eec76f3137aaa0ba5348dce7de532dc80af7"
+    },
+    {
+      "name": "gateway",
+      "type": "skill-md",
+      "description": "Use gateway.bitplan.dev, an OpenAI-compatible inference API paid in BSV with no API keys.",
+      "url": "https://bitplan.dev/.well-known/agent-skills/gateway/SKILL.md",
+      "digest": "sha256:a35a5dc3d549b11b96b166d7c9319460b97a624d6bde520076f02da00497b31f"
     }
   ]
 }

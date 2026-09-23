@@ -100,11 +100,11 @@ override) is merged on top of what the plugin injects.
   `x-gateway-deposit: exact`, refreshing the token through the wallet 30
   minutes before its 24-hour expiry. If the wallet is not running, a token that
   is still valid keeps working; once it has expired the error says what to do.
-- On 402, parses the `bsv-tx-v1` challenge, pays `amount_sats` to the payee
-  locking script with `createAction`, and repeats the identical request once
-  with `X402-Proof`. A second 402, a wallet refusal, or insufficient funds
-  surface as a clear error with the amount and the account's paymail; nothing
-  is paid twice.
+- On 402, reads the x402 v2 `PAYMENT-REQUIRED` (scheme `exact` on BSV),
+  pays `amount` sats to `payTo` with `createAction`, and repeats the identical
+  request once with `PAYMENT-SIGNATURE`. A second 402, a wallet refusal, or
+  insufficient funds surface as a clear error with the amount and the
+  account's paymail; nothing is paid twice.
 - Never logs the token, a signature, or a key.
 
 ## Without the plugin

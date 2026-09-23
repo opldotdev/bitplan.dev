@@ -37,4 +37,14 @@ describe('gateway token', () => {
 		const names = gateway?.commands.map((c: Command) => c.name()).sort()
 		expect(names).toEqual(['credits', 'deposit', 'models', 'token'])
 	})
+
+	test('deposit help points at live terms, not a retired floor', () => {
+		const program = buildProgram()
+		const gateway = program.commands.find((c: Command) => c.name() === 'gateway')
+		const deposit = gateway?.commands.find((c: Command) => c.name() === 'deposit')
+		const desc = deposit?.description() ?? ''
+		expect(desc).not.toMatch(/0\.5 BSV/)
+		expect(desc).toMatch(/x402-info/)
+		expect(desc).toMatch(/\/v1\/rate/)
+	})
 })
