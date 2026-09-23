@@ -81,17 +81,66 @@ describe("agent pages", () => {
     );
     const index = JSON.parse(
       await readFile(new URL("agent-skills/index.json", publicRoot), "utf8")
-    ) as { $schema: string; skills: Array<{ digest: string }> };
+    ) as {
+      $schema: string;
+      skills: Array<{ name: string; digest: string }>;
+    };
     const catalog = JSON.parse(
       await readFile(new URL("ai-catalog.json", publicRoot), "utf8")
     ) as { entries: Array<{ data?: unknown; url?: unknown }> };
     const digest = createHash("sha256").update(canonicalSkill).digest("hex");
+    const publishedGateway = await readFile(
+      new URL("agent-skills/gateway/SKILL.md", publicRoot),
+      "utf8"
+    );
+    const canonicalGateway = await readFile(
+      new URL("../../../../skills/gateway/SKILL.md", import.meta.url),
+      "utf8"
+    );
+    const gatewayDigest = createHash("sha256")
+      .update(canonicalGateway)
+      .digest("hex");
+    const bitplan = index.skills.find((skill) => skill.name === "bitplan");
+    const gateway = index.skills.find((skill) => skill.name === "gateway");
 
     expect(index.$schema).toBe(
       "https://schemas.agentskills.io/discovery/0.2.0/schema.json"
     );
-    expect(index.skills[0].digest).toBe(`sha256:${digest}`);
+    expect(bitplan?.digest).toBe(`sha256:${digest}`);
     expect(publishedSkill).toBe(canonicalSkill);
+    expect(gateway?.digest).toBe(`sha256:${gatewayDigest}`);
+    expect(publishedGateway).toBe(canonicalGateway);
+    expect(canonicalGateway).toContain("evaluate");
+    expect(canonicalGateway).toContain("@bitplan.dev");
+    expect(canonicalGateway).toContain("PAYMENT-SIGNATURE");
+    expect(canonicalGateway).toContain("byok_fee_bps");
+    expect(canonicalGateway).not.toContain("0.5 BSV");
+    expect(canonicalGateway).not.toContain("@gateway.bitplan.dev");
+    expect(canonicalGateway).not.toContain("30%");
+    expect(canonicalGateway).toContain("$SKILL_DIR/scripts/token.ts");
+    expect(canonicalGateway).toContain("$SKILL_DIR/scripts/pay.ts");
+    expect(canonicalGateway).toContain("when `byok_fee_bps` is above 0");
+    const gatewayScripts = ["token.ts", "pay.ts", "package.json"] as const;
+    const publishedScripts = await Promise.all(
+      gatewayScripts.map((name) =>
+        readFile(
+          new URL(`agent-skills/gateway/scripts/${name}`, publicRoot),
+          "utf8"
+        )
+      )
+    );
+    const canonicalScripts = await Promise.all(
+      gatewayScripts.map((name) =>
+        readFile(
+          new URL(
+            `../../../../skills/gateway/scripts/${name}`,
+            import.meta.url
+          ),
+          "utf8"
+        )
+      )
+    );
+    expect(publishedScripts).toEqual(canonicalScripts);
     expect(catalog.entries).toHaveLength(2);
     expect(
       catalog.entries.every(

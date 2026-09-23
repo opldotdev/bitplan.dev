@@ -17,6 +17,10 @@
 
 ### Changed
 
+- Mirror gateway Wave 1 surface docs: skill endpoints and batch details,
+  three-word `@bitplan.dev` paymail, live router / own-key fees, x402 v2
+  `PAYMENT-SIGNATURE`, and CLI deposit help that points at live terms.
+
 - Added internal encrypted annotation checkpoint parsing/replay and no-send
   multi-output signing helpers. These are not yet connected to native Publish;
   transaction journaling, lineage verification, and verified handles remain pending.

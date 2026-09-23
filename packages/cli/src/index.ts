@@ -80,7 +80,9 @@ export function buildProgram(): Command {
 
 	gateway
 		.command('deposit [sats]')
-		.description('Add credits from the wallet (minimum 0.5 BSV).')
+		.description(
+			'Add credits from the wallet. Amount follows live terms (GET /v1/rate, /.well-known/x402-info).',
+		)
 		.option('--yes', 'Approve the payment; the wallet still confirms')
 		.option('--json', 'Print raw JSON')
 		.option('--wallet-url <url>', 'BRC-100 JSON API endpoint')

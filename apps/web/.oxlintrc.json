@@ -1,4 +1,5 @@
 {
   "jsPlugins": ["@shadcn/lint"],
+  "ignorePatterns": ["public/.well-known/agent-skills/gateway/scripts/**"],
   "rules": {}
 }

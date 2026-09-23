@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- `bitplan gateway deposit` help no longer states a retired 0.5 BSV floor.
+  The amount follows live terms (`GET /v1/rate`, `/.well-known/x402-info`).
+
 ## 0.0.21
 
 ### Changed

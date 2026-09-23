@@ -1,0 +1,9 @@
+{
+	"name": "gateway-skill-scripts",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@bsv/sdk": "^2.7.1",
+		"bitcoin-auth": "^0.0.8"
+	}
+}
